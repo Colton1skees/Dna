@@ -11,4 +11,8 @@
     <ProjectReference Include="..\Dna\Dna.csproj" />
   </ItemGroup>
 
+  <ItemGroup>
+    <PackageReference Include="CommandLineParser" Version="2.9.0-preview1" />
+  </ItemGroup>
+
 </Project>
