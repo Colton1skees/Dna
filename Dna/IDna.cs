@@ -10,12 +10,24 @@ namespace Dna
 {
     public interface IDna
     {
+        /// <summary>
+        /// Class for parsing and manipulating binaries.
+        /// </summary>
         public IBinary Binary { get; }
 
+        /// <summary>
+        /// Class for disassembling instructions.
+        /// </summary>
         public BinaryDisassembler BinaryDisassembler { get; }
 
+        /// <summary>
+        /// Class for performing linear sweep disassembly.
+        /// </summary>
         public ICfgReconstructor LinearSweep { get; }
 
+        /// <summary>
+        /// Class for performing recursive descent disassembly.
+        /// </summary>
         public ICfgReconstructor RecursiveDescent { get; }
     }
 }
