@@ -7,7 +7,7 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <Folder Include="IL\" />
+    <Folder Include="IL\Expression\Float\" />
     <Folder Include="Translation\" />
     <Folder Include="Routine\" />
   </ItemGroup>
