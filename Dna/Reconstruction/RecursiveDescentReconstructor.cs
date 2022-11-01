@@ -25,22 +25,22 @@ namespace Dna.Reconstruction
         {
             // Initialize a control flow graph with a single node,
             // starting at the provided address.
-            graph = new ControlFlowGraph<Instruction>();
+            graph = new ControlFlowGraph<Instruction>(address);
             Node node = new Node(address.ToString("X"));
-            var basicBlock = DisassembleBlock(address);
-            node.UserData.Add(address.ToString("X"), basicBlock);
+            var basicBlock = DisassembleBlock(graph, address);
+            node.SetBlock(basicBlock);
             graph.Nodes.Add(node);
 
             // Recursively follow all new paths.
             var edges = GetBlockEdges(basicBlock);
             foreach (var edge in edges)
-                RecursiveHandleBlock(edge, node);
+                RecursiveHandleBlock(graph, edge, node);
             return graph;
         }
 
-        private BasicBlock<Instruction> DisassembleBlock(ulong address)
+        private BasicBlock<Instruction> DisassembleBlock(ControlFlowGraph<Instruction> graph, ulong address)
         {
-            BasicBlock<Instruction> block = new BasicBlock<Instruction>();
+            BasicBlock<Instruction> block = graph.CreateBlock(address);
             block.Address = address;
             while(true)
             {
@@ -78,7 +78,7 @@ namespace Dna.Reconstruction
             return edges;
         }
 
-        private Node RecursiveHandleBlock(ulong addrInitialBlock, Node source)
+        private Node RecursiveHandleBlock(ControlFlowGraph<Instruction> graph, ulong addrInitialBlock, Node source)
         {
             // If we have already traversed this block, then we add it as an edge
             // and return.
@@ -94,12 +94,12 @@ namespace Dna.Reconstruction
             }
 
             // Extract basic block information.
-            var basicBlock = DisassembleBlock(addrInitialBlock);
+            var basicBlock = DisassembleBlock(graph, addrInitialBlock);
             var edges = GetBlockEdges(basicBlock);
 
             // Create a node for the block.
-            var targetNode = new Node(initialBlockIdentifier);
-            targetNode.UserData.Add(initialBlockIdentifier, basicBlock);
+            var targetBlock = graph.CreateBlock(addrInitialBlock);
+            var targetNode = targetBlock.Node;
             graph.Nodes.Add(targetNode);
             graph.Edges.Add(source, targetNode);
 
@@ -111,7 +111,7 @@ namespace Dna.Reconstruction
                 if (existingNodes.Count() == 1)
                     edgeNode = existingNodes.First();
                 else if (existingNodes.Count() == 0)
-                    edgeNode = RecursiveHandleBlock(addrOfEdge, targetNode);
+                    edgeNode = RecursiveHandleBlock(graph,addrOfEdge, targetNode);
                 else
                     throw new InvalidOperationException(String.Format("Too many instances of node with name: {0}", strEdgeAddr));
 

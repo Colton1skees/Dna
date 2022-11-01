@@ -4,17 +4,30 @@
     <TargetFramework>net6.0</TargetFramework>
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
+    <Platforms>AnyCPU;x64</Platforms>
   </PropertyGroup>
 
   <ItemGroup>
+    <Compile Remove="NewFolder\**" />
+    <EmbeddedResource Remove="NewFolder\**" />
+    <None Remove="NewFolder\**" />
+  </ItemGroup>
+
+  <ItemGroup>
     <Folder Include="Analysis\" />
+    <Folder Include="Binary\Linux\" />
   </ItemGroup>
 
   <ItemGroup>
     <PackageReference Include="AsmResolver" Version="4.9.0" />
     <PackageReference Include="AsmResolver.PE.File" Version="4.9.0" />
+    <PackageReference Include="ELFSharp" Version="2.15.0" />
     <PackageReference Include="Iced" Version="1.17.0" />
     <PackageReference Include="Rivers" Version="0.1.0" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\Dna.ControlFlow\Dna.ControlFlow.csproj" />
   </ItemGroup>
 
 </Project>

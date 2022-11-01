@@ -4,12 +4,11 @@
     <TargetFramework>net6.0</TargetFramework>
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
+    <Platforms>AnyCPU;x64</Platforms>
   </PropertyGroup>
 
   <ItemGroup>
-    <Folder Include="IL\" />
-    <Folder Include="Translation\" />
-    <Folder Include="Routine\" />
+    <PackageReference Include="Rivers" Version="0.1.0" />
   </ItemGroup>
 
 </Project>

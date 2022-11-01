@@ -14,11 +14,5 @@ namespace Dna.Extensions
         {
             return (BasicBlock<T>)node.UserData.Values.First();
         }
-
-        public static void SetBlock<T>(this Node node, BasicBlock<T> block)
-        {
-            node.UserData.Clear();
-            node.UserData.Add(block.Address.ToString("X"), block);
-        }
     }
 }

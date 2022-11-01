@@ -9,6 +9,12 @@ namespace Dna.ControlFlow
 {
     public static class GraphFormatter
     {
+        /// <summary>
+        /// Gets a string representation of a control flow graph.
+        /// </summary>
+        /// <typeparam name="T"></typeparam>
+        /// <param name="graph"></param>
+        /// <returns></returns>
         public static string FormatGraph<T>(ControlFlowGraph<T> graph)
         {
             StringBuilder stringBuilder = new StringBuilder();
@@ -28,6 +34,12 @@ namespace Dna.ControlFlow
             return stringBuilder.ToString();
         }
 
+        /// <summary>
+        /// Gets a string representation of a basic block.
+        /// </summary>
+        /// <typeparam name="T"></typeparam>
+        /// <param name="block"></param>
+        /// <returns></returns>
         public static string FormatBlock<T>(BasicBlock<T> block)
         {
             StringBuilder stringBuilder = new StringBuilder();

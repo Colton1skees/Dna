@@ -1,4 +1,5 @@
-﻿using System;
+﻿using Rivers;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
@@ -8,7 +9,15 @@ namespace Dna.ControlFlow
 {
     public class BasicBlock<T>
     {
-        private List<T> instructions = new List<T>();
+        /// <summary>
+        /// Gets the parent graph containing the node.
+        /// </summary>
+        public ControlFlowGraph<T> ParentGraph => (ControlFlowGraph<T>)Node.ParentGraph;
+
+        /// <summary>
+        /// Gets or sets the node containing the basic block.
+        /// </summary>
+        public Node Node { get; internal set; }
 
         /// <summary>
         /// Gets or sets the address of the basic block.
@@ -16,20 +25,20 @@ namespace Dna.ControlFlow
         public ulong Address { get; set; }
 
         /// <summary>
-        /// Gets the list of basic block instructions.
+        /// Gets a collection of basic block instructions.
         /// </summary>
-        public List<T> Instructions => instructions;
+        public List<T> Instructions { get; } = new List<T>();
 
         /// <summary>
         /// Gets or sets the first basic block instruction.
         /// </summary>
         public T EntryInstruction
         {
-            get => instructions.First();
+            get => Instructions.First();
             set
             {
-                instructions.RemoveAt(0);
-                instructions.Insert(0, value);
+                Instructions.RemoveAt(0);
+                Instructions.Insert(0, value);
             }
         }
 
@@ -38,12 +47,17 @@ namespace Dna.ControlFlow
         /// </summary>
         public T ExitInstruction
         {
-            get => instructions.Last();
+            get => Instructions.Last();
             set
             {
-                instructions.RemoveAt(instructions.Count - 1);
-                instructions.Add(value);
+                Instructions.RemoveAt(Instructions.Count - 1);
+                Instructions.Add(value);
             }
+        }
+
+        public BasicBlock()
+        {
+
         }
 
         public override string ToString()

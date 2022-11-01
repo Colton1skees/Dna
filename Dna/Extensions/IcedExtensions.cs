@@ -40,7 +40,7 @@ namespace Dna.Extensions
             OpKind.Immediate8_2nd,
         };
 
-        public static List<List<Register>> regList = new List<List<Iced.Intel.Register>>()
+        private static List<List<Register>> registerMapping = new List<List<Register>>()
         {
             new List<Register>() {Register.RAX, Register.EAX, Register.AX, Register.AH, Register.AL },
             new List<Register>() {Register.RBX, Register.EBX, Register.BX, Register.BH, Register.BL },
@@ -59,6 +59,16 @@ namespace Dna.Extensions
             new List<Register>() {Register.R14, Register.R14D, Register.R14W, Register.None, Register.R14L },
             new List<Register>() {Register.R15, Register.R15D, Register.R15W, Register.None, Register.R15L },
         };
+
+        public static string GetName(this Register register)
+        {
+            return register.ToString().ToLower();
+        }
+
+        public static int GetSizeInBits(this Register register)
+        {
+            return register.GetSize() * 8;
+        }
 
         public static bool IsBranch(this FlowControl flowControl)
         {

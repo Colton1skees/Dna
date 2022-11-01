@@ -26,7 +26,7 @@ namespace Dna.Binary.Windows
         ///     The optional base address of the binary.
         ///     If no address is provided, then base address specified in the optional header is used.
         /// </param>
-        public WindowsBinary(int bitness, byte[] binaryBytes, ulong? baseAddress)
+        public WindowsBinary(int bitness, byte[] binaryBytes, ulong? baseAddress = null)
         {
             Bitness = bitness;
             Bytes = binaryBytes;
