@@ -1,5 +1,6 @@
 ﻿using Dna.ControlFlow;
 using Dna.Extensions;
+using Dna.Relocation;
 using Iced.Intel;
 using Rivers;
 using System;
@@ -14,10 +15,13 @@ namespace Dna.Reconstruction
     {
         private readonly IDna dna;
 
+        private readonly Assembler assembler;
+
         private ControlFlowGraph<Instruction> graph;
 
         public RecursiveDescentReconstructor(IDna dna)
         {
+            assembler = new Assembler(dna.Binary.Bitness);
             this.dna = dna;
         }
 
@@ -26,15 +30,15 @@ namespace Dna.Reconstruction
             // Initialize a control flow graph with a single node,
             // starting at the provided address.
             graph = new ControlFlowGraph<Instruction>(address);
-            Node node = new Node(address.ToString("X"));
             var basicBlock = DisassembleBlock(graph, address);
-            node.SetBlock(basicBlock);
-            graph.Nodes.Add(node);
 
             // Recursively follow all new paths.
             var edges = GetBlockEdges(basicBlock);
             foreach (var edge in edges)
-                RecursiveHandleBlock(graph, edge, node);
+                RecursiveHandleBlock(graph, edge, basicBlock);
+
+            // Collapse pairs of duplicated blocks into a single block.
+            RemoveDuplicatedBlocks();
             return graph;
         }
 
@@ -67,7 +71,9 @@ namespace Dna.Reconstruction
             {
                 // If the jump destination can be resolved, then add it as an edge.
                 if (exitInstruction.Op0Kind.IsImmediate())
-                    edges.Add(exitInstruction.NearBranchTarget);
+                    edges.Add(exitInstruction.GetImmediate(0));
+                else if (exitInstruction.Op0Kind.IsBranchOpKind())
+                    edges.Add(exitInstruction.GetBranchTarget(exitInstruction.Op0Kind));
 
                 // If we encounter a conditional instruction, then we add the not taken 
                 // destination as an edge too.
@@ -98,10 +104,8 @@ namespace Dna.Reconstruction
             var edges = GetBlockEdges(basicBlock);
 
             // Create a node for the block.
-            var targetBlock = graph.CreateBlock(addrInitialBlock);
-            var targetNode = targetBlock.Node;
-            graph.Nodes.Add(targetNode);
-            graph.Edges.Add(source, targetNode);
+            var targetNode = basicBlock;
+            graph.Edges.Add(source, basicBlock);
 
             foreach(var addrOfEdge in edges)
             {
@@ -121,5 +125,54 @@ namespace Dna.Reconstruction
 
             return targetNode;
         }
+
+        private void RemoveDuplicatedBlocks()
+        {
+            // Get a list of all basic blocks.
+            var blocks = graph.GetBlocks();
+
+            // Group the basic blocks via their exit instruction's address.
+            var blockGrouping = blocks
+                .GroupBy(x => x.ExitInstruction.IP)
+                .ToDictionary(x => x.Key, x => x.ToList());
+
+            foreach(var group in blockGrouping.Where(x => x.Value.Count > 1))
+            {
+                // Throw if the block was duplicated more than once.
+                // TODO: Refactor this to handle an infinite amount of block duplications.
+                if (group.Value.Count > 2)
+                    throw new InvalidOperationException("Basic blocks with more than a single duplication cannot be collapsed.");
+
+                // Identify the source block which was copied from, along with the block
+                // which contains the copy.
+                var blockWithCopy = group.Value.MaxBy(x => x.Instructions.Count);
+                var originalBlock = group.Value.Single(x => x != blockWithCopy);
+
+                // Remove all duplicated instructions from the block.
+                var startIndex = blockWithCopy.Instructions.IndexOf(originalBlock.EntryInstruction);
+                blockWithCopy.Instructions.RemoveRange(startIndex, blockWithCopy.Instructions.Count - startIndex);
+
+                // Update the block exit instruction.
+                var jmpInstIP = blockWithCopy.ExitInstruction.NextIP;
+                assembler.jmp(jmpInstIP);
+                var jmpInst = InstructionRelocator.RelocateInstructions(new List<Instruction>() { assembler.Instructions.Last() }, jmpInstIP).Single();
+
+                // Insert a jump to the copied from block, then update the edges.
+                blockWithCopy.Instructions.Add(jmpInst);
+                blockWithCopy.OutgoingEdges.Clear();
+                blockWithCopy.OutgoingEdges.Add(new Edge(blockWithCopy, originalBlock));
+
+                // Collect any previously existing circular references.
+                var edgesToDelete = blockWithCopy.IncomingEdges
+                    .Where(x => x.Source == originalBlock && x.Target == originalBlock)
+                    .ToList();
+
+                // Delete all circular references.
+                foreach(var edge in edgesToDelete)
+                    blockWithCopy.IncomingEdges.Remove(edge);
+            }
+        }
+
+        
     }
 }

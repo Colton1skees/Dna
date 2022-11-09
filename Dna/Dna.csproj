@@ -5,16 +5,18 @@
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
     <Platforms>AnyCPU;x64</Platforms>
+    <AllowUnsafeBlocks>True</AllowUnsafeBlocks>
+  </PropertyGroup>
+
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|AnyCPU'">
+    <Optimize>False</Optimize>
+  </PropertyGroup>
+
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
+    <Optimize>False</Optimize>
   </PropertyGroup>
 
   <ItemGroup>
-    <Compile Remove="NewFolder\**" />
-    <EmbeddedResource Remove="NewFolder\**" />
-    <None Remove="NewFolder\**" />
-  </ItemGroup>
-
-  <ItemGroup>
-    <Folder Include="Analysis\" />
     <Folder Include="Binary\Linux\" />
   </ItemGroup>
 
@@ -23,11 +25,13 @@
     <PackageReference Include="AsmResolver.PE.File" Version="4.9.0" />
     <PackageReference Include="ELFSharp" Version="2.15.0" />
     <PackageReference Include="Iced" Version="1.17.0" />
+    <PackageReference Include="LLVMSharp" Version="5.0.0" />
     <PackageReference Include="Rivers" Version="0.1.0" />
   </ItemGroup>
 
   <ItemGroup>
     <ProjectReference Include="..\Dna.ControlFlow\Dna.ControlFlow.csproj" />
+    <ProjectReference Include="..\TritonTranslator\TritonTranslator\TritonTranslator.csproj" />
   </ItemGroup>
 
 </Project>

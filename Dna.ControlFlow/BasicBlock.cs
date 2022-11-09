@@ -1,4 +1,5 @@
-﻿using Rivers;
+﻿using Dna.Extensions;
+using Rivers;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -7,18 +8,8 @@ using System.Threading.Tasks;
 
 namespace Dna.ControlFlow
 {
-    public class BasicBlock<T>
+    public class BasicBlock<T> : Node
     {
-        /// <summary>
-        /// Gets the parent graph containing the node.
-        /// </summary>
-        public ControlFlowGraph<T> ParentGraph => (ControlFlowGraph<T>)Node.ParentGraph;
-
-        /// <summary>
-        /// Gets or sets the node containing the basic block.
-        /// </summary>
-        public Node Node { get; internal set; }
-
         /// <summary>
         /// Gets or sets the address of the basic block.
         /// </summary>
@@ -55,14 +46,33 @@ namespace Dna.ControlFlow
             }
         }
 
-        public BasicBlock()
+        public BasicBlock(ulong address) : base(address.ToString("X"))
         {
 
         }
 
-        public override string ToString()
+        public IEnumerable<BlockEdge<T>> GetIncomingEdges() => 
+            IncomingEdges.Select(x => x.ToBlockEdge<T>());
+
+        public IEnumerable<BlockEdge<T>> GetOutgoingEdges() => 
+            OutgoingEdges.Select(x => x.ToBlockEdge<T>());
+
+        public void AddIncomingEdge(BlockEdge<T> edge) => IncomingEdges.Add(edge);
+
+        public void AddOutgoingEdge(BlockEdge<T> edge) => OutgoingEdges.Add(edge);
+
+        public void AddIncomingEdges(IEnumerable<BlockEdge<T>> edges)
         {
-            return GraphFormatter.FormatBlock(this);
+            foreach (var edge in edges)
+                IncomingEdges.Add(edge);
         }
+
+        public void AddOutgoingEdges(IEnumerable<BlockEdge<T>> edges)
+        {
+            foreach (var edge in edges)
+                OutgoingEdges.Add(edge);
+        }
+
+        public override string ToString() => GraphFormatter.FormatBlock(this);
     }
 }

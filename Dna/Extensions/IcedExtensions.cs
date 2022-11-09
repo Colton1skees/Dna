@@ -2,6 +2,7 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Runtime.CompilerServices;
 using System.Text;
 using System.Threading.Tasks;
 
@@ -20,11 +21,6 @@ namespace Dna.Extensions
             OpKind.Immediate8to32,
             OpKind.Immediate8to64,
             OpKind.Immediate8_2nd,
-            OpKind.FarBranch16,
-            OpKind.FarBranch32,
-            OpKind.NearBranch16,
-            OpKind.NearBranch32,
-            OpKind.NearBranch64,
         };
 
         private static List<OpKind> explicitImmediateKinds = new List<OpKind>()
@@ -96,6 +92,42 @@ namespace Dna.Extensions
         public static bool IsExplicitImmediate(this OpKind kind)
         {
             return explicitImmediateKinds.Contains(kind);
+        }
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public static bool IsBranchOpKind(this OpKind kind)
+        {
+            switch (kind)
+            {
+                case OpKind.FarBranch16:
+                case OpKind.FarBranch32:
+                case OpKind.NearBranch16:
+                case OpKind.NearBranch32:
+                case OpKind.NearBranch64:
+                    return true;
+                default:
+                    return false;
+            }
+        }
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public static ulong GetBranchTarget(this Instruction instruction, OpKind kind)
+        {
+            switch (kind)
+            {
+                case OpKind.FarBranch16:
+                    return instruction.FarBranch16;
+                case OpKind.FarBranch32:
+                    return instruction.FarBranch32;
+                case OpKind.NearBranch16:
+                    return instruction.NearBranch16;
+                case OpKind.NearBranch32:
+                    return instruction.NearBranch32;
+                case OpKind.NearBranch64:
+                    return instruction.NearBranch64;
+                default:
+                    throw new InvalidOperationException(String.Format("Operand {0} is not a branch.", kind));
+            }
         }
     }
 }

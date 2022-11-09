@@ -24,9 +24,11 @@ namespace Dna.ControlFlow
         /// <returns></returns>
         public BasicBlock<T> CreateBlock(ulong address)
         {
-            var node = new Node(address.ToString("X"));
-            var block = new BasicBlock<T>();
-            block.Node = node;
+            Console.WriteLine("Creating block at {0}", address.ToString("X"));
+            var block = new BasicBlock<T>(address);
+            block.Address = address;
+            block.UserData.Add(block.Address.ToString("X"), block);
+            Nodes.Add(block);
             return block;
         }
 
