@@ -13,10 +13,10 @@ Dna is a static analysis framework for x86/x64, mainly geared towards deobfuscat
 You can find an example usage [here](https://github.com/Colton1skees/Dna/blob/master/Dna.Example/Program.cs).
 
 # Roadmap
- * [] Decompilation via translating IR cfgs to IR Hex-Rays microcode
- * [] SMT solver interface
- * [] Symbolic execution engine
- * [] Expression simplification engine
- * [] SSA form construction
- * [] Wide set of compiler optimization passes
- * [] Native IR -> x86 compiler
+ * [ ] Decompilation via translating IR cfgs to IR Hex-Rays microcode
+ * [ ] SMT solver interface
+ * [ ] Symbolic execution engine
+ * [ ] Expression simplification engine
+ * [ ] SSA form construction
+ * [ ] Wide set of compiler optimization passes
+ * [ ] Native IR -> x86 compiler
