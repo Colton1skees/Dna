@@ -24,7 +24,6 @@ namespace Dna.ControlFlow
         /// <returns></returns>
         public BasicBlock<T> CreateBlock(ulong address)
         {
-            Console.WriteLine("Creating block at {0}", address.ToString("X"));
             var block = new BasicBlock<T>(address);
             block.Address = address;
             block.UserData.Add(block.Address.ToString("X"), block);
@@ -40,6 +39,11 @@ namespace Dna.ControlFlow
         public IEnumerable<T> GetInstructions()
         {
             return Nodes.SelectMany(x => x.GetBlock<T>().Instructions);
+        }
+
+        public bool WhileEachBlockInReversePostOrder(BasicBlock<T> block, Func<BasicBlock<T>, bool> func)
+        {
+            return false;
         }
 
         public override string ToString()

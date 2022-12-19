@@ -4,7 +4,7 @@ using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 
-namespace Dna.DataStructures
+namespace Dna.ControlFlow.DataStructures
 {
     public class OrderedSet<T> : ICollection<T>
     {
@@ -16,6 +16,18 @@ namespace Dna.DataStructures
             : this(EqualityComparer<T>.Default)
         {
         }
+
+        public OrderedSet(IEnumerable<T> input)
+        {
+            var comparer = EqualityComparer<T>.Default;
+            dictionary = new Dictionary<T, LinkedListNode<T>>(comparer);
+            linkedList = new LinkedList<T>();
+            foreach (var item in input)
+            {
+                Add(item);
+            }
+        }
+           
 
         public OrderedSet(IEqualityComparer<T> comparer)
         {

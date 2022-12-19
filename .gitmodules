@@ -1,3 +1,9 @@
 [submodule "TritonTranslator"]
 	path = TritonTranslator
 	url = https://github.com/Colton1skees/TritonTranslator.git
+[submodule "asmjit"]
+	path = asmjit
+	url = https://github.com/asmjit/asmjit.git
+[submodule "unicorn"]
+	path = unicorn
+	url = https://github.com/unicorn-engine/unicorn.git

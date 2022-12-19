@@ -18,7 +18,7 @@ namespace Dna.ControlFlow
         /// <summary>
         /// Gets a collection of basic block instructions.
         /// </summary>
-        public List<T> Instructions { get; } = new List<T>();
+        public List<T> Instructions { get; set; } = new List<T>();
 
         /// <summary>
         /// Gets or sets the first basic block instruction.

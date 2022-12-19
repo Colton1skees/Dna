@@ -498,6 +498,9 @@ namespace Dna.Lifting
 
         private void StoreToOperand(IOperand operand, LLVMValueRef result)
         {
+            if (operand is SsaOperand ssaOP)
+                operand = ssaOP.BaseOperand;
+
             if (operand is RegisterOperand regOperand)
             {
                 // Fix up register sizing. TODO: Remove.
@@ -525,6 +528,9 @@ namespace Dna.Lifting
 
         private LLVMValueRef LoadSourceOperand(IOperand operand)
         {
+            if (operand is SsaOperand ssaOP)
+                operand = ssaOP.BaseOperand;
+
             if (operand is ImmediateOperand immOperand)
             {
                 var intType = LLVM.IntType(operand.Bitsize);

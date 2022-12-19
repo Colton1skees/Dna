@@ -26,12 +26,14 @@
     <PackageReference Include="ELFSharp" Version="2.15.0" />
     <PackageReference Include="Iced" Version="1.17.0" />
     <PackageReference Include="LLVMSharp" Version="5.0.0" />
+    <PackageReference Include="Microsoft.Z3" Version="4.11.2" />
     <PackageReference Include="Rivers" Version="0.1.0" />
   </ItemGroup>
 
   <ItemGroup>
     <ProjectReference Include="..\Dna.ControlFlow\Dna.ControlFlow.csproj" />
     <ProjectReference Include="..\TritonTranslator\TritonTranslator\TritonTranslator.csproj" />
+    <ProjectReference Include="..\unicorn\bindings\dotnet\UnicornManaged\UnicornManaged.fsproj" />
   </ItemGroup>
 
 </Project>

@@ -38,7 +38,7 @@ namespace Dna.Reconstruction
                 RecursiveHandleBlock(graph, edge, basicBlock);
 
             // Collapse pairs of duplicated blocks into a single block.
-            RemoveDuplicatedBlocks();
+            //RemoveDuplicatedBlocks();
             return graph;
         }
 

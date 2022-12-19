@@ -191,6 +191,7 @@ namespace Dna.Relocation
                 var otherBlock = relocationMapping[exitInstruction.NextIP].RelocatedRip;
                 assembler.jmp(otherBlock);
                 relocatedBlock.RelocatedInstructions.AddRange(assembler.Instructions);
+                var idk = assembler.CreateLabel("adssa");
             }
 
             else
