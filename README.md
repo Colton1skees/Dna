@@ -10,14 +10,12 @@
 - Translation of routines to **LLVM** IR
 - IR **optimization** passes
 - Function relocation(optionally across binaries, with some caveats)
-- .NET bindings for the **hex-rays microcode** API
 
 You can find an example usage [here](https://github.com/Colton1skees/Dna/blob/master/Dna.Example/Program.cs).
 
 # Roadmap
  * [X] SMT solver interface
  * [X] **Symbolic** execution engine
- * [X] Expression simplification engine
+ * [ ] Expression simplification engine
  * [ ] **SSA** form construction
- * [ ] Wide set of compiler optimization passes
- * [ ] Native IR -> x86 compiler
+ * [ ] IR to x86 compiler
