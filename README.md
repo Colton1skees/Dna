@@ -14,8 +14,8 @@
 You can find an example usage [here](https://github.com/Colton1skees/Dna/blob/master/Dna.Example/Program.cs).
 
 # Roadmap
- * [-] SMT solver interface
- * [-] **Symbolic** execution engine
+ * [X] SMT solver interface
+ * [X] **Symbolic** execution engine
  * [ ] Expression simplification engine
  * [ ] **SSA** form construction
  * [ ] Wide set of compiler optimization passes
