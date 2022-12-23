@@ -90,6 +90,9 @@ namespace Dna.Optimization
         {
             foreach(var instruction in block.Instructions)
             {
+                if (instruction.HasDestination && instruction.Dest is SsaOperand ssaDest)
+                    instruction.Dest = ssaDest.BaseOperand;
+
                 // If an ssa operand exists(e.g. rax.3),
                 // replace it with the base operand(e.g. rax).
                 for(int i = 0; i < instruction.Operands.Count; i++)

@@ -18,6 +18,7 @@
 
   <ItemGroup>
     <Folder Include="Binary\Linux\" />
+    <Folder Include="Lifting\X86\" />
   </ItemGroup>
 
   <ItemGroup>

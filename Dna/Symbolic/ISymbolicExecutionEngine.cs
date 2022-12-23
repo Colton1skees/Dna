@@ -15,12 +15,12 @@ namespace Dna.Symbolic
         /// <summary>
         /// Gets a readonly mapping of each operand's symbolic value.
         /// </summary>
-        public IReadOnlyDictionary<IOperand, Expr> VariableDefinitions { get; }
+        public IReadOnlyDictionary<IOperand, AbstractNode> VariableDefinitions { get; }
 
         /// <summary>
         /// Gets a readonly mapping of each memory node's symbolic value.
         /// </summary>
-        public IReadOnlyDictionary<MemoryNode, Expr> MemoryDefinitions { get; }
+        public IReadOnlyDictionary<MemoryNode, AbstractNode> MemoryDefinitions { get; }
 
         public void ExecuteInstruction(AbstractInst inst);
     }

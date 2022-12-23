@@ -4,10 +4,9 @@ using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 
-namespace Dna.Lifting.X86
+namespace Dna.Synthesis
 {
-    public class Compiler
+    public class ExpressionSynthesizer
     {
-
     }
 }

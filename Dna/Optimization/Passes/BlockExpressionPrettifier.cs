@@ -47,33 +47,17 @@ namespace Dna.Optimization.Passes
             OptimizeBlock(targetBlock);
         }
 
+        
         private void OptimizeBlock(Block block)
         {
             var symex = new SymbolicExecutionEngine();
-            foreach(var inst in block.Instructions.SkipWhile(x => !x.ToString().Contains("t74.0:32 = sx i32 0x0, i32 0xC8")))
+            foreach(var inst in block.Instructions.Take(block.Instructions.Count - 1))
             {
-                // Skip if the instruction does not write to anything.
-                if (!inst.HasDestination)
-                    continue;
-
                 symex.ExecuteInstruction(inst);
-
-                var z3Expr = symex.VariableDefinitions[inst.Dest];
-                var definitions = BreadthFirstSearch(inst, symex);
-                
-
-                if(inst.ToString().Contains("Reg(zf).0:1 = select t69.0, i1 0x1, i1 0x0"))
-                {
-                    foreach(var def in definitions.Where(x => x.Key.ToString().Contains("t72.0")))
-                    {
-                        symex.CompareExpression((int)inst.Dest.Bitsize, (BitVecExpr)z3Expr, def.Key);
-                    }
-                    Console.WriteLine("Returning.");
-                    return;
-                }
             }
         }
 
+        /*
         private Dictionary<IOperand, Expr> BreadthFirstSearch(AbstractInst inst, SymbolicExecutionEngine symex)
         {
             Dictionary<IOperand, Expr> result = new();
@@ -115,5 +99,6 @@ namespace Dna.Optimization.Passes
 
             return result;
         }
+        */
     }
 }
