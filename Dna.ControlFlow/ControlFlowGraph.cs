@@ -14,6 +14,7 @@ namespace Dna.ControlFlow
 
         public ControlFlowGraph(ulong startAddress)
         {
+            Name = startAddress.ToString("X");
             StartAddress = startAddress;
         }
 

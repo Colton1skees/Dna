@@ -8,6 +8,7 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <PackageReference Include="DotNetGraph" Version="2.7.0" />
     <PackageReference Include="Rivers" Version="0.1.0" />
   </ItemGroup>
 

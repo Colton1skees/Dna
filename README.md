@@ -6,6 +6,7 @@
 - Expression Simplification
 - Parsing of executable file formats
 - Control flow graph reconstruction
+- Control flow graph visualization
 - Translation of routines to an intermediate representation
 - Translation of routines to **LLVM** IR
 - IR **optimization** passes

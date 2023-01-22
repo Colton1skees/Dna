@@ -7,6 +7,7 @@ using Dna.Optimization;
 using Dna.Optimization.Passes;
 using Dna.Optimization.Ssa;
 using Dna.Relocation;
+using DotNetGraph.Extensions;
 using Rivers;
 using Rivers.Analysis;
 using System.Diagnostics;
@@ -15,7 +16,7 @@ using TritonTranslator.Arch.X86;
 
 // Load the 64 bit PE file.
 // Note: This file is automatically copied to the build directory.
-var path = @"SampleExecutable.bin";
+var path = @"SampleExecutable";
 var binary = new WindowsBinary(64, File.ReadAllBytes(path), 0x140000000);
 
 // Instantiate dna.
@@ -45,6 +46,10 @@ blockDcePass.Run();
 
 // Print the optimized control flow graph.
 Console.WriteLine("Optimized cfg:\n{0}", GraphFormatter.FormatGraph(liftedCfg));
+
+// Create a .DOT file for visualizing the IR cfg.
+var dotGraph = GraphVisualizer.GetDotGraph(liftedCfg);
+File.WriteAllText("graph.dot", dotGraph.Compile(false, false));
 
 // Lift the control flow graph to LLVM IR.
 var llvmLifter = new LLVMLifter(architecture);

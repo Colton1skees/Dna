@@ -13,6 +13,9 @@
   </ItemGroup>
 
   <ItemGroup>
+    <None Update="SampleExecutable">
+      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+    </None>
     <None Update="SampleExecutable.bin">
       <CopyToOutputDirectory>Always</CopyToOutputDirectory>
     </None>
