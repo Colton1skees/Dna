@@ -143,13 +143,12 @@ namespace Dna.Simplification
                     // Step 2: Delete all sub-candidates where the number of child nodes does not match our AST.
                     foreach(var subAst in candidate.Value.ChildQueue.ToList())
                     {
-                        if(subAst.ChildQueue.Count != visiting.Children.Count)
-                        {
-                            candidateMapping.
-                        }
+
                     }
                 }
             }
+
+            return null;
         }
 
         private AstMatchCandidates GetNodeAstMatch(AbstractNode node)

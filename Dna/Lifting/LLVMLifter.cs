@@ -55,7 +55,7 @@ namespace Dna.Lifting
             this.architecture = architecture;
         }
 
-        public void Compile(ControlFlowGraph<AbstractInst> irCfg)
+        public void Lift(ControlFlowGraph<AbstractInst> irCfg)
         {
             var function = LLVM.AddFunction(
                 module,
@@ -84,10 +84,6 @@ namespace Dna.Lifting
                     CompileInstruction(inst);
                 }
             }
-
-                
-            Console.WriteLine("Dumping module.");
-            LLVM.DumpModule(module);
         }
 
         private void CompileInstruction(AbstractInst instruction)
@@ -568,6 +564,11 @@ namespace Dna.Lifting
             {
                 throw new InvalidOperationException(String.Format("Cannot load source operand: {0}", operand.ToString()));
             }
+        }
+
+        public void DumpModule()
+        {
+            LLVM.DumpModule(module);
         }
     }
 }

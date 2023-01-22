@@ -12,4 +12,10 @@
     <ProjectReference Include="..\Dna\Dna.csproj" />
   </ItemGroup>
 
+  <ItemGroup>
+    <None Update="SampleExecutable.bin">
+      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+    </None>
+  </ItemGroup>
+
 </Project>
