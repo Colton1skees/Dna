@@ -19,8 +19,4 @@
     <PackageReference Include="Antlr4.Runtime" Version="4.6.6" />
   </ItemGroup>
 
-  <ItemGroup>
-    <Folder Include="Parsing\" />
-  </ItemGroup>
-
 </Project>

@@ -7,6 +7,7 @@ using Dna.Optimization;
 using Dna.Optimization.Passes;
 using Dna.Optimization.Ssa;
 using Dna.Relocation;
+using Dna.Synthesis.Parsing;
 using DotNetGraph.Extensions;
 using Rivers;
 using Rivers.Analysis;
@@ -21,6 +22,9 @@ var binary = new WindowsBinary(64, File.ReadAllBytes(path), 0x140000000);
 
 // Instantiate dna.
 var dna = new Dna.Dna(binary);
+
+
+ExpressionDatabaseParser.ParseExpression(@"ExprOp("" + "", ExprOp("" ^ "", ExprId(""p2"", 8), ExprOp("" + "", ExprOp("" - "", ExprId(""p2"", 8)), ExprInt(2, 8))), ExprInt(2, 8))");
 
 // Parse a control flow graph from the binary.
 ulong funcAddr = 0x140001030;
@@ -59,6 +63,7 @@ llvmLifter.Lift(liftedCfg);
 bool printLLVM = true;
 if (printLLVM)
     llvmLifter.DumpModule();
+
 
 Console.WriteLine("Finished.");
 Console.ReadLine();

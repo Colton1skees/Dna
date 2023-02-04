@@ -1,4 +1,4 @@
-grammar KGram;
+grammar Miasm;
 
 expression: BinaryComplement expression #BinaryComplementExpression
             | 'ExprOp' LPARAM '"-"' COMMA expression RPARAM # NegateExpression

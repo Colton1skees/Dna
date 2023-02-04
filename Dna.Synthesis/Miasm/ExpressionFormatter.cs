@@ -6,15 +6,11 @@ using System.Threading.Tasks;
 
 namespace Dna.Synthesis.Miasm
 {
-    public abstract class Expr
+    public static class ExpressionFormatter
     {
-        public uint Size { get; set; }
-
-        public int Hash { get; set; }
-
-        public Expr(uint size)
+        public static string FormatExpression(Expr expr)
         {
-            
+            return null;
         }
     }
 }
