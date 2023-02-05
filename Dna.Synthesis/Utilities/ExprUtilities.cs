@@ -15,11 +15,11 @@ namespace Dna.Synthesis.Utils
         /// </summary>
         /// <param name="expr"></param>
         /// <returns></returns>
-        public static HashSet<ExprId> GetUniqueVariables(Expr expr)
+        public static HashSet<ExprId> GetUniqueVariables(MiasmExpr expr)
         {
             // TODO: Do not visit memory ptr expressions.
             var uniqueVariables = new HashSet<ExprId>();
-            ExprVisitor.DfsVisit(expr, (Expr visitedExpr) =>
+            ExprVisitor.DfsVisit(expr, (MiasmExpr visitedExpr) =>
             {
                 if (visitedExpr is not ExprId exprId)
                     return;
@@ -30,15 +30,28 @@ namespace Dna.Synthesis.Utils
             return uniqueVariables;
         }
 
-        /// <summary>
-        /// Rebuild an expression via visiting sub-expressions, while replacing known expressions.
-        /// </summary>
-        /// <param name="expr"></param>
-        /// <param name="replacements"></param>
-        /// <returns></returns>
-        public static Expr ExprReplace(Expr expr, Dictionary<Expr, Expr> replacements)
+        public static int GetExpressionLength(MiasmExpr expr)
         {
+            // Visit all nodes while incrementing a count per node.
+            int count = 0;
+            ExprVisitor.DfsVisit(expr, (MiasmExpr visited) =>
+            {
+                count++;
+            });
 
+            return count;
+        }
+
+        public static List<MiasmExpr> GetSubExpressions(MiasmExpr expr)
+        {
+            List<MiasmExpr> output = new List<MiasmExpr>();
+            ExprVisitor.DfsVisit(expr, (MiasmExpr inputExpr) =>
+            {
+                output.Add(inputExpr);
+            });
+
+            output.Reverse();
+            return output;
         }
     }
 }

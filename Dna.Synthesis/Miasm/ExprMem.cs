@@ -6,11 +6,11 @@ using System.Threading.Tasks;
 
 namespace Dna.Synthesis.Miasm
 {
-    public class ExprMem : Expr
+    public class ExprMem : MiasmExpr
     {
-        public Expr Ptr { get; }
+        public MiasmExpr Ptr { get; }
 
-        public ExprMem(Expr ptr, uint size) : base(size)
+        public ExprMem(MiasmExpr ptr, uint size) : base(size)
         {
             Ptr = ptr;
         }

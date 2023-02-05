@@ -3,7 +3,7 @@
 **Dna** is a static analysis framework for **x86/x64**, mainly geared towards deobfuscation. It offers:
 - **Instruction semantics** via [TritonTranslator](https://github.com/Colton1skees/TritonTranslator)
 - Symbolic execution
-- Expression Simplification
+- Mixed boolean-arithmetic(MBA) simplification
 - Parsing of executable file formats
 - Control flow graph reconstruction
 - Control flow graph visualization
@@ -17,6 +17,6 @@ You can find an example usage [here](https://github.com/Colton1skees/Dna/blob/ma
 # Roadmap
  * [X] SMT solver interface
  * [X] **Symbolic** execution engine
- * [ ] Expression simplification engine
+ * [X] Mixed boolean-arithmetic(MBA) simplifier
  * [ ] **SSA** form construction
  * [ ] IR to x86 compiler

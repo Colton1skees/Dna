@@ -6,7 +6,7 @@ using System.Threading.Tasks;
 
 namespace Dna.Synthesis.Miasm
 {
-    public class ExprInt : Expr
+    public class ExprInt : MiasmExpr
     {
         public ulong Value { get; }
 

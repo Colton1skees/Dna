@@ -31,7 +31,7 @@ namespace Dna.Synthesis.Jit
             }
         }
 
-        public (LLVMValueRef functionPointer, Dictionary<ExprId, LLVMValueRef> argMapping) LiftAst(Expr expr, IEnumerable<ExprId> inputVariables)
+        public (LLVMValueRef functionPointer, Dictionary<ExprId, LLVMValueRef> argMapping) LiftAst(MiasmExpr expr, IEnumerable<ExprId> inputVariables)
         {
             // Create integer arguments for each input variable.
             var argumentTypes = inputVariables.Select(x => LLVM.IntType(x.Size)).ToArray();
@@ -62,7 +62,7 @@ namespace Dna.Synthesis.Jit
             return (function, argumentMapping.ToDictionary(x => x.Key, x => x.Value));
         }
 
-        private LLVMValueRef Translate(Expr expr)
+        private LLVMValueRef Translate(MiasmExpr expr)
         {
             switch(expr)
             {

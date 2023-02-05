@@ -8,22 +8,22 @@ using System.Threading.Tasks;
 
 namespace Dna.Synthesis.Parsing
 {
-    class MiasmAstTranslationVisitor : MiasmBaseVisitor<Expr>
+    class MiasmAstTranslationVisitor : MiasmBaseVisitor<MiasmExpr>
     {
-        public override Expr VisitBinaryComplementExpression([NotNull] MiasmParser.BinaryComplementExpressionContext context)
+        public override MiasmExpr VisitBinaryComplementExpression([NotNull] MiasmParser.BinaryComplementExpressionContext context)
         {
             // TODO: Confirm this is correct.
             var expr = Visit(context.expression());
             return new ExprOp(expr.Size, "^", expr, new ExprInt(ulong.MaxValue, expr.Size));
         }
 
-        public override Expr VisitNegateExpression([NotNull] MiasmParser.NegateExpressionContext context)
+        public override MiasmExpr VisitNegateExpression([NotNull] MiasmParser.NegateExpressionContext context)
         {
             var expr = Visit(context.expression());
             return new ExprOp(expr.Size, "-", expr);
         }
 
-        public override Expr VisitMulExpression([NotNull] MiasmParser.MulExpressionContext context)
+        public override MiasmExpr VisitMulExpression([NotNull] MiasmParser.MulExpressionContext context)
         {
             var expressions = context.expression();
             var expr1 = Visit(expressions[0]);
@@ -34,7 +34,7 @@ namespace Dna.Synthesis.Parsing
             return new ExprOp(expr1.Size, "*", expr1, expr2);
         }
 
-        public override Expr VisitAddExpression([NotNull] MiasmParser.AddExpressionContext context)
+        public override MiasmExpr VisitAddExpression([NotNull] MiasmParser.AddExpressionContext context)
         {
             var expressions = context.expression();
             var expr1 = Visit(expressions[0]);
@@ -45,7 +45,7 @@ namespace Dna.Synthesis.Parsing
             return new ExprOp(expr1.Size, "+", expr1, expr2);
         }
 
-        public override Expr VisitAndExpression([NotNull] MiasmParser.AndExpressionContext context)
+        public override MiasmExpr VisitAndExpression([NotNull] MiasmParser.AndExpressionContext context)
         {
             var expressions = context.expression();
             var expr1 = Visit(expressions[0]);
@@ -56,7 +56,7 @@ namespace Dna.Synthesis.Parsing
             return new ExprOp(expr1.Size, "&", expr1, expr2);
         }
 
-        public override Expr VisitOrExpression([NotNull] MiasmParser.OrExpressionContext context)
+        public override MiasmExpr VisitOrExpression([NotNull] MiasmParser.OrExpressionContext context)
         {
             var expressions = context.expression();
             var expr1 = Visit(expressions[0]);
@@ -67,7 +67,7 @@ namespace Dna.Synthesis.Parsing
             return new ExprOp(expr1.Size, "|", expr1, expr2);
         }
 
-        public override Expr VisitXorExpression([NotNull] MiasmParser.XorExpressionContext context)
+        public override MiasmExpr VisitXorExpression([NotNull] MiasmParser.XorExpressionContext context)
         {
             var expressions = context.expression();
             var expr1 = Visit(expressions[0]);
@@ -78,7 +78,7 @@ namespace Dna.Synthesis.Parsing
             return new ExprOp(expr1.Size, "^", expr1, expr2);
         }
 
-        public override Expr VisitLeftShiftExpression([NotNull] MiasmParser.LeftShiftExpressionContext context)
+        public override MiasmExpr VisitLeftShiftExpression([NotNull] MiasmParser.LeftShiftExpressionContext context)
         {
             var expressions = context.expression();
             var expr1 = Visit(expressions[0]);
@@ -89,7 +89,7 @@ namespace Dna.Synthesis.Parsing
             return new ExprOp(expr1.Size, "<<", expr1, expr2);
         }
 
-        public override Expr VisitSliceExpression([NotNull] MiasmParser.SliceExpressionContext context)
+        public override MiasmExpr VisitSliceExpression([NotNull] MiasmParser.SliceExpressionContext context)
         {
             var expr = Visit(context.expression());
             var numbers = context.NUMBER();
@@ -99,11 +99,11 @@ namespace Dna.Synthesis.Parsing
             return new ExprSlice(expr, start, stop);
         }
 
-        public override Expr VisitIdExpression([NotNull] MiasmParser.IdExpressionContext context)
+        public override MiasmExpr VisitIdExpression([NotNull] MiasmParser.IdExpressionContext context)
         {
             // If the name contains quotations(e.g. "p0"), remove them.
             var name = context.STRING().GetText();
-            name.Replace(@"""", "");
+            name = name.Replace("\"", "");
 
             var sizeText = context.NUMBER().GetText();
             var size = Convert.ToUInt32(sizeText);
@@ -111,7 +111,7 @@ namespace Dna.Synthesis.Parsing
             return new ExprId(name, size);
         }
 
-        public override Expr VisitIntExpression([NotNull] MiasmParser.IntExpressionContext context)
+        public override MiasmExpr VisitIntExpression([NotNull] MiasmParser.IntExpressionContext context)
         {
             var numbers = context.NUMBER();
             var value = Convert.ToUInt64(numbers[0].GetText());

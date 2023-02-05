@@ -30,9 +30,9 @@ namespace Dna.Synthesis.Utilities
         /// </summary>
         /// <param name="variableCount">The number of variables in the synthesis function.</param>
         /// <param name="sampleCount">The number of independent oracle queries.</param>
-        public static List<List<long>> GenInputs(int variableCount, int sampleCount)
+        public static List<List<ulong>> GenInputs(int variableCount, int sampleCount)
         {
-            var inputs = new List<List<long>>();   
+            var inputs = new List<List<ulong>>();   
             for(int i = 0; i < sampleCount; i++)
             {
                 inputs.Add(GenInputsArray(variableCount));
@@ -44,9 +44,9 @@ namespace Dna.Synthesis.Utilities
         /// <summary>
         /// Gets an array of random values.
         /// </summary>
-        public static List<long> GenInputsArray(int count)
+        public static List<ulong> GenInputsArray(int count)
         {
-            List<long> inputs = new List<long>();
+            List<ulong> inputs = new List<ulong>();
             for(int i = 0; i < count; i++)
             {
                 inputs.Add(GetRandInput());
@@ -60,7 +60,7 @@ namespace Dna.Synthesis.Utilities
         /// u8, u16, u32, u64, and special values for better
         /// synthesis coverage.
         /// </summary>
-        public static long GetRandInput()
+        public static ulong GetRandInput()
         {
             // Get a random between value 0 and 4.
             var coin = rand.NextInt64(byte.MinValue, byte.MaxValue) % 5;
@@ -74,21 +74,21 @@ namespace Dna.Synthesis.Utilities
             else if (coin == 3)
                 return GetRandBits(64);
             else if (coin == 4)
-                return (long)Choice(specialValues);
+                return Choice(specialValues);
             else
                 throw new InvalidOperationException();
         }
 
-        public static long GetRandBits(int size)
+        public static ulong GetRandBits(int size)
         {
             if (size == 8)
-                return rand.NextInt64(byte.MinValue, byte.MaxValue);
+                return (ulong)rand.NextInt64(byte.MinValue, byte.MaxValue);
             else if (size == 16)
-                return rand.NextInt64(ushort.MinValue, ushort.MaxValue);
+                return (ulong)rand.NextInt64(ushort.MinValue, ushort.MaxValue);
             else if (size == 32)
-                return rand.NextInt64(uint.MinValue, uint.MaxValue);
+                return (ulong)rand.NextInt64(uint.MinValue, uint.MaxValue);
             else if (size == 64)
-                return rand.NextInt64(long.MinValue, long.MaxValue);
+                return (ulong)rand.NextInt64(long.MinValue, long.MaxValue);
             else
                 throw new NotImplementedException($"Cannot get random integer of size {size}");
         }

@@ -12,11 +12,10 @@ namespace Dna.Synthesis.Parsing
     {
         private static MiasmAstTranslationVisitor visitor = new MiasmAstTranslationVisitor();
 
-        public static Expr ParseExpression(string discount)
+        public static MiasmExpr ParseExpression(string exprText)
         {
-            discount = discount.Replace(" ", "");
-            // Console.WriteLine(discount);
-            var charStream = new AntlrInputStream(discount);
+            exprText = exprText.Replace(" ", "");
+            var charStream = new AntlrInputStream(exprText);
             var lexer = new MiasmLexer(charStream);
             var tokenStream = new CommonTokenStream(lexer);
             var parser = new MiasmParser(tokenStream);

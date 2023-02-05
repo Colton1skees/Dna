@@ -9,7 +9,7 @@ namespace Dna.Synthesis.Utilities
 {
     public static class ExprVisitor
     {
-        public static void DfsVisit(Expr expr, Action<Expr> onVisited)
+        public static void DfsVisit(MiasmExpr expr, Action<MiasmExpr> onVisited)
         {
             onVisited(expr);
             if (expr is ExprId exprId)
@@ -52,50 +52,63 @@ namespace Dna.Synthesis.Utilities
             }
         }
 
-        public static Expr DfsReplace(Expr expr, Func<Expr, Expr?> getReplacement)
+        public static MiasmExpr DfsReplace(MiasmExpr expr, Func<MiasmExpr, MiasmExpr?> getReplacement)
         {
-
             var replacement = getReplacement(expr);
             if (replacement != null)
                 return replacement;
 
             if (expr is ExprId exprId)
             {
-                return;
+                return new ExprId(exprId.Name, exprId.Size);
             }
 
             else if (expr is ExprCond exprCond)
             {
-                DfsVisit(exprCond.Cond, getReplacement);
-                DfsVisit(exprCond.Src1, getReplacement);
-                DfsVisit(exprCond.Src2, getReplacement);
+                var cond = DfsReplace(exprCond.Cond, getReplacement);
+                var src1 = DfsReplace(exprCond.Src1, getReplacement);
+                var src2 = DfsReplace(exprCond.Src2, getReplacement);
+                return new ExprCond(cond, src1, src2, expr.Size);
             }
 
             else if (expr is ExprMem exprMem)
             {
-                DfsVisit(exprMem.Ptr, getReplacement);
+                var ptr = DfsReplace(exprMem.Ptr, getReplacement);
+                return new ExprMem(ptr, exprMem.Size);
             }
 
             else if (expr is ExprOp exprOp)
             {
+                var operands = new List<MiasmExpr>();
                 foreach (var operand in exprOp.Operands)
-                    DfsVisit(operand, getReplacement);
+                    operands.Add(DfsReplace(operand, getReplacement));
+
+                return new ExprOp(exprOp.Size, exprOp.Op, operands);
             }
 
             else if (expr is ExprSlice exprSlice)
             {
-                DfsVisit(exprSlice.Src, getReplacement);
+                var src = DfsReplace(exprSlice.Src, getReplacement);
+                return new ExprSlice(src, exprSlice.Start, exprSlice.Start);
             }
 
             else if (expr is ExprCompose exprCompose)
             {
+                var operands = new List<MiasmExpr>();
                 foreach (var operand in exprCompose.Operands)
-                    DfsVisit(operand, getReplacement);
+                    operands.Add(DfsReplace(operand, getReplacement));
+
+                return new ExprCompose(operands);
             }
 
             else if (expr is ExprInt exprInt)
             {
-                return;
+                return new ExprInt(exprInt.Value, exprInt.Size);
+            }
+
+            else
+            {
+                throw new NotImplementedException();
             }
         }
     }

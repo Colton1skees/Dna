@@ -9,7 +9,7 @@ namespace Dna.Synthesis.Evaluation
 {
     public static class ExpressionEvaluator
     {
-        public static ulong EvaluateExpression(Expr expr)
+        public static ulong EvaluateExpression(MiasmExpr expr)
         {
             switch(expr)
             {

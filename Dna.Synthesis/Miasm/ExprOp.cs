@@ -6,18 +6,18 @@ using System.Threading.Tasks;
 
 namespace Dna.Synthesis.Miasm
 {
-    public class ExprOp : Expr
+    public class ExprOp : MiasmExpr
     {
         public string Op { get; }
 
-        public List<Expr> Operands { get; }
+        public List<MiasmExpr> Operands { get; }
 
-        public ExprOp(uint size, string op, params Expr[] operands) : this(size, op, operands.ToList())
+        public ExprOp(uint size, string op, params MiasmExpr[] operands) : this(size, op, operands.ToList())
         {
 
         }
 
-        public ExprOp(uint size, string op, List<Expr> operands) : base(size)
+        public ExprOp(uint size, string op, List<MiasmExpr> operands) : base(size)
         {
             Op = op;
             Operands = operands;

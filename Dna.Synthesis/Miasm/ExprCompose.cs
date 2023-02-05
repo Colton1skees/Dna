@@ -6,16 +6,16 @@ using System.Threading.Tasks;
 
 namespace Dna.Synthesis.Miasm
 {
-    public class ExprCompose : Expr
+    public class ExprCompose : MiasmExpr
     {
-        public List<Expr> Operands { get; }
+        public List<MiasmExpr> Operands { get; }
 
-        public ExprCompose(params Expr[] expressions) : this(expressions.ToList())
+        public ExprCompose(params MiasmExpr[] expressions) : this(expressions.ToList())
         {
  
         }
 
-        public ExprCompose(List<Expr> expressions) : base((uint)expressions.Select(x => (int)x.Size).Sum())
+        public ExprCompose(List<MiasmExpr> expressions) : base((uint)expressions.Select(x => (int)x.Size).Sum())
         {
             Operands = expressions;
         }
