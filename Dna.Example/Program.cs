@@ -7,8 +7,10 @@ using Dna.Optimization;
 using Dna.Optimization.Passes;
 using Dna.Optimization.Ssa;
 using Dna.Relocation;
+using Dna.Synthesis.Jit;
 using Dna.Synthesis.Miasm;
 using Dna.Synthesis.Parsing;
+using Dna.Synthesis.Utils;
 using DotNetGraph.Extensions;
 using Rivers;
 using Rivers.Analysis;
@@ -26,10 +28,13 @@ var dna = new Dna.Dna(binary);
 
 var lines = File.ReadAllLines(@"C:\Users\colton\source\repos\msynth\database\3_variables_constants_7_nodes.txt");
 
+var jitter = new LLVMJitter();
 List<Expr> exprs = new List<Expr>(lines.Length);
 foreach(var line in lines)
 {
-    exprs.Add(ExpressionDatabaseParser.ParseExpression(line));
+    var expr = ExpressionDatabaseParser.ParseExpression(line);
+    exprs.Add(expr);
+    jitter.LiftAst(expr, ExprUtilities.GetUniqueVariables(expr));
 }
 
 //ExpressionDatabaseParser.ParseExpression(@"ExprOp("" + "", ExprOp("" ^ "", ExprId(""p2"", 8), ExprOp("" + "", ExprOp("" - "", ExprId(""p2"", 8)), ExprInt(2, 8))), ExprInt(2, 8))");

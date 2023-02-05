@@ -15,16 +15,16 @@ namespace Dna.Synthesis.Utils
         /// </summary>
         /// <param name="expr"></param>
         /// <returns></returns>
-        public static HashSet<Expr> GetUniqueVariables(Expr expr)
+        public static HashSet<ExprId> GetUniqueVariables(Expr expr)
         {
             // TODO: Do not visit memory ptr expressions.
-            var uniqueVariables = new HashSet<Expr>();
+            var uniqueVariables = new HashSet<ExprId>();
             ExprVisitor.DfsVisit(expr, (Expr visitedExpr) =>
             {
-                if (visitedExpr is not ExprId)
+                if (visitedExpr is not ExprId exprId)
                     return;
 
-                uniqueVariables.Add(visitedExpr);
+                uniqueVariables.Add(exprId);
             });
 
             return uniqueVariables;

@@ -14,5 +14,17 @@ namespace Dna.Synthesis.Miasm
         {
             Name = name;
         }
+
+        public override int GetHashCode()
+        {
+            return Name.GetHashCode();
+        }
+
+        public override bool Equals(object? obj)
+        {
+            if (obj != null && obj is ExprId exprId && exprId.Name == Name)
+                return true;
+            return base.Equals(obj);
+        }
     }
 }

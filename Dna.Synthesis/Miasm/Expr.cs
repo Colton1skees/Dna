@@ -14,7 +14,9 @@ namespace Dna.Synthesis.Miasm
 
         public Expr(uint size)
         {
-            
+            if (size == 0 || size > 64)
+                throw new NotSupportedException();
+            Size = size;
         }
     }
 }
