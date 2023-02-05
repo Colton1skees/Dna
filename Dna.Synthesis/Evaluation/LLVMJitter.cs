@@ -1,4 +1,5 @@
 ﻿using Dna.Synthesis.Miasm;
+using Dna.Synthesis.Utils;
 using LLVMSharp;
 using System;
 using System.Collections.Generic;
@@ -30,7 +31,7 @@ namespace Dna.Synthesis.Jit
             }
         }
 
-        public void LiftAst(Expr expr, IEnumerable<ExprId> inputVariables)
+        public (LLVMValueRef functionPointer, Dictionary<ExprId, LLVMValueRef> argMapping) LiftAst(Expr expr, IEnumerable<ExprId> inputVariables)
         {
             // Create integer arguments for each input variable.
             var argumentTypes = inputVariables.Select(x => LLVM.IntType(x.Size)).ToArray();
@@ -57,6 +58,8 @@ namespace Dna.Synthesis.Jit
 
             // Iterate the function count so that each function gets a unique ID.
             functionCount++;
+
+            return (function, argumentMapping.ToDictionary(x => x.Key, x => x.Value));
         }
 
         private LLVMValueRef Translate(Expr expr)
@@ -119,6 +122,8 @@ namespace Dna.Synthesis.Jit
             switch(expr.Op)
             {
                 case "-":
+                    if (expr.Operands.Count != 1)
+                        throw new InvalidOperationException();
                     var type = LLVM.IntType(expr.Size);
                     var zero = LLVM.ConstInt(type, 0, new LLVMBool(0));
                     return LLVM.BuildSub(builder, zero, Translate(expr.Operands[0]), "Sub");
