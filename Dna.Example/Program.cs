@@ -27,7 +27,6 @@ var binary = new WindowsBinary(64, File.ReadAllBytes(path), 0x140000000);
 var dna = new Dna.Dna(binary);
 
 var lines = File.ReadAllLines(@"C:\Users\colton\source\repos\msynth\database\3_variables_constants_7_nodes.txt");
-
 var jitter = new LLVMJitter();
 List<Expr> exprs = new List<Expr>(lines.Length);
 foreach(var line in lines)

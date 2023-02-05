@@ -29,5 +29,16 @@ namespace Dna.Synthesis.Utils
 
             return uniqueVariables;
         }
+
+        /// <summary>
+        /// Rebuild an expression via visiting sub-expressions, while replacing known expressions.
+        /// </summary>
+        /// <param name="expr"></param>
+        /// <param name="replacements"></param>
+        /// <returns></returns>
+        public static Expr ExprReplace(Expr expr, Dictionary<Expr, Expr> replacements)
+        {
+
+        }
     }
 }

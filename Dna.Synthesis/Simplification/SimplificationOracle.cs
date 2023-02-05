@@ -1,9 +1,11 @@
 ﻿using Dna.Synthesis.Miasm;
 using Dna.Synthesis.Utilities;
+using Dna.Synthesis.Utils;
 using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
+using System.Text.RegularExpressions;
 using System.Threading.Tasks;
 
 namespace Dna.Synthesis.Simplification
@@ -19,6 +21,8 @@ namespace Dna.Synthesis.Simplification
         private List<List<long>> inputs;
 
         private Dictionary<string, List<Expr>> oracleMap;
+
+        private readonly Regex regex = new Regex("^p[0-9]*");
 
         public SimplificationOracle(int variableCount, int sampleCount, string libraryPath)
         {
@@ -37,7 +41,16 @@ namespace Dna.Synthesis.Simplification
 
         private ulong EvaluateExpression(Expr expr, List<ulong> inputs)
         {
-            throw new NotImplementedException();
+            var replacements = new Dictionary<ExprId, ExprInt>();
+            foreach(var variable in ExprUtilities.GetUniqueVariables(expr))
+            {
+                if (!regex.IsMatch(variable.Name))
+                    continue;
+
+                var index = Convert.ToInt32(variable.Name.Replace("p", ""));
+                replacements[variable] = new ExprInt(inputs[index], variable.Size);
+
+            }
         }
 
         private List<long> GetOutputs(Expr expr)
