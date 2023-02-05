@@ -31,7 +31,12 @@ namespace Dna.Synthesis.Simplification
 
         private Dictionary<string, List<Expr>> GenOracleMap()
         {
-            // TODO: Implement oracle map generation.
+            var output = new Dictionary<string, List<Expr>>();
+            return output;
+        }
+
+        private ulong EvaluateExpression(Expr expr, List<ulong> inputs)
+        {
             throw new NotImplementedException();
         }
 

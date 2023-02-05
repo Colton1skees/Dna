@@ -12,8 +12,9 @@ namespace Dna.Synthesis.Parsing
     {
         public override Expr VisitBinaryComplementExpression([NotNull] MiasmParser.BinaryComplementExpressionContext context)
         {
+            // TODO: Confirm this is correct.
             var expr = Visit(context.expression());
-            return new ExprOp(expr.Size, "^", expr, new ExprInt(Convert.ToUInt64(-1), expr.Size));
+            return new ExprOp(expr.Size, "^", expr, new ExprInt(ulong.MaxValue, expr.Size));
         }
 
         public override Expr VisitNegateExpression([NotNull] MiasmParser.NegateExpressionContext context)
@@ -113,7 +114,7 @@ namespace Dna.Synthesis.Parsing
         public override Expr VisitIntExpression([NotNull] MiasmParser.IntExpressionContext context)
         {
             var numbers = context.NUMBER();
-            var value = Convert.ToUInt32(numbers[0].GetText());
+            var value = Convert.ToUInt64(numbers[0].GetText());
             var size = Convert.ToUInt32(numbers[1].GetText());
             return new ExprInt(value, size);
         }

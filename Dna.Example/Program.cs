@@ -7,6 +7,7 @@ using Dna.Optimization;
 using Dna.Optimization.Passes;
 using Dna.Optimization.Ssa;
 using Dna.Relocation;
+using Dna.Synthesis.Miasm;
 using Dna.Synthesis.Parsing;
 using DotNetGraph.Extensions;
 using Rivers;
@@ -23,8 +24,15 @@ var binary = new WindowsBinary(64, File.ReadAllBytes(path), 0x140000000);
 // Instantiate dna.
 var dna = new Dna.Dna(binary);
 
+var lines = File.ReadAllLines(@"C:\Users\colton\source\repos\msynth\database\3_variables_constants_7_nodes.txt");
 
-ExpressionDatabaseParser.ParseExpression(@"ExprOp("" + "", ExprOp("" ^ "", ExprId(""p2"", 8), ExprOp("" + "", ExprOp("" - "", ExprId(""p2"", 8)), ExprInt(2, 8))), ExprInt(2, 8))");
+List<Expr> exprs = new List<Expr>(lines.Length);
+foreach(var line in lines)
+{
+    exprs.Add(ExpressionDatabaseParser.ParseExpression(line));
+}
+
+//ExpressionDatabaseParser.ParseExpression(@"ExprOp("" + "", ExprOp("" ^ "", ExprId(""p2"", 8), ExprOp("" + "", ExprOp("" - "", ExprId(""p2"", 8)), ExprInt(2, 8))), ExprInt(2, 8))");
 
 // Parse a control flow graph from the binary.
 ulong funcAddr = 0x140001030;
