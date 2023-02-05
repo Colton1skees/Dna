@@ -137,7 +137,6 @@ namespace Dna.Synthesis.Jit
                 default:
                     throw new NotImplementedException();
             }
-            return default(LLVMValueRef);
         }
     }
 }
