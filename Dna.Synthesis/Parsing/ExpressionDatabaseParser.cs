@@ -22,20 +22,8 @@ namespace Dna.Synthesis.Parsing
             var parser = new MiasmParser(tokenStream);
             parser.BuildParseTree = true;
             var expr = parser.root();
-            //Console.WriteLine(expr);
-            /*
-            Console.WriteLine(expr.GetType().FullName);
-            foreach(var child in expr.children)
-            {
-                Console.WriteLine("Child type: {0}", child.GetType().FullName);
-            }
-            Console.WriteLine(expr);
-
-            */
             var result = visitor.VisitRoot(expr);
             return result;
-           // Console.WriteLine(result);
-           // Console.WriteLine(result);
         }
     }
 }
