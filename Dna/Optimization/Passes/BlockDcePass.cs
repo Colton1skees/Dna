@@ -1,5 +1,5 @@
 ﻿using Dna.ControlFlow;
-using Dna.ControlFlow.DataStructures;
+using Dna.DataStructures;
 using Dna.Symbolic;
 using Microsoft.Z3;
 using System;

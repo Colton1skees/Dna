@@ -15,17 +15,17 @@ namespace Dna.DataStructures
         /// <summary>
         /// The default capacity.
         /// </summary>
-        private const int DefaultCapacity = 8;
+        private const int defaultCapacity = 8;
 
         /// <summary>
         /// The circular _buffer that holds the view.
         /// </summary>
-        private T[] _buffer;
+        private T[] buffer;
 
         /// <summary>
-        /// The offset into <see cref="_buffer"/> where the view begins.
+        /// The offset into <see cref="buffer"/> where the view begins.
         /// </summary>
-        private int _offset;
+        private int offset;
 
         /// <summary>
         /// Initializes a new instance of the <see cref="Deque&lt;T&gt;"/> class with the specified capacity.
@@ -35,7 +35,7 @@ namespace Dna.DataStructures
         {
             if (capacity < 0)
                 throw new ArgumentOutOfRangeException(nameof(capacity), "Capacity may not be negative.");
-            _buffer = new T[capacity];
+            buffer = new T[capacity];
         }
 
         /// <summary>
@@ -51,12 +51,12 @@ namespace Dna.DataStructures
             var count = source.Count;
             if (count > 0)
             {
-                _buffer = new T[count];
+                buffer = new T[count];
                 DoInsertRange(0, source);
             }
             else
             {
-                _buffer = new T[DefaultCapacity];
+                buffer = new T[defaultCapacity];
             }
         }
 
@@ -64,7 +64,7 @@ namespace Dna.DataStructures
         /// Initializes a new instance of the <see cref="Deque&lt;T&gt;"/> class.
         /// </summary>
         public Deque()
-            : this(DefaultCapacity)
+            : this(defaultCapacity)
         {
         }
 
@@ -163,14 +163,14 @@ namespace Dna.DataStructures
             if (IsSplit)
             {
                 // The existing buffer is split, so we have to copy it in parts
-                int length = Capacity - _offset;
-                Array.Copy(_buffer, _offset, array, arrayIndex, length);
-                Array.Copy(_buffer, 0, array, arrayIndex + length, Count - length);
+                int length = Capacity - offset;
+                Array.Copy(buffer, offset, array, arrayIndex, length);
+                Array.Copy(buffer, 0, array, arrayIndex + length, Count - length);
             }
             else
             {
                 // The existing buffer is whole
-                Array.Copy(_buffer, _offset, array, arrayIndex, Count);
+                Array.Copy(buffer, offset, array, arrayIndex, Count);
             }
         }
 
@@ -381,14 +381,14 @@ namespace Dna.DataStructures
         }
 
         /// <summary>
-        /// Gets a value indicating whether the buffer is "split" (meaning the beginning of the view is at a later index in <see cref="_buffer"/> than the end).
+        /// Gets a value indicating whether the buffer is "split" (meaning the beginning of the view is at a later index in <see cref="buffer"/> than the end).
         /// </summary>
         private bool IsSplit
         {
             get
             {
                 // Overflow-safe version of "(offset + Count) > Capacity"
-                return _offset > (Capacity - Count);
+                return offset > (Capacity - Count);
             }
         }
 
@@ -400,7 +400,7 @@ namespace Dna.DataStructures
         {
             get
             {
-                return _buffer.Length;
+                return buffer.Length;
             }
 
             set
@@ -408,7 +408,7 @@ namespace Dna.DataStructures
                 if (value < Count)
                     throw new ArgumentOutOfRangeException(nameof(value), "Capacity cannot be set to a value less than Count");
 
-                if (value == _buffer.Length)
+                if (value == buffer.Length)
                     return;
 
                 // Create the new _buffer and copy our existing range.
@@ -416,8 +416,8 @@ namespace Dna.DataStructures
                 CopyToArray(newBuffer);
 
                 // Set up to use the new _buffer.
-                _buffer = newBuffer;
-                _offset = 0;
+                buffer = newBuffer;
+                offset = 0;
             }
         }
 
@@ -434,7 +434,7 @@ namespace Dna.DataStructures
         /// <returns>The buffer index.</returns>
         private int DequeIndexToBufferIndex(int index)
         {
-            return (index + _offset) % Capacity;
+            return (index + offset) % Capacity;
         }
 
         /// <summary>
@@ -444,7 +444,7 @@ namespace Dna.DataStructures
         /// <returns>The element at the specified index.</returns>
         private T DoGetItem(int index)
         {
-            return _buffer[DequeIndexToBufferIndex(index)];
+            return buffer[DequeIndexToBufferIndex(index)];
         }
 
         /// <summary>
@@ -454,7 +454,7 @@ namespace Dna.DataStructures
         /// <param name="item">The element to store in the list.</param>
         private void DoSetItem(int index, T item)
         {
-            _buffer[DequeIndexToBufferIndex(index)] = item;
+            buffer[DequeIndexToBufferIndex(index)] = item;
         }
 
         /// <summary>
@@ -501,29 +501,29 @@ namespace Dna.DataStructures
         }
 
         /// <summary>
-        /// Increments <see cref="_offset"/> by <paramref name="value"/> using modulo-<see cref="Capacity"/> arithmetic.
+        /// Increments <see cref="offset"/> by <paramref name="value"/> using modulo-<see cref="Capacity"/> arithmetic.
         /// </summary>
-        /// <param name="value">The value by which to increase <see cref="_offset"/>. May not be negative.</param>
-        /// <returns>The value of <see cref="_offset"/> after it was incremented.</returns>
+        /// <param name="value">The value by which to increase <see cref="offset"/>. May not be negative.</param>
+        /// <returns>The value of <see cref="offset"/> after it was incremented.</returns>
         private int PostIncrement(int value)
         {
-            int ret = _offset;
-            _offset += value;
-            _offset %= Capacity;
+            int ret = offset;
+            offset += value;
+            offset %= Capacity;
             return ret;
         }
 
         /// <summary>
-        /// Decrements <see cref="_offset"/> by <paramref name="value"/> using modulo-<see cref="Capacity"/> arithmetic.
+        /// Decrements <see cref="offset"/> by <paramref name="value"/> using modulo-<see cref="Capacity"/> arithmetic.
         /// </summary>
-        /// <param name="value">The value by which to reduce <see cref="_offset"/>. May not be negative or greater than <see cref="Capacity"/>.</param>
-        /// <returns>The value of <see cref="_offset"/> before it was decremented.</returns>
+        /// <param name="value">The value by which to reduce <see cref="offset"/>. May not be negative or greater than <see cref="Capacity"/>.</param>
+        /// <returns>The value of <see cref="offset"/> before it was decremented.</returns>
         private int PreDecrement(int value)
         {
-            _offset -= value;
-            if (_offset < 0)
-                _offset += Capacity;
-            return _offset;
+            offset -= value;
+            if (offset < 0)
+                offset += Capacity;
+            return offset;
         }
 
         /// <summary>
@@ -532,7 +532,7 @@ namespace Dna.DataStructures
         /// <param name="value">The element to insert.</param>
         private void DoAddToBack(T value)
         {
-            _buffer[DequeIndexToBufferIndex(Count)] = value;
+            buffer[DequeIndexToBufferIndex(Count)] = value;
             ++Count;
         }
 
@@ -542,7 +542,7 @@ namespace Dna.DataStructures
         /// <param name="value">The element to insert.</param>
         private void DoAddToFront(T value)
         {
-            _buffer[PreDecrement(1)] = value;
+            buffer[PreDecrement(1)] = value;
             ++Count;
         }
 
@@ -552,7 +552,7 @@ namespace Dna.DataStructures
         /// <returns>The former last element.</returns>
         private T DoRemoveFromBack()
         {
-            T ret = _buffer[DequeIndexToBufferIndex(Count - 1)];
+            T ret = buffer[DequeIndexToBufferIndex(Count - 1)];
             --Count;
             return ret;
         }
@@ -564,7 +564,7 @@ namespace Dna.DataStructures
         private T DoRemoveFromFront()
         {
             --Count;
-            return _buffer[PostIncrement(1)];
+            return buffer[PostIncrement(1)];
         }
 
         /// <summary>
@@ -586,7 +586,7 @@ namespace Dna.DataStructures
                 int copyCount = index;
                 int writeIndex = Capacity - collectionCount;
                 for (int j = 0; j != copyCount; ++j)
-                    _buffer[DequeIndexToBufferIndex(writeIndex + j)] = _buffer[DequeIndexToBufferIndex(j)];
+                    buffer[DequeIndexToBufferIndex(writeIndex + j)] = buffer[DequeIndexToBufferIndex(j)];
 
                 // Rotate to the new view
                 PreDecrement(collectionCount);
@@ -599,14 +599,14 @@ namespace Dna.DataStructures
                 int copyCount = Count - index;
                 int writeIndex = index + collectionCount;
                 for (int j = copyCount - 1; j != -1; --j)
-                    _buffer[DequeIndexToBufferIndex(writeIndex + j)] = _buffer[DequeIndexToBufferIndex(index + j)];
+                    buffer[DequeIndexToBufferIndex(writeIndex + j)] = buffer[DequeIndexToBufferIndex(index + j)];
             }
 
             // Copy new items into place
             int i = index;
             foreach (T item in collection)
             {
-                _buffer[DequeIndexToBufferIndex(i)] = item;
+                buffer[DequeIndexToBufferIndex(i)] = item;
                 ++i;
             }
 
@@ -643,7 +643,7 @@ namespace Dna.DataStructures
                 int copyCount = index;
                 int writeIndex = collectionCount;
                 for (int j = copyCount - 1; j != -1; --j)
-                    _buffer[DequeIndexToBufferIndex(writeIndex + j)] = _buffer[DequeIndexToBufferIndex(j)];
+                    buffer[DequeIndexToBufferIndex(writeIndex + j)] = buffer[DequeIndexToBufferIndex(j)];
 
                 // Rotate to new view
                 PostIncrement(collectionCount);
@@ -656,7 +656,7 @@ namespace Dna.DataStructures
                 int copyCount = Count - collectionCount - index;
                 int readIndex = index + collectionCount;
                 for (int j = 0; j != copyCount; ++j)
-                    _buffer[DequeIndexToBufferIndex(index + j)] = _buffer[DequeIndexToBufferIndex(readIndex + j)];
+                    buffer[DequeIndexToBufferIndex(index + j)] = buffer[DequeIndexToBufferIndex(readIndex + j)];
             }
 
             // Adjust valid count
@@ -770,7 +770,7 @@ namespace Dna.DataStructures
         /// </summary>
         public void Clear()
         {
-            _offset = 0;
+            offset = 0;
             Count = 0;
         }
 

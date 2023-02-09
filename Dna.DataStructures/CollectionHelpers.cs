@@ -14,75 +14,54 @@ namespace Dna.DataStructures
             var result = source as IReadOnlyCollection<T>;
             if (result != null)
                 return result;
+
             var collection = source as ICollection<T>;
             if (collection != null)
                 return new CollectionWrapper<T>(collection);
-            var nongenericCollection = source as ICollection;
-            if (nongenericCollection != null)
-                return new NongenericCollectionWrapper<T>(nongenericCollection);
 
-            return new List<T>(source);
+            var nongenericCollection = source as ICollection;
+            return nongenericCollection != null 
+                ? new NongenericCollectionWrapper<T>(nongenericCollection) : new List<T>(source);
         }
 
         private sealed class NongenericCollectionWrapper<T> : IReadOnlyCollection<T>
         {
-            private readonly ICollection _collection;
+            private readonly ICollection collection;
+
+            public int Count => collection.Count;
 
             public NongenericCollectionWrapper(ICollection collection)
             {
                 if (collection == null)
                     throw new ArgumentNullException(nameof(collection));
-                _collection = collection;
-            }
-
-            public int Count
-            {
-                get
-                {
-                    return _collection.Count;
-                }
+                this.collection = collection;
             }
 
             public IEnumerator<T> GetEnumerator()
             {
-                foreach (T item in _collection)
+                foreach (T item in collection)
                     yield return item;
             }
 
-            IEnumerator IEnumerable.GetEnumerator()
-            {
-                return _collection.GetEnumerator();
-            }
+            IEnumerator IEnumerable.GetEnumerator() => collection.GetEnumerator();
         }
 
         private sealed class CollectionWrapper<T> : IReadOnlyCollection<T>
         {
-            private readonly ICollection<T> _collection;
+            private readonly ICollection<T> collection;
+
+            public int Count => collection.Count;
 
             public CollectionWrapper(ICollection<T> collection)
             {
                 if (collection == null)
                     throw new ArgumentNullException(nameof(collection));
-                _collection = collection;
+                this.collection = collection;
             }
 
-            public int Count
-            {
-                get
-                {
-                    return _collection.Count;
-                }
-            }
+            public IEnumerator<T> GetEnumerator() => collection.GetEnumerator();
 
-            public IEnumerator<T> GetEnumerator()
-            {
-                return _collection.GetEnumerator();
-            }
-
-            IEnumerator IEnumerable.GetEnumerator()
-            {
-                return _collection.GetEnumerator();
-            }
+            IEnumerator IEnumerable.GetEnumerator() => collection.GetEnumerator();
         }
     }
 }

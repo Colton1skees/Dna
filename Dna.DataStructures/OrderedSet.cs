@@ -4,13 +4,23 @@ using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 
-namespace Dna.ControlFlow.DataStructures
+namespace Dna.DataStructures
 {
     public class OrderedSet<T> : ICollection<T>
     {
         private readonly IDictionary<T, LinkedListNode<T>> dictionary;
 
         private readonly LinkedList<T> linkedList;
+
+        public int Count
+        {
+            get { return dictionary.Count; }
+        }
+
+        public virtual bool IsReadOnly
+        {
+            get { return dictionary.IsReadOnly; }
+        }
 
         public OrderedSet()
             : this(EqualityComparer<T>.Default)
@@ -28,21 +38,10 @@ namespace Dna.ControlFlow.DataStructures
             }
         }
            
-
         public OrderedSet(IEqualityComparer<T> comparer)
         {
             dictionary = new Dictionary<T, LinkedListNode<T>>(comparer);
             linkedList = new LinkedList<T>();
-        }
-
-        public int Count
-        {
-            get { return dictionary.Count; }
-        }
-
-        public virtual bool IsReadOnly
-        {
-            get { return dictionary.IsReadOnly; }
         }
 
         void ICollection<T>.Add(T item)
@@ -67,33 +66,22 @@ namespace Dna.ControlFlow.DataStructures
             return true;
         }
 
-        public IEnumerator<T> GetEnumerator()
-        {
-            return linkedList.GetEnumerator();
-        } 
+        public IEnumerator<T> GetEnumerator() => linkedList.GetEnumerator();
 
-        public bool Contains(T item)
-        {
-            return dictionary.ContainsKey(item);
-        }
+        public bool Contains(T item) => dictionary.ContainsKey(item);
 
-        public void CopyTo(T[] array, int arrayIndex)
-        {
-            linkedList.CopyTo(array, arrayIndex);
-        }
+        public void CopyTo(T[] array, int arrayIndex) => linkedList.CopyTo(array, arrayIndex);
 
         public bool Add(T item)
         {
             if (dictionary.ContainsKey(item))
                 return false;
+
             LinkedListNode<T> node = linkedList.AddLast(item);
             dictionary.Add(item, node);
             return true;
         }
 
-        System.Collections.IEnumerator System.Collections.IEnumerable.GetEnumerator()
-        {
-            return linkedList.GetEnumerator();
-        }
+        System.Collections.IEnumerator System.Collections.IEnumerable.GetEnumerator() => linkedList.GetEnumerator();
     }
 }
