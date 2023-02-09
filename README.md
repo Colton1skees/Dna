@@ -18,5 +18,6 @@ You can find an example usage [here](https://github.com/Colton1skees/Dna/blob/ma
  * [X] SMT solver interface
  * [X] **Symbolic** execution engine
  * [X] Mixed boolean-arithmetic(MBA) simplifier
- * [ ] **SSA** form construction
+ * [ ] Go-to free control flow structuring
+ * [ ] **SSA** form construction 
  * [ ] IR to x86 compiler
