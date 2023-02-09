@@ -7,16 +7,9 @@ using System.Threading.Tasks;
 
 namespace Dna.ControlFlow.Analysis
 {
-    public class DominatorAnalysis
+    public static class DominatorAnalysis
     {
-        private readonly Graph graph;
-
-        public DominatorAnalysis(Graph graph)
-        {
-            this.graph = graph;
-        }
-
-        public IReadOnlyDictionary<Node, HashSet<Node>> GetDominatorTree()
+        public static IReadOnlyDictionary<Node, HashSet<Node>> GetDominatorTree(Graph graph)
         {
             if (graph.Nodes.First().IncomingEdges.Count > 0)
                 throw new InvalidOperationException("Root nodes cannot have incoming edges.");

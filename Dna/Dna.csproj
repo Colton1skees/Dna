@@ -17,8 +17,13 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <Compile Remove="Lifting\X86\**" />
+    <EmbeddedResource Remove="Lifting\X86\**" />
+    <None Remove="Lifting\X86\**" />
+  </ItemGroup>
+
+  <ItemGroup>
     <Folder Include="Binary\Linux\" />
-    <Folder Include="Lifting\X86\" />
   </ItemGroup>
 
   <ItemGroup>

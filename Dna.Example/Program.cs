@@ -5,7 +5,6 @@ using Dna.Emulation;
 using Dna.Lifting;
 using Dna.Optimization;
 using Dna.Optimization.Passes;
-using Dna.Optimization.Ssa;
 using Dna.Relocation;
 using Dna.Synthesis.Jit;
 using Dna.Synthesis.Miasm;

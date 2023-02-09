@@ -36,8 +36,7 @@ namespace Dna.Tests.ControlFlow
             n2.OutgoingEdges.Add(n4);
             n3.OutgoingEdges.Add(n4);
 
-            var analysis = new DominatorAnalysis(graph);
-            var tree = analysis.GetDominatorTree();
+            var tree = DominatorAnalysis.GetDominatorTree(graph);
 
             var dictionary = graph.Nodes.Select(x => new KeyValuePair<Node, HashSet<Node>>(x, new HashSet<Node>()));
             var expectedOutput = new Dictionary<Node, HashSet<Node>>(dictionary);
