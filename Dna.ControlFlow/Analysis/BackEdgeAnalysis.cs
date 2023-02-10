@@ -9,11 +9,12 @@ namespace Dna.ControlFlow.Analysis
 {
     public static class BackEdgeAnalysis
     {
+        /// <inheritdoc cref="BackEdgeAnalysis.GetBackEdges(Graph, IReadOnlyDictionary{Node, HashSet{Node}})"/>
+        public static HashSet<Edge> GetBackEdges(Graph graph) => GetBackEdges(graph, DominatorAnalysis.GetDominatorTree(graph));
+
         /// <summary>
         /// Gets all outgoing edges where the target dominates its source.
         /// </summary>
-        /// <param name="graph"></param>
-        /// <param name="dominatorTree"></param>
         /// <returns></returns>
         public static HashSet<Edge> GetBackEdges(Graph graph, IReadOnlyDictionary<Node, HashSet<Node>> dominatorTree)
         {
