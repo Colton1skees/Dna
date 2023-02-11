@@ -59,7 +59,6 @@ namespace Dna.Structuring
             // Assert that the source of each retreating edge is a dummy node.
             if (backEdges.Any(x => x.SourceBlock.Instructions.Any()))
                 throw new InvalidOperationException("The source node of a retreating edge must now always be a dummy node.");
-
         }
 
         private void CreateMetaRegions(HashSet<BlockEdge<T>> backEdges)
