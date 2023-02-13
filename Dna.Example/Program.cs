@@ -15,6 +15,8 @@ using DotNetGraph.Extensions;
 using Rivers;
 using Rivers.Analysis;
 using System.Diagnostics;
+using Google.Protobuf;
+using Grpc.Net.Client;
 using TritonTranslator.Arch;
 using TritonTranslator.Arch.X86;
 
@@ -25,65 +27,6 @@ var binary = new WindowsBinary(64, File.ReadAllBytes(path), 0x140000000);
 
 // Instantiate dna.
 var dna = new Dna.Dna(binary);
-
-var libraryPath = @"C:\Users\colton\source\repos\msynth\database\reduced_database.txt";
-var lines = File.ReadAllLines(libraryPath);
-
-var oracle = new SimplificationOracle(7, 30, libraryPath);
-
-var simplifier = new ExpressionSimplifier(oracle, false, 1);
-
-// Construct expression: { ~((~A)+B)
-var a = new ExprId("a", 16);
-var b = new ExprId("b", 16);
-var c = new ExprId("c", 16);
-
-var ored = new ExprOp(16, "|", a, b);
-var anded = new ExprOp(16, "&", ored, a);
-
-for(int i = 0; i < 250; i++)
-{
-    if(i % 3 == 0)
-    {
-        anded = new ExprOp(16, "*", c, anded);
-    }
-
-    else
-    {
-        anded = new ExprOp(16, "+", anded, b);
-    }
-}
-
-// Simplify the expression
-var sw = Stopwatch.StartNew();
-var simplified = simplifier.Simplify(anded);
-
-// Print the simplified expression
-sw.Stop();
-var str = ExpressionFormatter.FormatExpression(simplified);
-Console.WriteLine(str);
-
-Console.WriteLine("Took {0} ms to simplify expression", sw.ElapsedMilliseconds);
-var jitter = new LLVMJitter();
-List<MiasmExpr> exprs = new List<MiasmExpr>(lines.Length);
-foreach(var line in lines)
-{
-    /*
-    var expr = ExpressionDatabaseParser.ParseExpression(line);
-    //exprs.Add(expr);
-    //jitter.LiftAst(expr, ExprUtilities.GetUniqueVariables(expr));
-
-    var exprStr = ExpressionFormatter.FormatExpression(expr);
-    if(line != exprStr)
-    {
-        Console.WriteLine("Expected {0}\n", line);
-        Console.WriteLine("But got {0}", exprStr);
-        Console.WriteLine("");
-    }
-    */
-}
-
-//ExpressionDatabaseParser.ParseExpression(@"ExprOp("" + "", ExprOp("" ^ "", ExprId(""p2"", 8), ExprOp("" + "", ExprOp("" - "", ExprId(""p2"", 8)), ExprInt(2, 8))), ExprInt(2, 8))");
 
 // Parse a control flow graph from the binary.
 ulong funcAddr = 0x140001030;
@@ -123,6 +66,36 @@ bool printLLVM = true;
 if (printLLVM)
     llvmLifter.DumpModule();
 
+Console.WriteLine("Press enter to decompile");
+
+var channel = GrpcChannel.ForAddress(new Uri("http://localhost:50051"));
+var client = new RellicDecompilation.RellicDecompilationClient(channel);
+var bytes = llvmLifter.Serialize();
+var byteString = ByteString.CopyFrom(bytes);
+var reply = client.Decompile(new DecompileCommand()
+{
+    LlvmModuleText = byteString
+});
+
+var sw2 = Stopwatch.StartNew();
+for (int i = 0; i < 50; i++)
+{
+    bytes = llvmLifter.Serialize();
+    byteString = ByteString.CopyFrom(bytes);
+    reply = client.Decompile(new DecompileCommand()
+    {
+        LlvmModuleText = byteString
+    });
+}
+
+sw2.Stop();
+Console.WriteLine("Took {0} ms to decompile 1000 methods", sw2.ElapsedMilliseconds);
+// Console.WriteLine(reply.DecompiledText);
+
+
+
+llvmLifter.WriteToBitcodeFile("Lifted.ll");
+//Console.WriteLine(File.ReadAllText("Lifted.ll"));
 
 Console.WriteLine("Finished.");
 Console.ReadLine();

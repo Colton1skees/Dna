@@ -3,6 +3,7 @@ using LLVMSharp;
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Runtime.InteropServices;
 using System.Text;
 using System.Threading.Tasks;
 using TritonTranslator.Arch;
@@ -42,6 +43,11 @@ namespace Dna.Lifting
             var parentRegs = X86Registers.RegisterMapping.Values.Where(x => x.ParentId == x.Id);
             foreach (var parentReg in parentRegs)
             {
+                // Skip registers with a size > 64, since rellic does not support 
+                // arbitrary bit widths.
+                if (parentReg.BitSize > 64)
+                    continue;
+                
                 Console.WriteLine(parentReg.Name);
                 var ptrType = (LLVM.IntType(parentReg.BitSize));
                 var global = LLVM.AddGlobal(module, ptrType, parentReg.Name);
@@ -570,5 +576,30 @@ namespace Dna.Lifting
         {
             LLVM.DumpModule(module);
         }
+
+        public void WriteToBitcodeFile(string message)
+        {
+            LLVM.SetTarget(module, "x86_64");
+            LLVM.WriteBitcodeToFile(module, message);
+        }
+        
+        public byte[] Serialize()
+        {
+            LLVM.SetTarget(module, "x86_64");
+            var bufferRef = LLVM.WriteBitcodeToMemoryBuffer(module);
+            var serialized = GetLlvmBytes(bufferRef);
+            LLVM.DisposeMemoryBuffer(bufferRef);
+            return serialized;
+        }
+        
+        private byte[] GetLlvmBytes(LLVMMemoryBufferRef bufferRef)
+        {
+            IntPtr start = LLVMSharp.LLVM.GetBufferStart(bufferRef);
+            var size = LLVMSharp.LLVM.GetBufferSize(bufferRef);
+            byte[] copy = new byte[size];
+            Marshal.Copy(start, copy, 0, size);
+            return copy;
+        }
+
     }
 }
