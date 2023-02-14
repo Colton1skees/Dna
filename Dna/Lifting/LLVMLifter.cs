@@ -19,8 +19,6 @@ namespace Dna.Lifting
 
         private readonly ICpuArchitecture architecture;
 
-        LLVMModuleRef module = LLVM.ModuleCreateWithName("TritonTranslator");
-
         LLVMBuilderRef builder = LLVM.CreateBuilder();
 
         private Dictionary<register_e, LLVMValueRef> registerGlobals = new Dictionary<register_e, LLVMValueRef>();
@@ -29,13 +27,15 @@ namespace Dna.Lifting
 
         private Dictionary<BasicBlock<AbstractInst>, LLVMBasicBlockRef> blockMapping = new Dictionary<BasicBlock<AbstractInst>, LLVMBasicBlockRef>();
 
+        public LLVMModuleRef Module { get; } = LLVM.ModuleCreateWithName("TritonTranslator");
+
         public LLVMLifter(ICpuArchitecture architecture)
         {
             LLVM.LinkInMCJIT();
             LLVM.InitializeX86TargetInfo();
             LLVM.InitializeX86Target();
             LLVM.InitializeX86TargetMC();
-            if (LLVM.CreateExecutionEngineForModule(out var engine, module, out var errorMessage).Value == 1)
+            if (LLVM.CreateExecutionEngineForModule(out var engine, Module, out var errorMessage).Value == 1)
             {
                 throw new Exception(errorMessage);
             }
@@ -48,9 +48,8 @@ namespace Dna.Lifting
                 if (parentReg.BitSize > 64)
                     continue;
                 
-                Console.WriteLine(parentReg.Name);
                 var ptrType = (LLVM.IntType(parentReg.BitSize));
-                var global = LLVM.AddGlobal(module, ptrType, parentReg.Name);
+                var global = LLVM.AddGlobal(Module, ptrType, parentReg.Name);
                 global.SetLinkage(LLVMLinkage.LLVMCommonLinkage);
                 //var ptrNull = LLVM.ConstPointerNull(LLVM.PointerType(ptrType, 0));
                 var ptrNull = LLVM.ConstInt(ptrType, 0, new LLVMBool(0));
@@ -64,7 +63,7 @@ namespace Dna.Lifting
         public void Lift(ControlFlowGraph<AbstractInst> irCfg)
         {
             var function = LLVM.AddFunction(
-                module,
+                Module,
                 "SampleFunc",
                 LLVM.FunctionType(LLVM.VoidType(),
                 new LLVMTypeRef[] { },
@@ -256,7 +255,7 @@ namespace Dna.Lifting
             // Create the intrinsic.
             var intType = LLVM.IntType(inst.Bitsize);
             var fnType = LLVM.FunctionType(intType, new LLVMTypeRef[] { intType, intType, intType }, false);
-            var intrinsicFunc = LLVM.AddFunction(module, "llvm.fshl.i" + inst.Bitsize, fnType);
+            var intrinsicFunc = LLVM.AddFunction(Module, "llvm.fshl.i" + inst.Bitsize, fnType);
 
             var result = LLVM.BuildCall(builder, intrinsicFunc, new LLVMValueRef[] { op1, op1, op2 }, "rol");
             StoreToOperand(inst.Dest, result);
@@ -271,7 +270,7 @@ namespace Dna.Lifting
             // Create the intrinsic.
             var intType = LLVM.IntType(inst.Bitsize);
             var fnType = LLVM.FunctionType(intType, new LLVMTypeRef[] { intType, intType, intType }, false);
-            var intrinsicFunc = LLVM.AddFunction(module, "llvm.fshr.i" + inst.Bitsize, fnType);
+            var intrinsicFunc = LLVM.AddFunction(Module, "llvm.fshr.i" + inst.Bitsize, fnType);
 
             // Invoke the intrinsic and store the result.
             var result = LLVM.BuildCall(builder, intrinsicFunc, new LLVMValueRef[] { op1, op1, op2 }, "ror");
@@ -574,19 +573,19 @@ namespace Dna.Lifting
 
         public void DumpModule()
         {
-            LLVM.DumpModule(module);
+            LLVM.DumpModule(Module);
         }
 
         public void WriteToBitcodeFile(string message)
         {
-            LLVM.SetTarget(module, "x86_64");
-            LLVM.WriteBitcodeToFile(module, message);
+            LLVM.SetTarget(Module, "x86_64");
+            LLVM.WriteBitcodeToFile(Module, message);
         }
         
         public byte[] Serialize()
         {
-            LLVM.SetTarget(module, "x86_64");
-            var bufferRef = LLVM.WriteBitcodeToMemoryBuffer(module);
+            LLVM.SetTarget(Module, "x86_64");
+            var bufferRef = LLVM.WriteBitcodeToMemoryBuffer(Module);
             var serialized = GetLlvmBytes(bufferRef);
             LLVM.DisposeMemoryBuffer(bufferRef);
             return serialized;
@@ -600,6 +599,5 @@ namespace Dna.Lifting
             Marshal.Copy(start, copy, 0, size);
             return copy;
         }
-
     }
 }

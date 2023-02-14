@@ -20,6 +20,9 @@ namespace Dna.ControlFlow.Analysis
             var targets = new HashSet<Node>();
             if(target != null)
                 targets.Add(target);
+
+            // TODO: Implement reachability analysis.
+            return null;
         }
     }
 }

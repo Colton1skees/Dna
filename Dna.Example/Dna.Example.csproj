@@ -1,4 +1,4 @@
-<Project Sdk="Microsoft.NET.Sdk">
+﻿<Project Sdk="Microsoft.NET.Sdk">
 
   <PropertyGroup>
     <OutputType>Exe</OutputType>
@@ -9,6 +9,7 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <ProjectReference Include="..\Dna.Decompiler\Dna.Decompiler.csproj" />
     <ProjectReference Include="..\Dna.Synthesis\Dna.Synthesis.csproj" />
     <ProjectReference Include="..\Dna\Dna.csproj" />
   </ItemGroup>

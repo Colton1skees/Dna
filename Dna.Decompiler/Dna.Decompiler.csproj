@@ -1,0 +1,33 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net7.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="ClangSharp" Version="15.0.0" />
+    <PackageReference Include="Google.Protobuf" Version="3.21.12" />
+    <PackageReference Include="Google.Protobuf.Tools" Version="3.21.12" />
+    <PackageReference Include="Grpc.Net.Client" Version="2.51.0" />
+    <PackageReference Include="Grpc.Tools" Version="2.51.0">
+      <PrivateAssets>all</PrivateAssets>
+      <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
+    </PackageReference>
+    <PackageReference Include="libclang" Version="15.0.0" />
+    <PackageReference Include="libclang.runtime.win-x64" Version="15.0.0" />
+    <PackageReference Include="libClangSharp.runtime.win-x64" Version="15.0.0" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\Dna.ControlFlow\Dna.ControlFlow.csproj" />
+    <ProjectReference Include="..\Dna\Dna.csproj" />
+    <ProjectReference Include="..\TritonTranslator\TritonTranslator\TritonTranslator.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Protobuf Include="Proto\rellic_decompilation.proto" GrpcServices="Client" />
+  </ItemGroup>
+
+</Project>

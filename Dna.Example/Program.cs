@@ -15,10 +15,12 @@ using DotNetGraph.Extensions;
 using Rivers;
 using Rivers.Analysis;
 using System.Diagnostics;
-using Google.Protobuf;
 using Grpc.Net.Client;
 using TritonTranslator.Arch;
 using TritonTranslator.Arch.X86;
+using ClangSharp.Interop;
+using ClangSharp;
+using Dna.Decompiler;
 
 // Load the 64 bit PE file.
 // Note: This file is automatically copied to the build directory.
@@ -66,36 +68,23 @@ bool printLLVM = true;
 if (printLLVM)
     llvmLifter.DumpModule();
 
-Console.WriteLine("Press enter to decompile");
-
-var channel = GrpcChannel.ForAddress(new Uri("http://localhost:50051"));
-var client = new RellicDecompilation.RellicDecompilationClient(channel);
-var bytes = llvmLifter.Serialize();
-var byteString = ByteString.CopyFrom(bytes);
-var reply = client.Decompile(new DecompileCommand()
+// Optionally decompile the lifted function to go-to free pseudo C, via Rellic.
+// On my machine, a fork of Rellic runs under WSL2 and communiucates via gRPC.
+// If you are not locally hosting this server at localhost:50051, then the API
+// call will fail. You can find the service here(https://github.com/Colton1skees/rellic-api),
+// although it will take a bit of leg work for outside use.
+bool decompile = true;
+if (decompile)
 {
-    LlvmModuleText = byteString
-});
+    // Create a decompiler instance.
+    var decompiler = new Decompiler(architecture);
 
-var sw2 = Stopwatch.StartNew();
-for (int i = 0; i < 50; i++)
-{
-    bytes = llvmLifter.Serialize();
-    byteString = ByteString.CopyFrom(bytes);
-    reply = client.Decompile(new DecompileCommand()
-    {
-        LlvmModuleText = byteString
-    });
+    // Decompile the lifted function to pseudo C.
+    var ast = decompiler.Decompile(liftedCfg);
+
+    // Print the decompiled routine.
+    Console.WriteLine("Decompiled routine:\n{0}", ast);
 }
-
-sw2.Stop();
-Console.WriteLine("Took {0} ms to decompile 1000 methods", sw2.ElapsedMilliseconds);
-// Console.WriteLine(reply.DecompiledText);
-
-
-
-llvmLifter.WriteToBitcodeFile("Lifted.ll");
-//Console.WriteLine(File.ReadAllText("Lifted.ll"));
 
 Console.WriteLine("Finished.");
 Console.ReadLine();

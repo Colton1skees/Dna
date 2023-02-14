@@ -11,7 +11,7 @@
 - Translation of routines to **LLVM** IR
 - IR **optimization** passes
 - Function relocation(optionally across binaries, with some caveats)
-- Decompilation(via [Rellic](https://github.com/lifting-bits/rellic)
+- Decompilation(via [Rellic](https://github.com/lifting-bits/rellic))
 
 You can find an example usage [here](https://github.com/Colton1skees/Dna/blob/master/Dna.Example/Program.cs).
 
@@ -19,6 +19,6 @@ You can find an example usage [here](https://github.com/Colton1skees/Dna/blob/ma
  * [X] SMT solver interface
  * [X] **Symbolic** execution engine
  * [X] Mixed boolean-arithmetic(MBA) simplifier
- * [X] Decompilation
- * [ ] **SSA** form construction 
- * [ ] IR to x86 compiler
+ * [X] Decompilation to pseudo C
+ * [ ] Jump table recovery
+ * [ ] Compiler back to x86/x64

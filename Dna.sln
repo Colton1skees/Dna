@@ -17,7 +17,9 @@ Project("{6EC3EE1D-3C4E-46DD-8F32-0CC8E7565705}") = "UnicornManaged", "unicorn\b
 EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Dna.Synthesis", "Dna.Synthesis\Dna.Synthesis.csproj", "{609DED32-46DB-42F3-99D8-AE73A64FD92E}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Dna.DataStructures", "Dna.DataStructures\Dna.DataStructures.csproj", "{9007DD90-82F1-4950-8009-EF413D44917B}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Dna.DataStructures", "Dna.DataStructures\Dna.DataStructures.csproj", "{9007DD90-82F1-4950-8009-EF413D44917B}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Dna.Decompiler", "Dna.Decompiler\Dna.Decompiler.csproj", "{27019130-162B-4122-99EA-491A1BFE07AE}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
@@ -227,6 +229,30 @@ Global
 		{9007DD90-82F1-4950-8009-EF413D44917B}.RelWithDebInfo|x64.Build.0 = Release|Any CPU
 		{9007DD90-82F1-4950-8009-EF413D44917B}.RelWithDebInfo|x86.ActiveCfg = Release|Any CPU
 		{9007DD90-82F1-4950-8009-EF413D44917B}.RelWithDebInfo|x86.Build.0 = Release|Any CPU
+		{27019130-162B-4122-99EA-491A1BFE07AE}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{27019130-162B-4122-99EA-491A1BFE07AE}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{27019130-162B-4122-99EA-491A1BFE07AE}.Debug|x64.ActiveCfg = Debug|Any CPU
+		{27019130-162B-4122-99EA-491A1BFE07AE}.Debug|x64.Build.0 = Debug|Any CPU
+		{27019130-162B-4122-99EA-491A1BFE07AE}.Debug|x86.ActiveCfg = Debug|Any CPU
+		{27019130-162B-4122-99EA-491A1BFE07AE}.Debug|x86.Build.0 = Debug|Any CPU
+		{27019130-162B-4122-99EA-491A1BFE07AE}.MinSizeRel|Any CPU.ActiveCfg = Debug|Any CPU
+		{27019130-162B-4122-99EA-491A1BFE07AE}.MinSizeRel|Any CPU.Build.0 = Debug|Any CPU
+		{27019130-162B-4122-99EA-491A1BFE07AE}.MinSizeRel|x64.ActiveCfg = Debug|Any CPU
+		{27019130-162B-4122-99EA-491A1BFE07AE}.MinSizeRel|x64.Build.0 = Debug|Any CPU
+		{27019130-162B-4122-99EA-491A1BFE07AE}.MinSizeRel|x86.ActiveCfg = Debug|Any CPU
+		{27019130-162B-4122-99EA-491A1BFE07AE}.MinSizeRel|x86.Build.0 = Debug|Any CPU
+		{27019130-162B-4122-99EA-491A1BFE07AE}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{27019130-162B-4122-99EA-491A1BFE07AE}.Release|Any CPU.Build.0 = Release|Any CPU
+		{27019130-162B-4122-99EA-491A1BFE07AE}.Release|x64.ActiveCfg = Release|Any CPU
+		{27019130-162B-4122-99EA-491A1BFE07AE}.Release|x64.Build.0 = Release|Any CPU
+		{27019130-162B-4122-99EA-491A1BFE07AE}.Release|x86.ActiveCfg = Release|Any CPU
+		{27019130-162B-4122-99EA-491A1BFE07AE}.Release|x86.Build.0 = Release|Any CPU
+		{27019130-162B-4122-99EA-491A1BFE07AE}.RelWithDebInfo|Any CPU.ActiveCfg = Release|Any CPU
+		{27019130-162B-4122-99EA-491A1BFE07AE}.RelWithDebInfo|Any CPU.Build.0 = Release|Any CPU
+		{27019130-162B-4122-99EA-491A1BFE07AE}.RelWithDebInfo|x64.ActiveCfg = Release|Any CPU
+		{27019130-162B-4122-99EA-491A1BFE07AE}.RelWithDebInfo|x64.Build.0 = Release|Any CPU
+		{27019130-162B-4122-99EA-491A1BFE07AE}.RelWithDebInfo|x86.ActiveCfg = Release|Any CPU
+		{27019130-162B-4122-99EA-491A1BFE07AE}.RelWithDebInfo|x86.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE

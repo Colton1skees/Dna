@@ -30,20 +30,10 @@
     <PackageReference Include="AsmResolver" Version="4.9.0" />
     <PackageReference Include="AsmResolver.PE.File" Version="4.9.0" />
     <PackageReference Include="ELFSharp" Version="2.15.0" />
-    <PackageReference Include="Google.Protobuf" Version="3.22.0-rc3" />
-    <PackageReference Include="Grpc.Net.Client" Version="2.51.0" />
-    <PackageReference Include="Grpc.Tools" Version="2.52.0-pre1">
-      <PrivateAssets>all</PrivateAssets>
-      <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
-    </PackageReference>
     <PackageReference Include="Iced" Version="1.17.0" />
     <PackageReference Include="LLVMSharp" Version="5.0.0" />
     <PackageReference Include="Microsoft.Z3" Version="4.11.2" />
     <PackageReference Include="Rivers" Version="0.1.0" />
-  </ItemGroup>
-  
-  <ItemGroup>
-    <Protobuf Include="Decompilation\rellic_decompilation.proto" GrpcServices="Client" />
   </ItemGroup>
 
   <ItemGroup>
