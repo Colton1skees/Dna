@@ -376,7 +376,7 @@ namespace Dna.Lifting
 
         private void FromZx(InstZx inst)
         {
-            var destType = LLVM.IntType(inst.Bitsize);
+            var destType = LLVMTypeRef.CreateInt(inst.Bitsize);
             var input = LoadSourceOperand(inst.InputOperand);
             var result = compiler.ZExt(input, destType, "zx");
             StoreToOperand(inst.Dest, op1);
@@ -386,7 +386,7 @@ namespace Dna.Lifting
         {
             var op1 = LoadSourceOperand(inst.Op1);
 
-            var pointer = compiler.Alloca(LLVM.IntType(inst.Bitsize), "copy");
+            var pointer = compiler.Alloca(LLVMTypeRef.CreateInt(inst.Bitsize), "copy");
 
             compiler.Store(op1, pointer);
 
@@ -401,7 +401,7 @@ namespace Dna.Lifting
             var op1 = LoadSourceOperand(inst.Op1);
 
             // Cast the address to a pointer.
-            var ptrType = LLVM.PointerType(LLVM.IntType(inst.Bitsize), 0);
+            var ptrType = LLVMTypeRef.CreatePointer(LLVMTypeRef.CreateInt(inst.Bitsize), 0);
             var pointer = compiler.IntToPtr(op1, ptrType, "load");
 
             // Dereference the pointer.

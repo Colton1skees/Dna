@@ -1,6 +1,7 @@
 ﻿using Dna.Synthesis.Miasm;
 using Dna.Synthesis.Utils;
 using LLVMSharp;
+using LLVMSharp.Interop;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -11,9 +12,9 @@ namespace Dna.Synthesis.Jit
 {
     public class LLVMJitter
     {
-        private readonly LLVMModuleRef module = LLVM.ModuleCreateWithName("TritonTranslator");
+        private readonly LLVMModuleRef Module = LLVMModuleRef.CreateWithName("TritonTranslator");
 
-        private readonly LLVMBuilderRef builder = LLVM.CreateBuilder();
+        private readonly LLVMBuilderRef builder;
 
         private Dictionary<ExprId, LLVMValueRef> argumentMapping = new();
 
@@ -21,36 +22,34 @@ namespace Dna.Synthesis.Jit
 
         public LLVMJitter()
         {
+            builder = Module.Context.CreateBuilder();
             LLVM.LinkInMCJIT();
             LLVM.InitializeX86TargetInfo();
             LLVM.InitializeX86Target();
             LLVM.InitializeX86TargetMC();
-            if (LLVM.CreateExecutionEngineForModule(out var engine, module, out var errorMessage).Value == 1)
-            {
-                throw new Exception(errorMessage);
-            }
+            var engine = Module.CreateExecutionEngine();
         }
 
         public (LLVMValueRef functionPointer, Dictionary<ExprId, LLVMValueRef> argMapping) LiftAst(MiasmExpr expr, IEnumerable<ExprId> inputVariables)
         {
             // Create integer arguments for each input variable.
-            var argumentTypes = inputVariables.Select(x => LLVM.IntType(x.Size)).ToArray();
+            var argumentTypes = inputVariables.Select(x => LLVMTypeRef.CreateInt(x.Size)).ToArray();
 
             // Create a function which evaluates to a single integer of the expression size.
-            var prototype = LLVM.FunctionType(LLVM.IntType(expr.Size), argumentTypes, false);
-            var function = LLVM.AddFunction(module, "Expr" + functionCount, prototype);
+            var prototype = LLVMTypeRef.CreateFunction(LLVMTypeRef.CreateInt(expr.Size), argumentTypes, false);
+            var function = Module.AddFunction("Expr" + functionCount, prototype);
             
             // Create a single block and position the builder to emit instructions for this block.
-            var block = LLVM.AppendBasicBlock(function, "entry");
-            LLVM.PositionBuilderAtEnd(builder, block);
+            var block = function.AppendBasicBlock("entry");
+            builder.PositionAtEnd(block);
 
             // Maintain a mapping of <inputVariable, llvmParam>.
             argumentMapping.Clear();
-            var arguments = LLVM.GetParams(function);
+            var arguments = function.Params;
             int i = 0;
-            foreach (var argument in inputVariables)
+            foreach (var inputVariable in inputVariables)
             {
-                argumentMapping.Add(argument, arguments[i]);
+                argumentMapping.Add(inputVariable, arguments[i]);
                 i++;
             }
 
@@ -86,8 +85,8 @@ namespace Dna.Synthesis.Jit
 
         private LLVMValueRef FromExprInt(ExprInt exprInt)
         {
-            var intType = LLVM.IntType(exprInt.Size);
-            return LLVM.ConstInt(intType, exprInt.Value, new LLVMBool(0));
+            var intType = LLVMTypeRef.CreateInt(exprInt.Size);
+            return LLVMValueRef.CreateConstInt(intType, exprInt.Value, false);
         }
 
         private LLVMValueRef FromExprSlice(ExprSlice exprSlice)
@@ -96,12 +95,12 @@ namespace Dna.Synthesis.Jit
             var src = Translate(exprSlice.Src);
 
             // Remove trailing bits.
-            var sliceSize = LLVM.IntType(exprSlice.Src.Size);
+            var sliceSize = LLVMTypeRef.CreateInt(exprSlice.Src.Size);
             LLVMValueRef? shifted = null;
             if (exprSlice.Start != 0)
             {
-                var toShr = LLVM.ConstInt(sliceSize, exprSlice.Start, new LLVMBool(0));
-                shifted = LLVM.BuildLShr(builder, src, toShr, "shifted");
+                var toShr = LLVMValueRef.CreateConstInt(sliceSize, exprSlice.Start, false);
+                shifted = builder.BuildLShr(src, toShr, "shifted");
             }
 
             else
@@ -111,10 +110,10 @@ namespace Dna.Synthesis.Jit
 
             // Remove leading bits.
             var shiftSize = (1u << (int)(exprSlice.Stop - exprSlice.Start)) - 1;
-            var toAnd = LLVM.ConstInt(sliceSize, shiftSize, new LLVMBool(0));
-            var anded = LLVM.BuildAnd(builder, shifted.Value, toAnd, "anded");
+            var toAnd = LLVMValueRef.CreateConstInt(sliceSize, shiftSize, false);
+            var anded = builder.BuildAnd(shifted.Value, toAnd, "anded");
 
-            return LLVM.BuildTrunc(builder, anded, LLVM.IntType(exprSlice.Size), "sliced");
+            return builder.BuildTrunc(anded, LLVMTypeRef.CreateInt(exprSlice.Size), "sliced");
         }
 
         private LLVMValueRef FromExprOp(ExprOp expr)
@@ -124,21 +123,21 @@ namespace Dna.Synthesis.Jit
                 case "-":
                     if (expr.Operands.Count != 1)
                         throw new InvalidOperationException();
-                    var type = LLVM.IntType(expr.Size);
-                    var zero = LLVM.ConstInt(type, 0, new LLVMBool(0));
-                    return LLVM.BuildSub(builder, zero, Translate(expr.Operands[0]), "Sub");
+                    var type = LLVMTypeRef.CreateInt(expr.Size);
+                    var zero = LLVMValueRef.CreateConstInt(type, 0, false);
+                    return builder.BuildSub(zero, Translate(expr.Operands[0]), "Sub");
                 case "*":
-                    return LLVM.BuildMul(builder, Translate(expr.Operands[0]), Translate(expr.Operands[1]), "Mul");
+                    return builder.BuildMul(Translate(expr.Operands[0]), Translate(expr.Operands[1]), "Mul");
                 case "+":
-                    return LLVM.BuildAdd(builder, Translate(expr.Operands[0]), Translate(expr.Operands[1]), "Add");
+                    return builder.BuildAdd(Translate(expr.Operands[0]), Translate(expr.Operands[1]), "Add");
                 case "&":
-                    return LLVM.BuildAnd(builder, Translate(expr.Operands[0]), Translate(expr.Operands[1]), "And");
+                    return builder.BuildAnd(Translate(expr.Operands[0]), Translate(expr.Operands[1]), "And");
                 case "|":
-                    return LLVM.BuildOr(builder, Translate(expr.Operands[0]), Translate(expr.Operands[1]), "Or");
+                    return builder.BuildOr(Translate(expr.Operands[0]), Translate(expr.Operands[1]), "Or");
                 case "^":
-                    return LLVM.BuildXor(builder, Translate(expr.Operands[0]), Translate(expr.Operands[1]), "Xor");
+                    return builder.BuildXor(Translate(expr.Operands[0]), Translate(expr.Operands[1]), "Xor");
                 case "<<":
-                    return LLVM.BuildShl(builder, Translate(expr.Operands[0]), Translate(expr.Operands[1]), "Shl");
+                    return builder.BuildShl(Translate(expr.Operands[0]), Translate(expr.Operands[1]), "Shl");
                 default:
                     throw new NotImplementedException();
             }

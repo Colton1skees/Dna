@@ -1,4 +1,5 @@
 ﻿using LLVMSharp;
+using LLVMSharp.Interop;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -10,21 +11,29 @@ namespace Dna.Decompiler.Rellic
 {
     public static class LlvmUtilities
     {
-        public static byte[] SerializeModuleToBC(LLVMModuleRef module)
+        public unsafe static byte[] SerializeModuleToBC(LLVMModuleRef module)
         {
-            var bufferRef = LLVM.WriteBitcodeToMemoryBuffer(module);
-            var serialized = GetLlvmBytes(bufferRef);
-            LLVM.DisposeMemoryBuffer(bufferRef);
-            return serialized;
+            unsafe
+            {
+                var bufferRef = LLVM.WriteBitcodeToMemoryBuffer((LLVMOpaqueModule*)module.Handle);
+                var serialized = GetLlvmBytes(bufferRef);
+                LLVM.DisposeMemoryBuffer(bufferRef);
+                return serialized;
+            }
         }
 
-        private static byte[] GetLlvmBytes(LLVMMemoryBufferRef bufferRef)
+        private unsafe static byte[] GetLlvmBytes(LLVMOpaqueMemoryBuffer* bufferRef)
         {
-            IntPtr start = LLVMSharp.LLVM.GetBufferStart(bufferRef);
-            var size = LLVMSharp.LLVM.GetBufferSize(bufferRef);
+            var start = LLVM.GetBufferStart(bufferRef);
+            var size = LLVM.GetBufferSize(bufferRef);
             byte[] copy = new byte[size];
-            Marshal.Copy(start, copy, 0, size);
+            Marshal.Copy((nint)start, copy, 0, (int)size);
             return copy;
+        }
+
+        public static string SerialzeModuleToString(LLVMModuleRef module)
+        {
+            return module.PrintToString();
         }
     }
 }

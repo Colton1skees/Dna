@@ -2,6 +2,7 @@ using Dna.Decompiler.Rellic;
 using Google.Protobuf;
 using Grpc.Net.Client;
 using LLVMSharp;
+using LLVMSharp.Interop;
 using static RellicDecompilation;
 
 namespace Dna.Decompilation;
@@ -27,9 +28,6 @@ internal class RellicLLVMDecompiler
     /// <returns></returns>
     public string Decompile(LLVMModuleRef module)
     {
-        // Set the LLVM target to x86_64. 
-        LLVM.SetTarget(module, "x86_64");
-
         // Serialize the LLVM module to bitcode.
         var bitcode = LlvmUtilities.SerializeModuleToBC(module);
 

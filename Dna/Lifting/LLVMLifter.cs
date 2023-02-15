@@ -1,7 +1,9 @@
 ﻿using Dna.ControlFlow;
 using LLVMSharp;
+using LLVMSharp.Interop;
 using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.Linq;
 using System.Runtime.InteropServices;
 using System.Text;
@@ -15,11 +17,13 @@ namespace Dna.Lifting
 {
     public class LLVMLifter
     {
+        private LLVMModuleRef module;
+
         private readonly string opName = "op";
 
         private readonly ICpuArchitecture architecture;
 
-        LLVMBuilderRef builder = LLVM.CreateBuilder();
+        private readonly LLVMBuilderRef builder;
 
         private Dictionary<register_e, LLVMValueRef> registerGlobals = new Dictionary<register_e, LLVMValueRef>();
 
@@ -27,18 +31,20 @@ namespace Dna.Lifting
 
         private Dictionary<BasicBlock<AbstractInst>, LLVMBasicBlockRef> blockMapping = new Dictionary<BasicBlock<AbstractInst>, LLVMBasicBlockRef>();
 
-        public LLVMModuleRef Module { get; } = LLVM.ModuleCreateWithName("TritonTranslator");
+        public LLVMModuleRef Module => module;
 
         public LLVMLifter(ICpuArchitecture architecture)
         {
+            module = LLVMModuleRef.CreateWithName("TritonTranslator");
+            module.Target = "x86_64";
+            builder = Module.Context.CreateBuilder();
+
             LLVM.LinkInMCJIT();
             LLVM.InitializeX86TargetInfo();
             LLVM.InitializeX86Target();
             LLVM.InitializeX86TargetMC();
-            if (LLVM.CreateExecutionEngineForModule(out var engine, Module, out var errorMessage).Value == 1)
-            {
-                throw new Exception(errorMessage);
-            }
+
+            var engine = Module.CreateExecutionEngine();
 
             var parentRegs = X86Registers.RegisterMapping.Values.Where(x => x.ParentId == x.Id);
             foreach (var parentReg in parentRegs)
@@ -47,13 +53,12 @@ namespace Dna.Lifting
                 // arbitrary bit widths.
                 if (parentReg.BitSize > 64)
                     continue;
-                
-                var ptrType = (LLVM.IntType(parentReg.BitSize));
-                var global = LLVM.AddGlobal(Module, ptrType, parentReg.Name);
-                global.SetLinkage(LLVMLinkage.LLVMCommonLinkage);
-                //var ptrNull = LLVM.ConstPointerNull(LLVM.PointerType(ptrType, 0));
-                var ptrNull = LLVM.ConstInt(ptrType, 0, new LLVMBool(0));
-                global.SetInitializer(ptrNull);
+
+                var ptrType = (LLVMTypeRef.CreateInt(parentReg.BitSize));
+                var global = Module.AddGlobal(ptrType, parentReg.Name);
+                global.Linkage = LLVMLinkage.LLVMCommonLinkage;
+                var ptrNull = LLVMValueRef.CreateConstInt(ptrType, 0, false);
+                global.Initializer = ptrNull;
                 registerGlobals.Add(parentReg.Id, global);
             }
 
@@ -62,28 +67,28 @@ namespace Dna.Lifting
 
         public void Lift(ControlFlowGraph<AbstractInst> irCfg)
         {
-            var function = LLVM.AddFunction(
-                Module,
+            var function = Module.AddFunction(
                 "SampleFunc",
-                LLVM.FunctionType(LLVM.VoidType(),
+                LLVMTypeRef.CreateFunction(LLVMTypeRef.Void,
                 new LLVMTypeRef[] { },
                 false));
 
-            LLVM.SetLinkage(function, LLVMLinkage.LLVMExternalLinkage);
 
-            var entryBlock = LLVM.AppendBasicBlock(function, "entry");
-            LLVM.PositionBuilderAtEnd(builder, entryBlock);
+            function.Linkage = LLVMLinkage.LLVMExternalLinkage;
+
+            var entryBlock = function.AppendBasicBlock("entry");
+            builder.PositionAtEnd(entryBlock);
             var irBlocks = irCfg.GetBlocks();
             blockMapping.Add(irBlocks.First(), entryBlock);
             foreach (var block in irBlocks.Skip(1))
             {
-                var llvmBlock = LLVM.AppendBasicBlock(function, block.Name);
+                var llvmBlock = function.AppendBasicBlock(block.Name);
                 blockMapping.Add(block, llvmBlock);
             }
 
             foreach (var block in irBlocks)
             {
-                LLVM.PositionBuilderAtEnd(builder, blockMapping[block]);
+                builder.PositionAtEnd(blockMapping[block]);
                 foreach(var inst in block.Instructions)
                 {
                     CompileInstruction(inst);
@@ -188,7 +193,7 @@ namespace Dna.Lifting
         {
             var op1 = LoadSourceOperand(inst.Op1);
             var op2 = LoadSourceOperand(inst.Op2);
-            var result = LLVM.BuildAdd(builder, op1, op2, "add");
+            var result = builder.BuildAdd(op1, op2, "add");
             StoreToOperand(inst.Dest, result);
         }
 
@@ -196,7 +201,7 @@ namespace Dna.Lifting
         {
             var op1 = LoadSourceOperand(inst.Op1);
             var op2 = LoadSourceOperand(inst.Op2);
-            var result = LLVM.BuildAnd(builder, op1, op2, "and");
+            var result = builder.BuildAnd(op1, op2, "and");
             StoreToOperand(inst.Dest, result);
         }
 
@@ -204,7 +209,7 @@ namespace Dna.Lifting
         {
             var op1 = LoadSourceOperand(inst.Op1);
             var op2 = LoadSourceOperand(inst.Op2);
-            var result = LLVM.BuildAShr(builder, op1, op2, "ashr");
+            var result = builder.BuildAShr(op1, op2, "ashr");
             StoreToOperand(inst.Dest, result);
         }
 
@@ -212,7 +217,7 @@ namespace Dna.Lifting
         {
             var op1 = LoadSourceOperand(inst.Op1);
             var op2 = LoadSourceOperand(inst.Op2);
-            var result = LLVM.BuildLShr(builder, op1, op2, "lshr");
+            var result = builder.BuildLShr(op1, op2, "lshr");
             StoreToOperand(inst.Dest, result);
         }
 
@@ -220,21 +225,21 @@ namespace Dna.Lifting
         {
             var op1 = LoadSourceOperand(inst.Op1);
             var op2 = LoadSourceOperand(inst.Op2);
-            var result = LLVM.BuildMul(builder, op1, op2, "mul");
+            var result = builder.BuildMul(op1, op2, "mul");
             StoreToOperand(inst.Dest, result);
         }
 
         private void FromNeg(InstNeg inst)
         {
             var op1 = LoadSourceOperand(inst.Op1);
-            var result = LLVM.BuildNeg(builder, op1, "neg");
+            var result = builder.BuildNeg(op1, "neg");
             StoreToOperand(inst.Dest, result);
         }
 
         private void FromNot(InstNot inst)
         {
             var op1 = LoadSourceOperand(inst.Op1);
-            var result = LLVM.BuildNot(builder, op1, "not");
+            var result = builder.BuildNot(op1, "not");
             StoreToOperand(inst.Dest, result);
         }
 
@@ -242,7 +247,7 @@ namespace Dna.Lifting
         {
             var op1 = LoadSourceOperand(inst.Op1);
             var op2 = LoadSourceOperand(inst.Op2);
-            var result = LLVM.BuildOr(builder, op1, op2, "or");
+            var result = builder.BuildOr(op1, op2, "or");
             StoreToOperand(inst.Dest, result);
         }
 
@@ -253,11 +258,11 @@ namespace Dna.Lifting
             var op2 = LoadSourceOperand(inst.Op2);
 
             // Create the intrinsic.
-            var intType = LLVM.IntType(inst.Bitsize);
-            var fnType = LLVM.FunctionType(intType, new LLVMTypeRef[] { intType, intType, intType }, false);
-            var intrinsicFunc = LLVM.AddFunction(Module, "llvm.fshl.i" + inst.Bitsize, fnType);
+            var intType = LLVMTypeRef.CreateInt(inst.Bitsize);
+            var fnType = LLVMTypeRef.CreateFunction(intType, new LLVMTypeRef[] { intType, intType, intType }, false);
+            var intrinsicFunc = Module.AddFunction("llvm.fshl.i" + inst.Bitsize, fnType);
 
-            var result = LLVM.BuildCall(builder, intrinsicFunc, new LLVMValueRef[] { op1, op1, op2 }, "rol");
+            var result = builder.BuildCall(intrinsicFunc, new LLVMValueRef[] { op1, op1, op2 }, "rol");
             StoreToOperand(inst.Dest, result);
         }
 
@@ -268,12 +273,12 @@ namespace Dna.Lifting
             var op2 = LoadSourceOperand(inst.Op2);
 
             // Create the intrinsic.
-            var intType = LLVM.IntType(inst.Bitsize);
-            var fnType = LLVM.FunctionType(intType, new LLVMTypeRef[] { intType, intType, intType }, false);
-            var intrinsicFunc = LLVM.AddFunction(Module, "llvm.fshr.i" + inst.Bitsize, fnType);
+            var intType = LLVMTypeRef.CreateInt(inst.Bitsize);
+            var fnType = LLVMTypeRef.CreateFunction(intType, new LLVMTypeRef[] { intType, intType, intType }, false);
+            var intrinsicFunc = Module.AddFunction("llvm.fshr.i" + inst.Bitsize, fnType);
 
             // Invoke the intrinsic and store the result.
-            var result = LLVM.BuildCall(builder, intrinsicFunc, new LLVMValueRef[] { op1, op1, op2 }, "ror");
+            var result = builder.BuildCall(intrinsicFunc, new LLVMValueRef[] { op1, op1, op2 }, "ror");
             StoreToOperand(inst.Dest, result);
         }
 
@@ -281,7 +286,7 @@ namespace Dna.Lifting
         {
             var op1 = LoadSourceOperand(inst.Op1);
             var op2 = LoadSourceOperand(inst.Op2);
-            var result = LLVM.BuildSDiv(builder, op1, op2, "sdiv");
+            var result = builder.BuildSDiv(op1, op2, "sdiv");
             StoreToOperand(inst.Dest, result);
         }
 
@@ -323,7 +328,7 @@ namespace Dna.Lifting
                     throw new InvalidOperationException(String.Format("Cond type {0} is invalid.", inst.CondType));
             }
 
-            var result = LLVM.BuildICmp(builder, predicate.Value, op1, op2, "cond");
+            var result = builder.BuildICmp(predicate.Value, op1, op2, "cond");
             StoreToOperand(inst.Dest, result);
         }
 
@@ -333,9 +338,9 @@ namespace Dna.Lifting
             // TODO: Validate.
             var op1 = LoadSourceOperand(inst.Op1);
             var op2 = LoadSourceOperand(inst.Op2);
-            var srem = LLVM.BuildSRem(builder, op1, op2, opName);
-            var added = LLVM.BuildAdd(builder, srem, op2, opName);
-            var result = LLVM.BuildSRem(builder, added, op2, "smod");
+            var srem = builder.BuildSRem(op1, op2, opName);
+            var added = builder.BuildAdd(srem, op2, opName);
+            var result = builder.BuildSRem(added, op2, "smod");
             StoreToOperand(inst.Dest, result);
         }
 
@@ -343,7 +348,7 @@ namespace Dna.Lifting
         {
             var op1 = LoadSourceOperand(inst.Op1);
             var op2 = LoadSourceOperand(inst.Op2);
-            var result = LLVM.BuildSRem(builder, op1, op2, "srem");
+            var result = builder.BuildSRem(op1, op2, "srem");
             StoreToOperand(inst.Dest, result);
         }
 
@@ -351,7 +356,7 @@ namespace Dna.Lifting
         {
             var op1 = LoadSourceOperand(inst.Op1);
             var op2 = LoadSourceOperand(inst.Op2);
-            var result = LLVM.BuildSub(builder, op1, op2, "sub");
+            var result = builder.BuildSub(op1, op2, "sub");
             StoreToOperand(inst.Dest, result);
         }
 
@@ -359,7 +364,7 @@ namespace Dna.Lifting
         {
             var op1 = LoadSourceOperand(inst.Op1);
             var op2 = LoadSourceOperand(inst.Op2);
-            var result = LLVM.BuildUDiv(builder, op1, op2, "udiv");
+            var result = builder.BuildUDiv(op1, op2, "udiv");
             StoreToOperand(inst.Dest, result);
         }
 
@@ -368,7 +373,7 @@ namespace Dna.Lifting
         {
             var op1 = LoadSourceOperand(inst.Op1);
             var op2 = LoadSourceOperand(inst.Op2);
-            var result = LLVM.BuildURem(builder, op1, op2, "urem");
+            var result = builder.BuildURem(op1, op2, "urem");
             StoreToOperand(inst.Dest, result);
         }
 
@@ -376,22 +381,22 @@ namespace Dna.Lifting
         {
             var op1 = LoadSourceOperand(inst.Op1);
             var op2 = LoadSourceOperand(inst.Op2);
-            var result = LLVM.BuildXor(builder, op1, op2, "xor");
+            var result = builder.BuildXor(op1, op2, "xor");
             StoreToOperand(inst.Dest, result);
         }
 
         private void FromConcat(InstConcat inst)
         {
             var op1 = LoadSourceOperand(inst.Op1);
-            var intType = LLVM.IntType(inst.Bitsize);
-            var result = LLVM.BuildZExt(builder, op1, intType, "concat");
+            var intType = LLVMTypeRef.CreateInt(inst.Bitsize);
+            var result = builder.BuildZExt(op1, intType, "concat");
 
             foreach (var operand in inst.Operands.Skip(1))
             {
-                var shiftN = LLVM.ConstInt(intType, operand.Bitsize, new LLVMBool(0));
-                result = LLVM.BuildShl(builder, result, shiftN, "concat");
-                var extended = LLVM.BuildZExt(builder, LoadSourceOperand(operand), intType, opName);
-                result = LLVM.BuildOr(builder, result, extended, "concat");
+                var shiftN = LLVMValueRef.CreateConstInt(intType, operand.Bitsize, false);
+                result = builder.BuildShl(result, shiftN, "concat");
+                var extended = builder.BuildZExt(LoadSourceOperand(operand), intType, opName);
+                result = builder.BuildOr(result, extended, "concat");
             }
 
             StoreToOperand(inst.Dest, result);
@@ -401,17 +406,17 @@ namespace Dna.Lifting
         {
             var low = (ImmediateOperand)inst.Op2;
             var value = LoadSourceOperand(inst.Op3);
-            var intType = LLVM.IntType(inst.Bitsize);
+            var intType = LLVMTypeRef.CreateInt(inst.Bitsize);
 
             if (low.Value == 0)
             {
-                var truncated = LLVM.BuildTrunc(builder, value, intType, opName);
+                var truncated = builder.BuildTrunc(value, intType, opName);
                 StoreToOperand(inst.Dest, truncated);
                 return;
             }
 
-            var shifted = LLVM.BuildLShr(builder, value, LoadSourceOperand(low), opName);
-            var result = LLVM.BuildTrunc(builder, shifted, intType, "extract");
+            var shifted = builder.BuildLShr(value, LoadSourceOperand(low), opName);
+            var result = builder.BuildTrunc(shifted, intType, "extract");
             StoreToOperand(inst.Dest, result);
         }
 
@@ -420,23 +425,23 @@ namespace Dna.Lifting
             var op1 = LoadSourceOperand(inst.Op1);
             var op2 = LoadSourceOperand(inst.Op2);
             var op3 = LoadSourceOperand(inst.Op3);
-            var result = LLVM.BuildSelect(builder, op1, op2, op3, "select");
+            var result = builder.BuildSelect(op1, op2, op3, "select");
             StoreToOperand(inst.Dest, result);
         }
 
         private void FromSx(InstSx inst)
         {
-            var destType = LLVM.IntType(inst.Bitsize);
+            var destType = LLVMTypeRef.CreateInt(inst.Bitsize);
             var input = LoadSourceOperand(inst.InputOperand);
-            var result = LLVM.BuildSExt(builder, input, destType, "sx");
+            var result = builder.BuildSExt(input, destType, "sx");
             StoreToOperand(inst.Dest, result);
         }
 
         private void FromZx(InstZx inst)
         {
-            var destType = LLVM.IntType(inst.Bitsize);
+            var destType = LLVMTypeRef.CreateInt(inst.Bitsize);
             var input = LoadSourceOperand(inst.InputOperand);
-            var result = LLVM.BuildZExt(builder, input, destType, "zx");
+            var result = builder.BuildZExt(input, destType, "zx");
             StoreToOperand(inst.Dest, result);
         }
 
@@ -444,11 +449,13 @@ namespace Dna.Lifting
         {
             var op1 = LoadSourceOperand(inst.Op1);
 
-            var pointer = LLVM.BuildAlloca(builder, LLVM.IntType(inst.Bitsize), "copy");
+            var valType = LLVMTypeRef.CreateInt(inst.Bitsize);
 
-            LLVM.BuildStore(builder, op1, pointer);
+            var pointer = builder.BuildAlloca(valType, "copy");
 
-            var load = LLVM.BuildLoad(builder, pointer, "copy");
+            builder.BuildStore(op1, pointer);
+
+            var load = builder.BuildLoad2(valType, pointer, "copy");
 
             StoreToOperand(inst.Dest, load);
         }
@@ -459,11 +466,12 @@ namespace Dna.Lifting
             var op1 = LoadSourceOperand(inst.Op1);
 
             // Cast the address to a pointer.
-            var ptrType = LLVM.PointerType(LLVM.IntType(inst.Bitsize), 0);
-            var pointer = LLVM.BuildIntToPtr(builder, op1, ptrType, "load");
+            var valType = LLVMTypeRef.CreateInt(inst.Bitsize);
+            var ptrType = LLVMTypeRef.CreatePointer(valType, 0);
+            var pointer = builder.BuildIntToPtr(op1, ptrType, "loadPtr");
 
             // Dereference the pointer.
-            var value = LLVM.BuildLoad(builder, pointer, "load");
+            var value = builder.BuildLoad2(valType, pointer, "load");
 
             StoreToOperand(inst.Dest, value);
         }
@@ -474,7 +482,7 @@ namespace Dna.Lifting
             var thenAddr = inst.Op1 as ImmediateOperand;
             var thenBlock = blockMapping.Single(x => x.Key.Address == thenAddr.Value).Value;
 
-            LLVM.BuildBr(builder, thenBlock);
+            builder.BuildBr(thenBlock);
         }
 
         private void FromJcc(InstJcc inst)
@@ -489,12 +497,12 @@ namespace Dna.Lifting
             var elseAddr = inst.Op3 as ImmediateOperand;
             var elseBlock = blockMapping.Single(x => x.Key.Address == elseAddr.Value).Value;
 
-            LLVM.BuildCondBr(builder, cond, thenBlock, elseBlock);
+            builder.BuildCondBr(cond, thenBlock, elseBlock);
         }
 
         private void FromRet(InstRet inst)
         {
-            LLVM.BuildRetVoid(builder);
+            builder.BuildRetVoid();
         }
 
         private void StoreToOperand(IOperand operand, LLVMValueRef result)
@@ -509,11 +517,11 @@ namespace Dna.Lifting
                 var rootPointer = registerGlobals[root.Id];
                 if (regOperand.Register.Id != root.Id)
                 {
-                    var destType = LLVM.PointerType(LLVM.IntType(regOperand.Bitsize), 0);
-                    rootPointer = LLVM.BuildPointerCast(builder, rootPointer, destType, opName);
+                    var destType = LLVMTypeRef.CreatePointer(LLVMTypeRef.CreateInt(regOperand.Bitsize), 0);
+                    rootPointer = builder.BuildPointerCast(rootPointer, destType, opName);
                 }
 
-                LLVM.BuildStore(builder, result, rootPointer);
+                builder.BuildStore(result, rootPointer);
             }
 
             else if (operand is TemporaryOperand tempOperand)
@@ -534,28 +542,36 @@ namespace Dna.Lifting
 
             if (operand is ImmediateOperand immOperand)
             {
-                var intType = LLVM.IntType(operand.Bitsize);
+                var intType = LLVMTypeRef.CreateInt(operand.Bitsize);
 
-                var alloca = LLVM.BuildAlloca(builder, intType, "imm");
+                var alloca = builder.BuildAlloca(intType, "imm");
 
-                LLVM.BuildStore(builder, LLVM.ConstInt(intType, immOperand.Value, new LLVMBool(0)), alloca);
+                builder.BuildStore(LLVMValueRef.CreateConstInt(intType, immOperand.Value, false), alloca);
 
-                var load = LLVM.BuildLoad(builder, alloca, "imm");
+                var load = builder.BuildLoad2(intType, alloca, "imm");
 
                 return load;
             }
 
             else if (operand is RegisterOperand regOperand)
             {
+                // Get a pointer to the root register(e.g. RAX)
                 var root = architecture.GetRootParentRegister(regOperand.Register.Id);
                 var rootPointer = registerGlobals[root.Id];
+
+                var valueType = LLVMTypeRef.CreateInt(regOperand.Bitsize);
+
+                // If the input register is not the root parent(e.g. if it is EAX, but not RAX),
+                // then we cast the pointer for truncation.
+                // So if we currently have an i64*, and we are reading reg EAX, then we truncate the
+                // pointer to i32*.
                 if (regOperand.Register.Id != root.Id)
                 {
-                    var destType = LLVM.PointerType(LLVM.IntType(regOperand.Bitsize), 0);
-                    rootPointer = LLVM.BuildPointerCast(builder, rootPointer, destType, "reg");
+                    var destType = LLVMTypeRef.CreatePointer(valueType, 0);
+                    rootPointer = builder.BuildPointerCast(rootPointer, destType, "reg");
                 }
 
-                var load = LLVM.BuildLoad(builder, rootPointer, "reg");
+                var load = builder.BuildLoad2(valueType, rootPointer, "reg");
                 return load;
             }
 
@@ -573,30 +589,28 @@ namespace Dna.Lifting
 
         public void DumpModule()
         {
-            LLVM.DumpModule(Module);
+            Module.Dump();
         }
 
-        public void WriteToBitcodeFile(string message)
+        public void WriteToBitcodeFile(string path)
         {
-            LLVM.SetTarget(Module, "x86_64");
-            LLVM.WriteBitcodeToFile(Module, message);
+            Module.WriteBitcodeToFile(path);
         }
         
-        public byte[] Serialize()
+        public unsafe byte[] Serialize()
         {
-            LLVM.SetTarget(Module, "x86_64");
             var bufferRef = LLVM.WriteBitcodeToMemoryBuffer(Module);
             var serialized = GetLlvmBytes(bufferRef);
             LLVM.DisposeMemoryBuffer(bufferRef);
             return serialized;
         }
         
-        private byte[] GetLlvmBytes(LLVMMemoryBufferRef bufferRef)
+        private unsafe byte[] GetLlvmBytes(LLVMOpaqueMemoryBuffer* bufferRef)
         {
-            IntPtr start = LLVMSharp.LLVM.GetBufferStart(bufferRef);
-            var size = LLVMSharp.LLVM.GetBufferSize(bufferRef);
+            var start = LLVM.GetBufferStart(bufferRef);
+            var size = LLVM.GetBufferSize(bufferRef);
             byte[] copy = new byte[size];
-            Marshal.Copy(start, copy, 0, size);
+            Marshal.Copy((nint)start, copy, 0, (int)size);
             return copy;
         }
     }

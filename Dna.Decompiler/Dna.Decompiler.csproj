@@ -4,6 +4,7 @@
     <TargetFramework>net7.0</TargetFramework>
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
+    <AllowUnsafeBlocks>True</AllowUnsafeBlocks>
   </PropertyGroup>
 
   <ItemGroup>
@@ -18,6 +19,7 @@
     <PackageReference Include="libclang" Version="15.0.0" />
     <PackageReference Include="libclang.runtime.win-x64" Version="15.0.0" />
     <PackageReference Include="libClangSharp.runtime.win-x64" Version="15.0.0" />
+    <PackageReference Include="LLVMSharp" Version="15.0.0-beta1" />
   </ItemGroup>
 
   <ItemGroup>

@@ -31,7 +31,7 @@ var binary = new WindowsBinary(64, File.ReadAllBytes(path), 0x140000000);
 var dna = new Dna.Dna(binary);
 
 // Parse a control flow graph from the binary.
-ulong funcAddr = 0x140001030;
+ulong funcAddr = 0x140001070;
 var cfg = dna.RecursiveDescent.ReconstructCfg(funcAddr);
 Console.WriteLine("Disassembled cfg:\n{0}", GraphFormatter.FormatGraph(cfg));
 Console.WriteLine(GraphFormatter.FormatGraph(cfg));

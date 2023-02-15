@@ -31,7 +31,8 @@
     <PackageReference Include="AsmResolver.PE.File" Version="4.9.0" />
     <PackageReference Include="ELFSharp" Version="2.15.0" />
     <PackageReference Include="Iced" Version="1.17.0" />
-    <PackageReference Include="LLVMSharp" Version="5.0.0" />
+    <PackageReference Include="libLLVM.runtime.win-x64" Version="15.0.0" />
+    <PackageReference Include="LLVMSharp" Version="15.0.0-beta1" />
     <PackageReference Include="Microsoft.Z3" Version="4.11.2" />
     <PackageReference Include="Rivers" Version="0.1.0" />
   </ItemGroup>
