@@ -31,7 +31,7 @@ var binary = new WindowsBinary(64, File.ReadAllBytes(path), 0x140000000);
 var dna = new Dna.Dna(binary);
 
 // Parse a control flow graph from the binary.
-ulong funcAddr = 0x140001070;
+ulong funcAddr = 0x140001030;
 var cfg = dna.RecursiveDescent.ReconstructCfg(funcAddr);
 Console.WriteLine("Disassembled cfg:\n{0}", GraphFormatter.FormatGraph(cfg));
 Console.WriteLine(GraphFormatter.FormatGraph(cfg));
@@ -70,7 +70,7 @@ if (printLLVM)
 
 // Optionally decompile the lifted function to go-to free pseudo C, via Rellic.
 // On my machine, a fork of Rellic runs under WSL2 and communiucates via gRPC.
-// If you are not locally hosting this server at localhost:50051, then the API
+// If you are not hosting this server at localhost:50051, then the API
 // call will fail. You can find the service here(https://github.com/Colton1skees/rellic-api),
 // although it will take a bit of leg work for outside use.
 bool decompile = true;

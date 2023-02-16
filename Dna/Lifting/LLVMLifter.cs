@@ -66,7 +66,7 @@ namespace Dna.Lifting
 
             // For each parent register(e.g. RAX), construct and store a global variable.
             //var registers = X86Registers.RegisterMapping.Values;
-            var registers = X86Registers.RegisterMapping.Values.Where(x => x.ParentId == x.Id);
+            var registers = X86Registers.RegisterMapping.Values;
             foreach (var reg in registers)
             {
                 // Skip registers with a size > 64, since rellic does not support 
@@ -106,10 +106,9 @@ namespace Dna.Lifting
             // Position the builder at the entry block.
             builder.PositionAtEnd(llvmFunction.EntryBasicBlock);
 
-
             // At the entry point of the LLVM routine, copy each lifted register
             // into a local variable.
-            //CopyRegistersToLocalVariables();
+            CopyRegistersToLocalVariables();
 
             // Create a lambda to take a given address(i.e. the destination of a direct jump)
             // and query which LLVM block it points to. This is necessary since our IR
@@ -129,6 +128,12 @@ namespace Dna.Lifting
                     lifter.LiftInstructionToLLVM(inst, getBlockByAddress);
                 }
             }
+
+            // Finally, at the end of each lifted block, restore certain registers
+            // back to global variables. Typically this will only be
+            // RAX + callee saved registers.
+            // https://learn.microsoft.com/en-us/cpp/build/x64-calling-convention?view=msvc-170
+            RestoreRegistersToGlobalVariables();
         }
 
         private LLVMValueRef CreateFunction(string name)
@@ -181,6 +186,40 @@ namespace Dna.Lifting
             }
         }
 
+        private void RestoreRegistersToGlobalVariables()
+        {
+            // Assume the function is fastcall.
+            var savedRegisters = new HashSet<register_e>()
+            {
+                register_e.ID_REG_X86_RAX,
+                register_e.ID_REG_X86_EAX,
+                register_e.ID_REG_X86_AX,
+                register_e.ID_REG_X86_AL,
+                register_e.ID_REG_X86_AH,
+            };
+
+            foreach(var block in llvmFunction.BasicBlocks.Where(x => x.Next == null))
+            {
+                // Assume that the last instruction is a RET.
+                builder.PositionBefore(block.LastInstruction);
+                if (!block.LastInstruction.ToString().ToLower().Contains("ret"))
+                    throw new InvalidOperationException("Basic block must exit with a RET.");
+
+                foreach(var register in savedRegisters)
+                {
+                    // Get a triton register operand.
+                    var regOperand = architecture.GetRegister(register);
+
+                    // Use our helper function to load the register local
+                    // variable value.
+                    var value = LoadSourceOperand(new RegisterOperand(regOperand));
+
+                    // Store the local variable value to our register global variable.
+                    builder.BuildStore(value, liftedRegisterGlobalVariableMapping[register]);
+                }
+            }
+        }
+
         private void StoreToOperand(IOperand operand, LLVMValueRef result)
         {
             if (operand is SsaOperand ssaOP)
@@ -188,16 +227,8 @@ namespace Dna.Lifting
 
             if (operand is RegisterOperand regOperand)
             {
-                // Fix up register sizing. TODO: Remove.
-                var root = architecture.GetRootParentRegister(regOperand.Register.Id);
-                var rootPointer = liftedRegisterGlobalVariableMapping[root.Id];
-                if (regOperand.Register.Id != root.Id)
-                {
-                    var destType = LLVMTypeRef.CreatePointer(LLVMTypeRef.CreateInt(regOperand.Bitsize), 0);
-                    rootPointer = builder.BuildPointerCast(rootPointer, destType, "rootPtr");
-                }
-
-                builder.BuildStore(result, rootPointer);
+                var pointer = liftedLocalRegisters[regOperand.Register.Id];
+                builder.BuildStore(result, pointer);
             }
 
             else if (operand is TemporaryOperand tempOperand)
@@ -231,23 +262,14 @@ namespace Dna.Lifting
 
             else if (operand is RegisterOperand regOperand)
             {
-                // Get a pointer to the root register(e.g. RAX)
-                var root = architecture.GetRootParentRegister(regOperand.Register.Id);
-                var rootPointer = liftedRegisterGlobalVariableMapping[root.Id];
+                // // Get a pointer to the local variable representing the input register.
+                var regPointer = liftedLocalRegisters[regOperand.Register.Id];
 
+                // Constrct an integer type of the register width.
                 var valueType = LLVMTypeRef.CreateInt(regOperand.Bitsize);
 
-                // If the input register is not the root parent(e.g. if it is EAX, but not RAX),
-                // then we cast the pointer for truncation.
-                // So if we currently have an i64*, and we are reading reg EAX, then we truncate the
-                // pointer to i32*.
-                if (regOperand.Register.Id != root.Id)
-                {
-                    var destType = LLVMTypeRef.CreatePointer(valueType, 0);
-                    rootPointer = builder.BuildPointerCast(rootPointer, destType, "reg");
-                }
-
-                var load = builder.BuildLoad2(valueType, rootPointer, "reg");
+                // Store to the register pointer.
+                var load = builder.BuildLoad2(valueType, regPointer, "reg");
                 return load;
             }
 
