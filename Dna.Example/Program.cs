@@ -68,6 +68,16 @@ bool printLLVM = true;
 if (printLLVM)
     llvmLifter.DumpModule();
 
+/*
+var text = llvmLifter.Module.PrintToString();
+
+var llvmLifter2 = new LLVMLifter2(architecture);
+llvmLifter2.Lift(liftedCfg);
+var text2 = llvmLifter2.Module.PrintToString();
+
+File.WriteAllText("before.ll", text);
+File.WriteAllText("after.ll", text2);
+*/
 // Optionally decompile the lifted function to go-to free pseudo C, via Rellic.
 // On my machine, a fork of Rellic runs under WSL2 and communiucates via gRPC.
 // If you are not locally hosting this server at localhost:50051, then the API

@@ -1,9 +1,12 @@
-﻿using Dna.ControlFlow;
+﻿using ClangSharp;
+using Dna.ControlFlow;
 using Dna.Decompilation;
 using Dna.Lifting;
 using Grpc.Net.Client;
+using Iced.Intel;
 using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
@@ -27,11 +30,11 @@ namespace Dna.Decompiler
         public string Decompile(ControlFlowGraph<AbstractInst> function)
         {
             // Lift the function to LLVM IR.
-            var lifter = new LLVMLifter(architecture);
-            lifter.Lift(function);
+            var lifter2 = new LLVMLifter(architecture);
+            lifter2.Lift(function);
 
-            // Decompile the function to pseudo C.
-            var ast = decompiler.Decompile(lifter.Module);
+            // Decompile to pseudo C.
+            var ast = decompiler.Decompile(lifter2.Module);
             return ast;
         }
     }

@@ -86,12 +86,20 @@ namespace Dna.Lifting
                 blockMapping.Add(block, llvmBlock);
             }
 
+            var translator = new InstToLLVMLifter(module, builder, LoadSourceOperand, StoreToOperand);
+
             foreach (var block in irBlocks)
             {
                 builder.PositionAtEnd(blockMapping[block]);
                 foreach(var inst in block.Instructions)
                 {
                     CompileInstruction(inst);
+                    /*
+                    translator.LiftInstructionToLLVM(inst, (ulong address) =>
+                    {
+                        return blockMapping.Single(x => x.Key.Address == address).Value;
+                    });
+                    */
                 }
             }
         }
