@@ -59,6 +59,15 @@ Console.WriteLine("Optimized cfg:\n{0}", GraphFormatter.FormatGraph(liftedCfg));
 var dotGraph = GraphVisualizer.GetDotGraph(liftedCfg);
 File.WriteAllText("graph.dot", dotGraph.Compile(false, false));
 
+// Load the binary into unicorn engine.
+var emulator = new UnicornEmulator(architecture);
+PEMapper.MapBinary(emulator, binary);
+
+// Execute the function.
+emulator.Start(0x140001251);
+
+Console.ReadLine();
+
 // Lift the control flow graph to LLVM IR.
 var llvmLifter = new LLVMLifter(architecture);
 llvmLifter.Lift(liftedCfg);

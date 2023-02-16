@@ -24,6 +24,7 @@
 
   <ItemGroup>
     <Folder Include="Binary\Linux\" />
+    <Folder Include="Emulation\Relocation\" />
   </ItemGroup>
 
   <ItemGroup>

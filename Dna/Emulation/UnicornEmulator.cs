@@ -59,9 +59,12 @@ namespace Dna.Emulation
 
         private void HookMethod(Unicorn u, long addr, int size, object userData)
         {
-            if(true)
-                Console.WriteLine("Code hook at addr: {0} with rip {1}", addr.ToString("X"), GetRegister(register_e.ID_REG_X86_RAX));
+            if (true)
+            {
+                Console.WriteLine("Code hook at addr: {0} with rip {1}", addr.ToString("X"), GetRegister(register_e.ID_REG_X86_RIP));
 
+                Console.WriteLine("RAX: 0x{0}", GetRegister(register_e.ID_REG_X86_RAX).ToString("X"));
+            }
         }
 
         public ulong GetRegister(register_e regId)
@@ -188,6 +191,7 @@ namespace Dna.Emulation
         public void Start(long addr, long untilAddr = long.MaxValue, long timeout = 100000, long count = long.MaxValue)
         {
             // Emulate a single instruction.
+            SetRegister(register_e.ID_REG_X86_RIP, (ulong)addr);
             unicorn.EmuStart(addr, untilAddr, 0, 0);
         }
 
