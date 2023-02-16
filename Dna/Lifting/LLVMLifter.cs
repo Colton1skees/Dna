@@ -40,7 +40,7 @@ namespace Dna.Lifting
         private ControlFlowGraph<AbstractInst> irCfg;
 
         // Current llvm function to lift into.
-        private LLVMValueRef llvmFunction;
+        public LLVMValueRef llvmFunction;
 
         // LLVM module to lift into.
         public LLVMModuleRef Module => module;
@@ -183,6 +183,14 @@ namespace Dna.Lifting
 
                 // Store a mapping of <register id, local variable.
                 liftedLocalRegisters.Add(registerId, alloca);
+
+                // Load the register value from it's global variable.
+                var value = builder.BuildLoad2(valueType, liftedRegisterGlobalVariableMapping[registerId]);
+
+                // Finally, store the register value to it's local variable.
+                // This local variable will then be used for all further
+                // local variable accesses.
+                builder.BuildStore(value, alloca);
             }
         }
 
@@ -205,7 +213,7 @@ namespace Dna.Lifting
                 if (!block.LastInstruction.ToString().ToLower().Contains("ret"))
                     throw new InvalidOperationException("Basic block must exit with a RET.");
 
-                foreach(var register in savedRegisters)
+                foreach(var register in liftedLocalRegisters.Keys)
                 {
                     // Get a triton register operand.
                     var regOperand = architecture.GetRegister(register);

@@ -4,6 +4,7 @@ using Dna.Decompilation;
 using Dna.Lifting;
 using Grpc.Net.Client;
 using Iced.Intel;
+using LLVMSharp.Interop;
 using System;
 using System.Collections.Generic;
 using System.Diagnostics;
@@ -34,7 +35,13 @@ namespace Dna.Decompiler
             lifter2.Lift(function);
 
             // Decompile to pseudo C.
-            var ast = decompiler.Decompile(lifter2.Module);
+            return Decompile(lifter2.Module);
+        }
+
+        public string Decompile(LLVMModuleRef module)
+        {
+            // Decompile to pseudo C.
+            var ast = decompiler.Decompile(module);
             return ast;
         }
     }

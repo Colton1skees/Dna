@@ -63,10 +63,46 @@ File.WriteAllText("graph.dot", dotGraph.Compile(false, false));
 var llvmLifter = new LLVMLifter(architecture);
 llvmLifter.Lift(liftedCfg);
 
+
+
+var passManager = llvmLifter.Module.CreateFunctionPassManager();
+
+passManager.AddBasicAliasAnalysisPass();
+passManager.AddTypeBasedAliasAnalysisPass();
+passManager.AddScopedNoAliasAAPass();
+
+
+passManager.AddLowerExpectIntrinsicPass();
+passManager.AddCFGSimplificationPass();
+passManager.AddPromoteMemoryToRegisterPass();
+passManager.AddEarlyCSEPass();
+
+passManager.AddDCEPass();
+passManager.AddAggressiveDCEPass();
+passManager.AddDeadStoreEliminationPass();
+
+
+
+passManager.AddInstructionCombiningPass();
+passManager.AddCFGSimplificationPass();
+passManager.AddDeadStoreEliminationPass();
+passManager.AddAggressiveDCEPass();
+
+
+
+passManager.InitializeFunctionPassManager();
+for (int i = 0; i < 10; i++)
+{
+    passManager.RunFunctionPassManager(llvmLifter.llvmFunction);
+}
+passManager.FinalizeFunctionPassManager();
+
+
 // Optionally write the llvm IR to the console.
 bool printLLVM = true;
 if (printLLVM)
     llvmLifter.Module.Dump();
+
 
 // Optionally decompile the lifted function to go-to free pseudo C, via Rellic.
 // On my machine, a fork of Rellic runs under WSL2 and communiucates via gRPC.
@@ -80,7 +116,7 @@ if (decompile)
     var decompiler = new Decompiler(architecture);
 
     // Decompile the lifted function to pseudo C.
-    var ast = decompiler.Decompile(liftedCfg);
+    var ast = decompiler.Decompile(llvmLifter.Module);
 
     // Print the decompiled routine.
     Console.WriteLine("Decompiled routine:\n{0}", ast);
