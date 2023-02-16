@@ -42,7 +42,6 @@
     <ProjectReference Include="..\Dna.ControlFlow\Dna.ControlFlow.csproj" />
     <ProjectReference Include="..\Dna.DataStructures\Dna.DataStructures.csproj" />
     <ProjectReference Include="..\TritonTranslator\TritonTranslator\TritonTranslator.csproj" />
-    <ProjectReference Include="..\unicorn\bindings\dotnet\UnicornManaged\UnicornManaged.fsproj" />
   </ItemGroup>
 
 </Project>
