@@ -5,8 +5,8 @@ using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 using TritonTranslator.Arch;
-using UnicornManaged;
-using UnicornManaged.Const;
+using Unicorn;
+using Unicorn.X86;
 
 namespace Dna.Emulation
 {
@@ -16,11 +16,7 @@ namespace Dna.Emulation
 
         private readonly ICpuArchitecture architecture;
 
-        public CodeHook codeHook;
-
-        public EventMemHook memHook;
-
-        private Unicorn unicorn;  
+        private X86Emulator unicorn;  
 
         static UnicornEmulator()
         {
@@ -114,7 +110,7 @@ namespace Dna.Emulation
             }
 
             // Update the flags register.
-            unicorn.RegWrite(X86.UC_X86_REG_RFLAGS, (long)rflags);
+            unicorn.Registers.(X86.UC_X86_REG_RFLAGS, (long)rflags);
         }
 
         private int GetFlagBitIndex(register_e regId)
@@ -161,7 +157,7 @@ namespace Dna.Emulation
         public T ReadMemory<T>(ulong addr)
         {
             var buffer = new byte[MarshalType<T>.Size];
-            unicorn.MemRead((long)addr, buffer);
+            unicorn.Memory.Read(addr, buffer, buffer.Length);
             return MarshalType<T>.ByteArrayToObject(buffer);
         }
 
@@ -175,40 +171,40 @@ namespace Dna.Emulation
         {
             try
             {
-                unicorn.MemWrite((long)addr, buffer);
+                unicorn.Memory.Write(addr, buffer, buffer.Length);
             }
 
-            catch(UnicornEngineException ex)
+            catch(Exception ex)
             {
                 if (!ex.Message.Contains("UC_ERR_WRITE_UNMAPPED"))
                     throw;
 
                 MapMemory(addr, buffer.Length);
-                unicorn.MemWrite((long)addr, buffer);
+                unicorn.Memory.Write(addr, buffer, buffer.Length);
             }
         }
 
-        public void Start(long addr, long untilAddr = long.MaxValue, long timeout = 100000, long count = long.MaxValue)
+        public void Start(ulong addr, ulong untilAddr = long.MaxValue)
         {
             // Emulate a single instruction.
             SetRegister(register_e.ID_REG_X86_RIP, (ulong)addr);
-            unicorn.EmuStart(addr, untilAddr, 0, 0);
+            unicorn.Start(addr, untilAddr);
         }
 
         /// <summary>
         /// Unicorn callback raised when unmapped memory is read or written.
         /// </summary>
-        private static bool UnmappedMemoryHook(Unicorn u, int eventType, long address, int size, long value, object userData)
+        private static bool UnmappedMemoryHook(Emulator emulator, MemoryType type, ulong address, int size, ulong value, object userData)
         {
             // TODO: Handle unmapped reads.
-            if (eventType != Common.UC_MEM_WRITE_UNMAPPED)
+            if (type != MemoryType.ReadUnmapped)
             {
                 throw new InvalidOperationException();
             }
 
             // Map the memory automatically.
             var newSize = (size / 0x1000) * 0x1000;
-            u.MemMap(address, newSize == 0 ? 1024 : newSize, Common.UC_PROT_ALL);
+            emulator.Memory.Map(address, newSize == 0 ? 1024 : newSize, MemoryPermissions.All);
             return true;
         }
 
@@ -216,7 +212,7 @@ namespace Dna.Emulation
         {
             // Map the memory automatically.
             var newAddress = (address / 0x1000) * 0x1000;
-            unicorn.MemMap((long)newAddress, 2 * 1024 * 1024, Common.UC_PROT_ALL);
+            unicorn.Memory.Map(newAddress, 2 * 1024 * 1024, MemoryPermissions.All);
         }
     }
 }
