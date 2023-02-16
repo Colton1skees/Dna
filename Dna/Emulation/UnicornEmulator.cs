@@ -12,52 +12,62 @@ namespace Dna.Emulation
 {
     public class UnicornEmulator : ICpuEmulatorState
     {
-        private static Dictionary<register_e, int> registerMapping = new();
+        private static Dictionary<register_e, Func<X86Emulator, ulong>> registerReadFunctions = new();
+
+        private static Dictionary<register_e, Action<X86Emulator, ulong>> registerWriteFunctions = new();
 
         private readonly ICpuArchitecture architecture;
 
-        private X86Emulator unicorn;  
+        private X86Emulator emulator;  
 
         static UnicornEmulator()
         {
-            var prefix = "UC_X86_REG_";
-            var properties = typeof(X86).GetProperties().Where(x => x.Name.StartsWith(prefix));
+            var registerProperties = typeof(X86Registers).GetProperties();
 
             var regNames = typeof(register_e)
                 .GetEnumValues()
                 .Cast<register_e>()
                 .ToDictionary(x => x.ToString().ToUpper().Replace("ID_REG_X86_", ""), x => x);
 
-            foreach(var property in properties)
+            foreach(var property in registerProperties)
             {
-                var name = property.Name.Replace(prefix, "");
+                var name = property.Name;
                 if(!regNames.ContainsKey(name))
                 {
                     Console.WriteLine("Failed to map register: {0}", name);
                     continue;
                 }
 
-                registerMapping.Add(regNames[name], (int)property.GetValue(null));
+                var getRegister = (X86Emulator emu) =>
+                {
+                    return (ulong)property.GetValue(emu);
+                };
+
+                var setRegister = (X86Emulator emu, ulong value) =>
+                {
+                    property.SetValue(emu, value);
+                };
+
+                registerReadFunctions.Add(regNames[name], getRegister);
+                registerWriteFunctions.Add(regNames[name], setRegister);
             }
         }
 
         public UnicornEmulator(ICpuArchitecture architecture)
         {
-            unicorn = new Unicorn(Common.UC_ARCH_X86, Common.UC_MODE_64);
+            emulator = new X86Emulator(X86Mode.b64);
             this.architecture = architecture;
 
             // Setup hooks.
-            memHook = new EventMemHook(UnmappedMemoryHook);
-            unicorn.AddEventMemHook(memHook, Common.UC_HOOK_MEM_READ_UNMAPPED | Common.UC_HOOK_MEM_WRITE_UNMAPPED);
-            codeHook = new CodeHook(HookMethod);
-            unicorn.AddCodeHook(codeHook, null, 1, 0);
+            emulator.Hooks.Memory.Add(MemoryEventHookType.UnmappedFetch | MemoryEventHookType.UnmappedRead | MemoryEventHookType.UnmappedWrite, UnmappedMemoryHook, null);
+            emulator.Hooks.Code.Add(CodeHook, null);
         }
 
-        private void HookMethod(Unicorn u, long addr, int size, object userData)
+        private void CodeHook(Emulator genericEmu, ulong address, int size, object userToken)
         {
             if (true)
             {
-                Console.WriteLine("Code hook at addr: {0} with rip {1}", addr.ToString("X"), GetRegister(register_e.ID_REG_X86_RIP));
+                Console.WriteLine("Code hook at addr: {0} with rip {1}", address.ToString("X"), GetRegister(register_e.ID_REG_X86_RIP));
 
                 Console.WriteLine("RAX: 0x{0}", GetRegister(register_e.ID_REG_X86_RAX).ToString("X"));
             }
@@ -66,16 +76,16 @@ namespace Dna.Emulation
         public ulong GetRegister(register_e regId)
         {
             // Return the register if it has a 1:1 mapping to unicorn's register list.
-            bool found = registerMapping.TryGetValue(regId, out int unicornId);
+            bool found = registerReadFunctions.TryGetValue(regId, out var readRegister);
             if (found)
-                return (ulong)unicorn.RegRead(unicornId);
+                return readRegister(emulator);
 
             // Throw if the register is not a flag bit.
             if (!architecture.IsFlagRegister(regId))
                 throw new InvalidOperationException(String.Format("Cannot map register {0} to unicorn", regId));
 
             // Shift so that the specific bit(e.g. bit 7 for SF) is at index zero.
-            var rflags = (ulong)unicorn.RegRead(X86.UC_X86_REG_RFLAGS);
+            var rflags = registerReadFunctions[register_e.ID_REG_X86_EFLAGS](emulator);
             var lowestBit = rflags >> GetFlagBitIndex(regId);
 
             // Zero out all other bits and return. 
@@ -85,10 +95,10 @@ namespace Dna.Emulation
         public void SetRegister(register_e regId, ulong value)
         {
             // Return the register if it has a 1:1 mapping to unicorn's register list.
-            bool found = registerMapping.TryGetValue(regId, out int unicornId);
+            bool found = registerWriteFunctions.TryGetValue(regId, out var writeRegister);
             if (found)
             {
-                unicorn.RegWrite(unicornId, (long)value);
+                writeRegister(emulator, value);
                 return;
             }
 
@@ -97,7 +107,7 @@ namespace Dna.Emulation
                 throw new InvalidOperationException(String.Format("Cannot map register {0} to unicorn", regId));
 
             // Set or clear the specified rflags bits.
-            var rflags = (ulong)unicorn.RegRead(X86.UC_X86_REG_RFLAGS);
+            var rflags = (ulong)emulator.Registers.EFLAGS;
             var bitIndex = GetFlagBitIndex(regId);
             if (value == 0)
             {
@@ -110,7 +120,7 @@ namespace Dna.Emulation
             }
 
             // Update the flags register.
-            unicorn.Registers.(X86.UC_X86_REG_RFLAGS, (long)rflags);
+            emulator.Registers.EFLAGS = (long)rflags;
         }
 
         private int GetFlagBitIndex(register_e regId)
@@ -157,7 +167,7 @@ namespace Dna.Emulation
         public T ReadMemory<T>(ulong addr)
         {
             var buffer = new byte[MarshalType<T>.Size];
-            unicorn.Memory.Read(addr, buffer, buffer.Length);
+            emulator.Memory.Read(addr, buffer, buffer.Length);
             return MarshalType<T>.ByteArrayToObject(buffer);
         }
 
@@ -171,7 +181,7 @@ namespace Dna.Emulation
         {
             try
             {
-                unicorn.Memory.Write(addr, buffer, buffer.Length);
+                emulator.Memory.Write(addr, buffer, buffer.Length);
             }
 
             catch(Exception ex)
@@ -180,7 +190,7 @@ namespace Dna.Emulation
                     throw;
 
                 MapMemory(addr, buffer.Length);
-                unicorn.Memory.Write(addr, buffer, buffer.Length);
+                emulator.Memory.Write(addr, buffer, buffer.Length);
             }
         }
 
@@ -188,7 +198,7 @@ namespace Dna.Emulation
         {
             // Emulate a single instruction.
             SetRegister(register_e.ID_REG_X86_RIP, (ulong)addr);
-            unicorn.Start(addr, untilAddr);
+            emulator.Start(addr, untilAddr);
         }
 
         /// <summary>
@@ -212,7 +222,7 @@ namespace Dna.Emulation
         {
             // Map the memory automatically.
             var newAddress = (address / 0x1000) * 0x1000;
-            unicorn.Memory.Map(newAddress, 2 * 1024 * 1024, MemoryPermissions.All);
+            emulator.Memory.Map(newAddress, 2 * 1024 * 1024, MemoryPermissions.All);
         }
     }
 }
