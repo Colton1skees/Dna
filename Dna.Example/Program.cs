@@ -21,10 +21,11 @@ using TritonTranslator.Arch.X86;
 using ClangSharp.Interop;
 using ClangSharp;
 using Dna.Decompiler;
+using Dna.Emulation.Unicorn;
 
 // Load the 64 bit PE file.
 // Note: This file is automatically copied to the build directory.
-var path = @"SampleExecutable";
+var path = @"SampleExecutable.bin";
 var binary = new WindowsBinary(64, File.ReadAllBytes(path), 0x140000000);
 
 // Instantiate dna.
@@ -64,9 +65,7 @@ var emulator = new UnicornEmulator(architecture);
 PEMapper.MapBinary(emulator, binary);
 
 // Execute the function.
-emulator.Start(0x140001251);
-
-Console.ReadLine();
+emulator.Start(0x1400010F7);
 
 // Lift the control flow graph to LLVM IR.
 var llvmLifter = new LLVMLifter(architecture);
@@ -96,8 +95,6 @@ passManager.AddInstructionCombiningPass();
 passManager.AddCFGSimplificationPass();
 passManager.AddDeadStoreEliminationPass();
 passManager.AddAggressiveDCEPass();
-
-
 
 passManager.InitializeFunctionPassManager();
 for (int i = 0; i < 10; i++)
