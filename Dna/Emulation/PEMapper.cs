@@ -13,7 +13,7 @@ namespace Dna.Emulation
     /// </summary>
     public static class PEMapper
     {
-        public static void MapBinary(ICpuEmulatorState state, WindowsBinary binary)
+        public static void MapBinary(ICpuEmulator state, WindowsBinary binary)
         {
             var peFile = binary.PEFile;
             foreach(var section in peFile.Sections)
