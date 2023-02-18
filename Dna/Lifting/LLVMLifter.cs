@@ -36,6 +36,8 @@ namespace Dna.Lifting
         // Mapping between <lifted block, llvm block>
         private Dictionary<BasicBlock<AbstractInst>, LLVMBasicBlockRef> liftedBlockMapping = new Dictionary<BasicBlock<AbstractInst>, LLVMBasicBlockRef>();
 
+        private LLVMValueRef memoryPtr;
+
         // Current control flow graph to lift.
         private ControlFlowGraph<AbstractInst> irCfg;
 
@@ -54,8 +56,15 @@ namespace Dna.Lifting
             module.Target = "x86_64";
             builder = Module.Context.CreateBuilder();
 
+            // Create an i64* pointer to store memory.
+            var memoryPtrType = LLVMTypeRef.CreatePointer(LLVMTypeRef.CreateInt(64), 0);
+            memoryPtr = Module.AddGlobal(memoryPtrType, "memory");
+            memoryPtr.Linkage = LLVMLinkage.LLVMCommonLinkage;
+            var memoryPtrNull = LLVMValueRef.CreateConstPointerNull(LLVMTypeRef.CreateInt(64));
+            memoryPtr.Initializer = memoryPtrNull;
+
             // Construct an LLVM lifter for translating individual instructions.
-            lifter = new InstToLLVMLifter(module, builder, LoadSourceOperand, StoreToOperand);
+            lifter = new InstToLLVMLifter(module, builder, memoryPtr, LoadSourceOperand, StoreToOperand);
 
             // Initialize x86 target info.
             LLVM.LinkInMCJIT();
@@ -122,6 +131,14 @@ namespace Dna.Lifting
             // Lift each block to LLVM IR.
             foreach(var block in irBlocks)
             {
+                if(block == irBlocks.First())
+                {
+                    var storeIntType = LLVMTypeRef.CreateInt(64);
+                    var storePtrType = LLVMTypeRef.CreatePointer(storeIntType, 0);
+
+                    var percentFour2 = builder.BuildLoad2(storePtrType, memoryPtr); 
+                    lifter.SetMemoryPtr(percentFour2);
+                }
                 builder.PositionAtEnd(liftedBlockMapping[block]);
                 foreach(var inst in block.Instructions)
                 {
@@ -206,15 +223,17 @@ namespace Dna.Lifting
                 register_e.ID_REG_X86_AH,
             };
 
-            foreach(var block in llvmFunction.BasicBlocks.Where(x => x.Next == null))
+            foreach(var block in liftedBlockMapping.Where(x => x.Key.OutgoingEdges.Count == 0).Select(x => x.Value))
             {
                 // Assume that the last instruction is a RET.
                 builder.PositionBefore(block.LastInstruction);
                 if (!block.LastInstruction.ToString().ToLower().Contains("ret"))
-                    throw new InvalidOperationException("Basic block must exit with a RET.");
+                   throw new InvalidOperationException("Basic block must exit with a RET.");
 
                 foreach(var register in liftedLocalRegisters.Keys)
                 {
+                    if (architecture.GetRootParentRegister(register).Id != register_e.ID_REG_X86_RAX)
+                        continue;
                     // Get a triton register operand.
                     var regOperand = architecture.GetRegister(register);
 

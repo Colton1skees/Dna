@@ -49,7 +49,7 @@ namespace Dna.Optimization.Passes
             foreach(var inst in instructions)
             {
                 // Filter to only include instructions which write to a temporary.
-                if (inst.Dest == null || inst.Dest is not TemporaryOperand)
+                if (inst.Dest == null || inst.Dest is not TemporaryOperand || inst is InstStore)
                     continue;
 
                 // Since temporaries can only be written to once, we throw an
@@ -168,7 +168,7 @@ namespace Dna.Optimization.Passes
                     continue;
 
                 // Mark the instruction for deletion.
-                instructionsToDelete.Add(tempDef.Value);
+                // instructionsToDelete.Add(tempDef.Value);
             }
 
             // Discard all old assignments.

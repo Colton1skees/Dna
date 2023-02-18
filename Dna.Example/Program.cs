@@ -32,7 +32,7 @@ var binary = new WindowsBinary(64, File.ReadAllBytes(path), 0x140000000);
 var dna = new Dna.Dna(binary);
 
 // Parse a control flow graph from the binary.
-ulong funcAddr = 0x140001030;
+ulong funcAddr = 0x140001670;
 var cfg = dna.RecursiveDescent.ReconstructCfg(funcAddr);
 Console.WriteLine("Disassembled cfg:\n{0}", GraphFormatter.FormatGraph(cfg));
 Console.WriteLine(GraphFormatter.FormatGraph(cfg));
@@ -50,8 +50,8 @@ for (int i = 0; i < 3; i++)
     Console.WriteLine("");
 
 // Elminate deadcode from the control flow graph.
-var blockDcePass = new BlockDcePass(liftedCfg);
-blockDcePass.Run();
+//var blockDcePass = new BlockDcePass(liftedCfg);
+//blockDcePass.Run();
 
 // Print the optimized control flow graph.
 Console.WriteLine("Optimized cfg:\n{0}", GraphFormatter.FormatGraph(liftedCfg));
@@ -71,7 +71,7 @@ rsp += 0x100;
 emulator.SetRegister(register_e.ID_REG_X86_RSP, rsp);
 
 // Execute the function.
-emulator.Start(0x140001747);
+//emulator.Start(0x140001747);
 
 // Lift the control flow graph to LLVM IR.
 var llvmLifter = new LLVMLifter(architecture);
@@ -95,8 +95,6 @@ passManager.AddDCEPass();
 passManager.AddAggressiveDCEPass();
 passManager.AddDeadStoreEliminationPass();
 
-
-
 passManager.AddInstructionCombiningPass();
 passManager.AddCFGSimplificationPass();
 passManager.AddDeadStoreEliminationPass();
@@ -111,10 +109,11 @@ passManager.FinalizeFunctionPassManager();
 
 
 // Optionally write the llvm IR to the console.
-bool printLLVM = true;
+bool printLLVM = false;
 if (printLLVM)
     llvmLifter.Module.Dump();
 
+llvmLifter.Module.PrintToFile(@"C:\Users\colton\Downloads\dfgfgfgd\code.ll");
 
 // Optionally decompile the lifted function to go-to free pseudo C, via Rellic.
 // On my machine, a fork of Rellic runs under WSL2 and communiucates via gRPC.
