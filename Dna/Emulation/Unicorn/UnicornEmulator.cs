@@ -28,6 +28,8 @@ namespace Dna.Emulation.Unicorn
 
             // Insert a hook to throw an exception when unmapped memory usages occur.
             Emulator.Hooks.Memory.Add(MemoryEventHookType.UnmappedFetch | MemoryEventHookType.UnmappedRead | MemoryEventHookType.UnmappedWrite, UnmappedMemoryHook, null);
+            Emulator.Hooks.Memory.Add(MemoryHookType.Read, OnMemoryRead, null);
+            Emulator.Hooks.Memory.Add(MemoryHookType.Write, OnMemoryWrite, null);
         }
 
         public ulong GetRegister(register_e regId)
@@ -100,8 +102,17 @@ namespace Dna.Emulation.Unicorn
         /// </summary>
         private bool UnmappedMemoryHook(Emulator emulator, MemoryType type, ulong address, int size, ulong value, object userData)
         {
-            Console.WriteLine("Unmapped memory addr: {0} with rip {1}", address.ToString("X"), GetRegister(register_e.ID_REG_X86_RIP));
-            throw new Exception();
+            throw new InvalidOperationException($"Emulator accessed unmapped memory. (type: {type}), (address: {address})");
+        }
+
+        private void OnMemoryRead(Emulator emulator, MemoryType type, ulong address, int size, ulong value, object userData)
+        {
+            memReadCallback?.Invoke(address, size);
+        }
+
+        private void OnMemoryWrite(Emulator emulator, MemoryType type, ulong address, int size, ulong value, object userData)
+        {
+            memWriteCallback?.Invoke(address, size, value);
         }
 
         public void SetMemoryReadCallback(dgOnMemoryRead callback)

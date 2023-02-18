@@ -36,7 +36,7 @@ namespace Dna.Symbolic
 
         public IReadOnlyDictionary<MemoryNode, AbstractNode> MemoryDefinitions => memoryDefinitions.AsReadOnly();
 
-        public BaseSymbolicExecutionEngine(Action<IOperand> onVariableUpdated = null, Action<MemoryNode> onMemoryUpdated = null)
+        public BaseSymbolicExecutionEngine(Action<IOperand> onVariableUpdated, Action<MemoryNode> onMemoryUpdated)
         {
             this.onVariableUpdated = onVariableUpdated;
             this.onMemoryUpdated = onMemoryUpdated;

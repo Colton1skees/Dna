@@ -15,7 +15,7 @@ namespace Dna.Symbolic
     {
         private ISymbolicAstBuilder astBuilder;
 
-        public SymbolicExecutionEngine()
+        public SymbolicExecutionEngine(Action<IOperand> onVariableUpdated, Action<MemoryNode> onMemoryUpdated) : base(onVariableUpdated, onMemoryUpdated)
         {
             astBuilder = new SymbolicAstBuilder(GetAstFromSymbolicState);
         }
