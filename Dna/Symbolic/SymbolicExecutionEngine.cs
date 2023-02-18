@@ -1,4 +1,5 @@
 ﻿using Dna.Simplification;
+using LLVMSharp;
 using Microsoft.Z3;
 using System;
 using System.Collections.Generic;
@@ -15,6 +16,10 @@ namespace Dna.Symbolic
     {
         private ISymbolicAstBuilder astBuilder;
 
+        private dgOnSymbolicVariableWrite variableWriteCallback;
+
+        private dgOnSymbolicMemoryWrite memoryWriteCallback;
+
         /// <summary>
         /// A mapping of each operand's symbolic value.
         /// </summary>
@@ -29,24 +34,39 @@ namespace Dna.Symbolic
 
         public IReadOnlyDictionary<MemoryNode, AbstractNode> MemoryDefinitions => memoryDefinitions.AsReadOnly();
 
-        public SymbolicExecutionEngine(dgGetAstFromSymbolicState getAstFromSymbolicState)
+        public SymbolicExecutionEngine(Func<IOperand, AbstractNode> symbolicAstEvaluator)
         {
-            astBuilder = new SymbolicAstBuilder(getAstFromSymbolicState);
+            if (symbolicAstEvaluator == null)
+                throw new ArgumentNullException(nameof(symbolicAstEvaluator));
+            astBuilder = new SymbolicAstBuilder(symbolicAstEvaluator);
         }
 
         public void ExecuteInstruction(AbstractInst inst)
         {
             if (inst is InstStore storeInst)
             {
+                // Note: Users are optionally allowed 
                 var ast = astBuilder.GetStoreAst(storeInst);
-                StoreMemoryDefinition(ast.destination, ast.source);
+                if(memoryWriteCallback?.Invoke(ast.destination, ast.source) == true)
+                    memoryDefinitions[ast.destination] = ast.source;
             }
 
             else
             {
                 var ast = astBuilder.GetAst(inst);
-                StoreOperandDefinition(ast.destination, ast.source);
+                if(variableWriteCallback?.Invoke(inst.Dest, ast.source) == true)
+                    variableDefinitions[inst.Dest] = ast.source;
             }
+        }
+
+        public void SetSymbolicVariableWriteCallback(dgOnSymbolicVariableWrite callback)
+        {
+            variableWriteCallback = callback;
+        }
+
+        public void SetSymbolicMemoryWriteCallback(dgOnSymbolicMemoryWrite callback)
+        {
+            memoryWriteCallback = callback;
         }
 
         public AbstractNode GetMemoryDefinition(MemoryNode memoryNode)

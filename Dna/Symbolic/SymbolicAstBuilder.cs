@@ -10,28 +10,26 @@ using TritonTranslator.Intermediate.Operands;
 
 namespace Dna.Symbolic
 {
-    public delegate AbstractNode dgGetAstFromSymbolicState(IOperand operand);
-
     /// <inheritdoc/>
     public class SymbolicAstBuilder : ISymbolicAstBuilder
     {
         /// <summary>
         /// The function pointer used to query the current symbolic ast for an operand.
         /// </summary>
-        private readonly dgGetAstFromSymbolicState getAstFromSymbolicState;
+        private readonly Func<IOperand, AbstractNode> evaluateSymbolicAst;
 
-        public SymbolicAstBuilder(dgGetAstFromSymbolicState getAstFromSymbolicState)
+        public SymbolicAstBuilder(Func<IOperand, AbstractNode> evaluateSymbolicAst)
         {
-            this.getAstFromSymbolicState = getAstFromSymbolicState;
+            this.evaluateSymbolicAst = evaluateSymbolicAst;
         }
 
         /// <inheritdoc/>
         public (IOperand destination, AbstractNode source) GetAst(AbstractInst instruction)
         {
             // Concise operand AST getter methods.
-            var op1 = () => getAstFromSymbolicState(instruction.Operands[0]);
-            var op2 = () => getAstFromSymbolicState(instruction.Operands[1]);
-            var op3 = () => getAstFromSymbolicState(instruction.Operands[2]);
+            var op1 = () =>  evaluateSymbolicAst(instruction.Operands[0]);
+            var op2 = () => evaluateSymbolicAst(instruction.Operands[1]);
+            var op3 = () => evaluateSymbolicAst(instruction.Operands[2]);
 
             // Construct an AST for the value of each operation.
             AbstractNode? valueAst = instruction switch
@@ -54,7 +52,7 @@ namespace Dna.Symbolic
                 InstUdiv => new BvudivNode(op1(), op2()),
                 InstUrem => new BvuremNode(op1(), op2()),
                 InstXor => new BvxorNode(op1(), op2()),
-                InstConcat => new ConcatNode(instruction.Operands.Select(x => getAstFromSymbolicState(x))),
+                InstConcat => new ConcatNode(instruction.Operands.Select(x => evaluateSymbolicAst(x))),
                 InstExtract inst => new ExtractNode((IntegerNode)op1(), (IntegerNode)op2(), op3()),
                 InstSelect inst => new IteNode(op1(), op2(), op3()),
                 InstSx inst => new SxNode(op1(), op2()),
@@ -70,9 +68,9 @@ namespace Dna.Symbolic
         private AbstractNode FromCond(InstCond cond)
         {
             // Concise operand AST getter methods.
-            var op1 = () => getAstFromSymbolicState(cond.Operands[0]);
-            var op2 = () => getAstFromSymbolicState(cond.Operands[1]);
-            var op3 = () => getAstFromSymbolicState(cond.Operands[2]);
+            var op1 = () => evaluateSymbolicAst(cond.Operands[0]);
+            var op2 = () => evaluateSymbolicAst(cond.Operands[1]);
+            var op3 = () => evaluateSymbolicAst(cond.Operands[2]);
 
             return cond.CondType switch
             {
@@ -92,8 +90,8 @@ namespace Dna.Symbolic
         public (MemoryNode destination, AbstractNode source) GetStoreAst(InstStore inst)
         {
             // Get nodes for the source and destination.
-            var dst = new MemoryNode(getAstFromSymbolicState(inst.Dest), inst.Bitsize);
-            var src = getAstFromSymbolicState(inst.Op1);
+            var dst = new MemoryNode(evaluateSymbolicAst(inst.Dest), inst.Bitsize);
+            var src = evaluateSymbolicAst(inst.Op1);
 
             return (dst, src);
         }
