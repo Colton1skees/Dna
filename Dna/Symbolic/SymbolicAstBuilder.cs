@@ -10,15 +10,17 @@ using TritonTranslator.Intermediate.Operands;
 
 namespace Dna.Symbolic
 {
+    public delegate AbstractNode dgGetAstFromSymbolicState(IOperand operand);
+
     /// <inheritdoc/>
     public class SymbolicAstBuilder : ISymbolicAstBuilder
     {
         /// <summary>
         /// The function pointer used to query the current symbolic ast for an operand.
         /// </summary>
-        private readonly Func<IOperand, AbstractNode> getAstFromSymbolicState;
+        private readonly dgGetAstFromSymbolicState getAstFromSymbolicState;
 
-        public SymbolicAstBuilder(Func<IOperand, AbstractNode> getAstFromSymbolicState)
+        public SymbolicAstBuilder(dgGetAstFromSymbolicState getAstFromSymbolicState)
         {
             this.getAstFromSymbolicState = getAstFromSymbolicState;
         }

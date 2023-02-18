@@ -11,39 +11,32 @@ using TritonTranslator.Intermediate.Operands;
 
 namespace Dna.Symbolic
 {
-    public class SymbolicExecutionEngine : BaseSymbolicExecutionEngine
+    public class SymbolicExecutionEngine : ISymbolicExecutionEngine
     {
         private ISymbolicAstBuilder astBuilder;
 
-        public SymbolicExecutionEngine(Action<IOperand> onVariableUpdated, Action<MemoryNode> onMemoryUpdated) : base(onVariableUpdated, onMemoryUpdated)
+        /// <summary>
+        /// A mapping of each operand's symbolic value.
+        /// </summary>
+        private Dictionary<IOperand, AbstractNode> variableDefinitions = new();
+
+        /// <summary>
+        /// A mapping of each memory node's symbolic value.
+        /// </summary>
+        private Dictionary<MemoryNode, AbstractNode> memoryDefinitions = new();
+
+        public IReadOnlyDictionary<IOperand, AbstractNode> VariableDefinitions => variableDefinitions.AsReadOnly();
+
+        public IReadOnlyDictionary<MemoryNode, AbstractNode> MemoryDefinitions => memoryDefinitions.AsReadOnly();
+
+        public SymbolicExecutionEngine(dgGetAstFromSymbolicState getAstFromSymbolicState)
         {
-            astBuilder = new SymbolicAstBuilder(GetAstFromSymbolicState);
+            astBuilder = new SymbolicAstBuilder(getAstFromSymbolicState);
         }
 
-        private AbstractNode GetAstFromSymbolicState(IOperand operand)
+        public void ExecuteInstruction(AbstractInst inst)
         {
-            if(VariableDefinitions.TryGetValue(operand, out AbstractNode ast))
-                return ast;
-            return CreateOperandNode(operand);
-        }
-
-        private AbstractNode CreateOperandNode(IOperand operand)
-        {
-            if (operand is ImmediateOperand immOp)
-                return new IntegerNode(immOp.Value, immOp.Bitsize);
-            else if (operand is RegisterOperand regOp)
-                return new RegisterNode(regOp.Register);
-            else if (operand is TemporaryOperand tempOp)
-                return new TemporaryNode(tempOp.Uid, tempOp.Bitsize);
-            else if (operand is SsaOperand ssaOp)
-                return new SsaVariableNode((VariableNode)CreateOperandNode(ssaOp.BaseOperand), ssaOp.Version);
-            else
-                throw new InvalidOperationException(String.Format("Cannot create operand node for type {0}", operand.GetType().FullName));
-        }
-
-        public override void ExecuteInstruction(AbstractInst inst)
-        {
-            if(inst is InstStore storeInst)
+            if (inst is InstStore storeInst)
             {
                 var ast = astBuilder.GetStoreAst(storeInst);
                 StoreMemoryDefinition(ast.destination, ast.source);
@@ -54,6 +47,26 @@ namespace Dna.Symbolic
                 var ast = astBuilder.GetAst(inst);
                 StoreOperandDefinition(ast.destination, ast.source);
             }
+        }
+
+        public AbstractNode GetMemoryDefinition(MemoryNode memoryNode)
+        {
+            return memoryDefinitions[memoryNode];
+        }
+
+        public void StoreMemoryDefinition(MemoryNode memoryNode, AbstractNode value)
+        {
+            memoryDefinitions[memoryNode] = value;
+        }
+
+        public AbstractNode GetOperandDefinition(IOperand operand)
+        {
+            return variableDefinitions[operand];
+        }
+
+        public void StoreOperandDefinition(IOperand operand, AbstractNode value)
+        {
+            variableDefinitions[operand] = value;
         }
     }
 }
