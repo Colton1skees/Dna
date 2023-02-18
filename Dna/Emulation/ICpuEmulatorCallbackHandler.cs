@@ -4,9 +4,10 @@ using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 
-namespace Dna.Symbolic
+namespace Dna.Emulation
 {
-    public class IntermediateToAst
+    public interface ICpuEmulatorCallbackHandler
     {
+        public ulong OnMemoryRead(ulong address, )
     }
 }

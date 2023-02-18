@@ -11,17 +11,9 @@ using TritonTranslator.Intermediate.Operands;
 
 namespace Dna.Symbolic
 {
-    public class SymbolicExecutionEngine : ISymbolicExecutionEngine
+    public class SymbolicExecutionEngine : BaseSymbolicExecutionEngine
     {
         private ISymbolicAstBuilder astBuilder;
-
-        private Dictionary<IOperand, AbstractNode> variableDefinitions = new();
-
-        private Dictionary<MemoryNode, AbstractNode> memoryDefinitions = new();
-
-        public IReadOnlyDictionary<IOperand, AbstractNode> VariableDefinitions => variableDefinitions;
-
-        public IReadOnlyDictionary<MemoryNode, AbstractNode> MemoryDefinitions => memoryDefinitions;
 
         public SymbolicExecutionEngine()
         {
@@ -30,7 +22,7 @@ namespace Dna.Symbolic
 
         private AbstractNode GetAstFromSymbolicState(IOperand operand)
         {
-            if(variableDefinitions.TryGetValue(operand, out AbstractNode ast))
+            if(VariableDefinitions.TryGetValue(operand, out AbstractNode ast))
                 return ast;
             return CreateOperandNode(operand);
         }
@@ -49,40 +41,18 @@ namespace Dna.Symbolic
                 throw new InvalidOperationException(String.Format("Cannot create operand node for type {0}", operand.GetType().FullName));
         }
 
-        public void ExecuteInstruction(AbstractInst inst)
+        public override void ExecuteInstruction(AbstractInst inst)
         {
             if(inst is InstStore storeInst)
             {
                 var ast = astBuilder.GetStoreAst(storeInst);
-                memoryDefinitions[ast.destination] = ast.source;
-                Console.WriteLine("{0} = {1}", ast.destination, ast.source);
+                StoreMemoryDefinition(ast.destination, ast.source);
             }
 
             else
             {
                 var ast = astBuilder.GetAst(inst);
-                variableDefinitions[ast.destination] = ast.source;
-                var text = String.Format("{0} = {1}", ast.destination, ast.source);
-                Console.WriteLine(text);
-
-                // TODO: Delete this debugging code.
-                if (text.Contains("Ite(Equal(Extract(0x1F:I32),0x0:I32),Bvsub(Reg(edx).0),Sx(0x0:I32),0xC8:I32)))),0x0:I32)),0x1:I1),0x0:I1))"))
-                {
-                    Console.WriteLine("Simplifying expression");
-
-                    /*
-                    var ctx = new Context();
-                    var z3Builder = new Z3AstBuilder(ctx);
-
-                    var expr = z3Builder.GetZ3Ast(ast.source);
-                    Console.WriteLine("AST: {0}\n", expr.ToString());
-                    Console.WriteLine("Simplified AST: {0}", expr.Simplify());
-                    Console.WriteLine("Done");
-                    */
-
-                    IExpressionSimplifier exprSimplifier = new RewriteSimplifier();
-                    exprSimplifier.SimplifyExpression(ast.source);
-                }
+                StoreOperandDefinition(ast.destination, ast.source);
             }
         }
     }

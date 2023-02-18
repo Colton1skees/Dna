@@ -7,6 +7,10 @@ using TritonTranslator.Arch;
 
 namespace Dna.Emulation
 {
+    public delegate void dgOnMemoryRead(ulong address, int size);
+
+    public delegate void dgOnMemoryWrite(ulong address, int size, ulong value);
+
     public interface ICpuEmulator
     {
         /// <summary>
@@ -53,5 +57,17 @@ namespace Dna.Emulation
         /// Writes memory contents at the provided address.
         /// </summary>
         public void WriteMemory(ulong addr, byte[] value);
+
+        /// <summary>
+        /// Sets a callback which will be invoked on each memory read.
+        /// </summary>
+        /// <param name="callback"></param>
+        public void SetMemoryReadCallback(dgOnMemoryRead callback);
+
+        /// <summary>
+        /// Sets a callback which will be invoked on each memory write.
+        /// </summary>
+        /// <param name="callback"></param>
+        public void SetMemoryWriteCallback(dgOnMemoryWrite callback);
     }
 }
