@@ -25,7 +25,7 @@ using Dna.Emulation.Unicorn;
 
 // Load the 64 bit PE file.
 // Note: This file is automatically copied to the build directory.
-var path = @"SampleExecutable.bin";
+var path = @"SampleExecutable";
 var binary = new WindowsBinary(64, File.ReadAllBytes(path), 0x140000000);
 
 // Instantiate dna.
@@ -64,8 +64,14 @@ File.WriteAllText("graph.dot", dotGraph.Compile(false, false));
 var emulator = new UnicornEmulator(architecture);
 PEMapper.MapBinary(emulator, binary);
 
+// Setup the stack.
+ulong rsp = 0x100000000;
+emulator.MapMemory(rsp, 0x1000 * 12);
+rsp += 0x100;
+emulator.SetRegister(register_e.ID_REG_X86_RSP, rsp);
+
 // Execute the function.
-emulator.Start(0x1400010F7);
+emulator.Start(0x140001747);
 
 // Lift the control flow graph to LLVM IR.
 var llvmLifter = new LLVMLifter(architecture);

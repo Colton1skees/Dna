@@ -15,6 +15,7 @@ namespace Dna.Emulation
     {
         public static void MapBinary(ICpuEmulator state, WindowsBinary binary)
         {
+            state.MapMemory(binary.BaseAddress, 0x1000 * 100);
             var peFile = binary.PEFile;
             foreach(var section in peFile.Sections)
             {

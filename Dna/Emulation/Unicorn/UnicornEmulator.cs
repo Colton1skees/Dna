@@ -2,6 +2,7 @@
 using Dna.Relocation;
 using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
@@ -27,6 +28,7 @@ namespace Dna.Emulation.Unicorn
             this.architecture = architecture;
 
             // Insert a hook to throw an exception when unmapped memory usages occur.
+            Emulator.Hooks.Code.Add(CodeHook, null);
             Emulator.Hooks.Memory.Add(MemoryEventHookType.UnmappedFetch | MemoryEventHookType.UnmappedRead | MemoryEventHookType.UnmappedWrite, UnmappedMemoryHook, null);
             Emulator.Hooks.Memory.Add(MemoryHookType.Read, OnMemoryRead, null);
             Emulator.Hooks.Memory.Add(MemoryHookType.Write, OnMemoryWrite, null);
@@ -113,6 +115,17 @@ namespace Dna.Emulation.Unicorn
         private void OnMemoryWrite(Emulator emulator, MemoryType type, ulong address, int size, ulong value, object userData)
         {
             memWriteCallback?.Invoke(address, size, value);
+        }
+
+        public void CodeHook(Emulator genericEmu, ulong address, int size, object userToken)
+        {
+            Console.WriteLine("executing {0}:", ((ulong)Emulator.Registers.RIP).ToString("X"));
+
+            if (Emulator.Registers.RIP == 0x140001753)
+            {
+                Console.WriteLine("RAX: 0x{0}", Emulator.Registers.RAX.ToString("X"));
+                Debugger.Break();
+            }
         }
 
         public void SetMemoryReadCallback(dgOnMemoryRead callback)

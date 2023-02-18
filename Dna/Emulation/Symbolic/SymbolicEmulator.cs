@@ -40,9 +40,25 @@ namespace Dna.Emulation.Symbolic
             engine = new SymbolicExecutionEngine(EvaluateSymbolicAst);
         }
 
-        public AbstractNode EvaluateSymbolicAst(IOperand operand)
+        private AbstractNode EvaluateSymbolicAst(IOperand operand)
         {
-            return null;
+            if (engine.VariableDefinitions.TryGetValue(operand, out AbstractNode ast))
+                return ast;
+            return CreateOperandNode(operand);
+        }
+
+        private AbstractNode CreateOperandNode(IOperand operand)
+        {
+            if (operand is ImmediateOperand immOp)
+                return new IntegerNode(immOp.Value, immOp.Bitsize);
+            else if (operand is RegisterOperand regOp)
+                return new RegisterNode(regOp.Register);
+            else if (operand is TemporaryOperand tempOp)
+                return new TemporaryNode(tempOp.Uid, tempOp.Bitsize);
+            else if (operand is SsaOperand ssaOp)
+                return new SsaVariableNode((VariableNode)CreateOperandNode(ssaOp.BaseOperand), ssaOp.Version);
+            else
+                throw new InvalidOperationException(String.Format("Cannot create operand node for type {0}", operand.GetType().FullName));
         }
 
         public ulong GetRegister(register_e regId)
@@ -142,6 +158,7 @@ namespace Dna.Emulation.Symbolic
             return decoder.Decode();
         }
 
+        /*
         private void OnMemoryRead(Emulator emulator, MemoryType type, ulong address, int size, ulong value, object userData)
         {
             memReadCallback?.Invoke(address, size);
@@ -151,6 +168,7 @@ namespace Dna.Emulation.Symbolic
         {
             memWriteCallback?.Invoke(address, size, value);
         }
+        */
 
         public void SetMemoryReadCallback(dgOnMemoryRead callback)
         {
@@ -165,12 +183,16 @@ namespace Dna.Emulation.Symbolic
 
         private ulong? FastEvaluate(AbstractNode node)
         {
-            throw new NotImplementedException();
+            if (node is BvNode bvNode)
+                node = (IntegerNode)bvNode.Expr1;
+            if (node is IntegerNode intNode)
+                return intNode.Value;
+            return null;
         }
 
         private Microsoft.Z3.Expr GetZ3Ast(AbstractNode ast)
         {
-            return null;
+            return z3Translator.GetZ3Ast(ast);
         }
     }
 }
