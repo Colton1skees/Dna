@@ -1,17 +1,18 @@
 # Dna
 
 **Dna** is a static analysis framework for **x86/x64**, mainly geared towards deobfuscation. It offers:
-- **Instruction semantics** via [TritonTranslator](https://github.com/Colton1skees/TritonTranslator)
+- **Instruction semantics** for x86/x64 via [TritonTranslator](https://github.com/Colton1skees/TritonTranslator)
 - Symbolic execution
 - Mixed boolean-arithmetic(MBA) simplification
+- SMT solver integration
+- Control flow graph recovery
+- Lifting to LLVM IR
+- Decompilation(via [Rellic](https://github.com/lifting-bits/rellic))
+- Emulation 
 - Parsing of executable file formats
-- Control flow graph reconstruction
-- Control flow graph visualization
-- Translation of routines to an intermediate representation
-- Translation of routines to **LLVM** IR
+- Visualization of control flow graphs
 - IR **optimization** passes
 - Function relocation(optionally across binaries, with some caveats)
-- Decompilation(via [Rellic](https://github.com/lifting-bits/rellic))
 
 You can find an example usage [here](https://github.com/Colton1skees/Dna/blob/master/Dna.Example/Program.cs).
 
