@@ -53,14 +53,14 @@ namespace Dna.Lifting
 
             // Constrct an LLVM module and builder.
             module = LLVMModuleRef.CreateWithName("TritonTranslator");
-            module.Target = "x86_64";
+            module.Target = "wasm64";
             builder = Module.Context.CreateBuilder();
 
             // Create an i64* pointer to store memory.
-            var memoryPtrType = LLVMTypeRef.CreatePointer(LLVMTypeRef.CreateInt(64), 0);
+            var memoryPtrType = LLVMTypeRef.CreateInt(64);
             memoryPtr = Module.AddGlobal(memoryPtrType, "memory");
             memoryPtr.Linkage = LLVMLinkage.LLVMCommonLinkage;
-            var memoryPtrNull = LLVMValueRef.CreateConstPointerNull(LLVMTypeRef.CreateInt(64));
+            var memoryPtrNull = LLVMValueRef.CreateConstInt(memoryPtrType, 0, false);
             memoryPtr.Initializer = memoryPtrNull;
 
             // Construct an LLVM lifter for translating individual instructions.
@@ -131,14 +131,6 @@ namespace Dna.Lifting
             // Lift each block to LLVM IR.
             foreach(var block in irBlocks)
             {
-                if(block == irBlocks.First())
-                {
-                    var storeIntType = LLVMTypeRef.CreateInt(64);
-                    var storePtrType = LLVMTypeRef.CreatePointer(storeIntType, 0);
-
-                    var percentFour2 = builder.BuildLoad2(storePtrType, memoryPtr); 
-                    lifter.SetMemoryPtr(percentFour2);
-                }
                 builder.PositionAtEnd(liftedBlockMapping[block]);
                 foreach(var inst in block.Instructions)
                 {

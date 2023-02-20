@@ -6,7 +6,7 @@ using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 
-namespace Dna.Structuring
+namespace Dna.Structuring.Revng
 {
     /// <summary>
     /// The following algorithm is a reimplementation from the paper:
@@ -45,7 +45,7 @@ namespace Dna.Structuring
         {
             // Insert a dummy node for each retreating edge.
             // TODO: Add code to JMP to the correct destination.
-            foreach(var backEdge in backEdges)
+            foreach (var backEdge in backEdges)
             {
                 var target = backEdge.TargetBlock;
                 var dummy = NodeInserter.InsertArtificalNode(graph);

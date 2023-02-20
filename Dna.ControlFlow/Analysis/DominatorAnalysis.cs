@@ -9,6 +9,13 @@ namespace Dna.ControlFlow.Analysis
 {
     public static class DominatorAnalysis
     {
+        /// <summary>
+        /// Constructs a dominator tree for the control flow graph.
+        /// For each node {N}, yield a set of nodes all nodes which dominate {N}.
+        /// </summary>
+        /// <param name="graph"></param>
+        /// <returns></returns>
+        /// <exception cref="InvalidOperationException"></exception>
         public static IReadOnlyDictionary<Node, HashSet<Node>> GetDominatorTree(Graph graph)
         {
             if (graph.Nodes.First().IncomingEdges.Count > 0)

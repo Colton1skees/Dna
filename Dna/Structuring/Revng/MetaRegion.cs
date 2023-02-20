@@ -6,7 +6,7 @@ using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 
-namespace Dna.Structuring
+namespace Dna.Structuring.Revng
 {
     public class MetaRegion<T> : IMetaRegion<T>
     {
@@ -38,7 +38,7 @@ namespace Dna.Structuring
         {
             // Remove old SCS nodes.
             bool needSubstitution = false;
-            foreach(var node in removal)
+            foreach (var node in removal)
             {
                 // Skip if the node does not need to be removed.
                 if (!Nodes.Contains(node))
@@ -84,7 +84,7 @@ namespace Dna.Structuring
         public bool IntersectsWith(IMetaRegion<T> region)
         {
             // If the region contains any node from our node list, there is an intersection.
-            foreach(var node in Nodes)
+            foreach (var node in Nodes)
             {
                 if (region.Nodes.Contains(node))
                     return true;
@@ -97,7 +97,7 @@ namespace Dna.Structuring
         // TODO: Validate.
         public bool IsSubSet(IMetaRegion<T> region)
         {
-            foreach(var node in region.Nodes)
+            foreach (var node in region.Nodes)
             {
                 if (!Nodes.Contains(node))
                     return false;
@@ -109,7 +109,7 @@ namespace Dna.Structuring
         // TODO: Validate.
         public bool IsSuperSet(IMetaRegion<T> region)
         {
-            foreach(var node in Nodes)
+            foreach (var node in Nodes)
             {
                 if (!region.Nodes.Contains(node))
                     return false;
@@ -134,9 +134,9 @@ namespace Dna.Structuring
 
         public BasicBlock<T> GetProbableEntry(IEnumerable<BasicBlock<T>> reversePostOrderTraveral)
         {
-            foreach(var node in reversePostOrderTraveral)
+            foreach (var node in reversePostOrderTraveral)
             {
-                if(ContainsNode(node)) 
+                if (ContainsNode(node))
                     return node;
             }
 

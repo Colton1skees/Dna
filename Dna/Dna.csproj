@@ -35,6 +35,7 @@
     <PackageReference Include="LLVMSharp" Version="15.0.0-beta1" />
     <PackageReference Include="Microsoft.Z3" Version="4.11.2" />
     <PackageReference Include="Rivers" Version="0.1.0" />
+    <PackageReference Include="WebAssembly" Version="1.2.1" />
   </ItemGroup>
 
   <ItemGroup>

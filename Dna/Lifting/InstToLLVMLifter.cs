@@ -21,9 +21,7 @@ namespace Dna.Lifting
 
         private readonly LLVMBuilderRef builder;
 
-        private LLVMValueRef memoryPtr;
-
-        private LLVMValueRef percentOne;
+        private readonly LLVMValueRef memoryPtr;
 
         private readonly Func<IOperand, LLVMValueRef> load;
 
@@ -36,11 +34,6 @@ namespace Dna.Lifting
             this.memoryPtr = memoryPtr;
             this.load = load;
             this.storeToOperand = storeToOperand;
-        }
-
-        public void SetMemoryPtr(LLVMValueRef percentOne)
-        {
-            this.percentOne = percentOne;   
         }
 
         public void LiftInstructionToLLVM(AbstractInst instruction, Func<ulong, LLVMBasicBlockRef> getBlockByAddress)
@@ -210,13 +203,9 @@ namespace Dna.Lifting
                 case InstLoad inst:
                     // Cast the address to a pointer.
                     var loadValType = LLVMTypeRef.CreateInt(inst.Bitsize);
-
                     var ptrType = LLVMTypeRef.CreatePointer(loadValType, 0);
-
-                    //var percentFour = builder.BuildLoad2(ptrType, memoryPtr);
-
-                    var loadPointer = builder.BuildInBoundsGEP2(ptrType, percentOne, new LLVMValueRef[] { op1() });
-                    //var loadPointer = builder.BuildIntToPtr(op1(), ptrType, "loadPtr");
+                    //var loadPointer = builder.BuildInBoundsGEP2(ptrType, op1(), new LLVMValueRef[] {});
+                    var loadPointer = builder.BuildIntToPtr(op1(), ptrType, "loadPtr");
 
                     // Dereference the pointer.
                     var loadValue = builder.BuildLoad2(loadValType, loadPointer, "load");
@@ -232,10 +221,7 @@ namespace Dna.Lifting
                     // Cast the destination address to a pointer of the source value width.
                     var storeIntType = LLVMTypeRef.CreateInt(inst.Op1.Bitsize);
                     var storePtrType = LLVMTypeRef.CreatePointer(storeIntType, 0);
-
-                    //var percentFour2 = builder.BuildLoad2(storePtrType, memoryPtr);
-                    //var storePtr = builder.BuildIntToPtr(storeAddr, storePtrType, "storePtr");
-                    var storePtr = builder.BuildInBoundsGEP2(storeIntType, percentOne, new LLVMValueRef[] { storeAddr });
+                    var storePtr = builder.BuildIntToPtr(storeAddr, storePtrType, "storePtr");
 
                     // Write to memory.
                     builder.BuildStore(storeValue, storePtr);

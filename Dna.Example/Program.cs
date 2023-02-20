@@ -22,6 +22,8 @@ using ClangSharp.Interop;
 using ClangSharp;
 using Dna.Decompiler;
 using Dna.Emulation.Unicorn;
+using Dna.Decompilation;
+using Dna.Structuring.Stackify;
 
 // Load the 64 bit PE file.
 // Note: This file is automatically copied to the build directory.
@@ -54,21 +56,21 @@ for (int i = 0; i < 3; i++)
 //blockDcePass.Run();
 
 // Print the optimized control flow graph.
-Console.WriteLine("Optimized cfg:\n{0}", GraphFormatter.FormatGraph(liftedCfg));
+//Console.WriteLine("Optimized cfg:\n{0}", GraphFormatter.FormatGraph(liftedCfg));
 
 // Create a .DOT file for visualizing the IR cfg.
-var dotGraph = GraphVisualizer.GetDotGraph(liftedCfg);
-File.WriteAllText("graph.dot", dotGraph.Compile(false, false));
+//var dotGraph = GraphVisualizer.GetDotGraph(liftedCfg);
+//File.WriteAllText("graph.dot", dotGraph.Compile(false, false));
 
 // Load the binary into unicorn engine.
-var emulator = new UnicornEmulator(architecture);
-PEMapper.MapBinary(emulator, binary);
+// var emulator = new UnicornEmulator(architecture);
+//PEMapper.MapBinary(emulator, binary);
 
 // Setup the stack.
-ulong rsp = 0x100000000;
-emulator.MapMemory(rsp, 0x1000 * 12);
-rsp += 0x100;
-emulator.SetRegister(register_e.ID_REG_X86_RSP, rsp);
+//ulong rsp = 0x100000000;
+//emulator.MapMemory(rsp, 0x1000 * 12);
+//rsp += 0x100;
+//emulator.SetRegister(register_e.ID_REG_X86_RSP, rsp);
 
 // Execute the function.
 //emulator.Start(0x140001747);
@@ -99,7 +101,6 @@ passManager.AddInstructionCombiningPass();
 passManager.AddCFGSimplificationPass();
 passManager.AddDeadStoreEliminationPass();
 passManager.AddAggressiveDCEPass();
-
 passManager.InitializeFunctionPassManager();
 for (int i = 0; i < 10; i++)
 {
@@ -113,8 +114,46 @@ bool printLLVM = false;
 if (printLLVM)
     llvmLifter.Module.Dump();
 
-llvmLifter.Module.PrintToFile(@"C:\Users\colton\Downloads\dfgfgfgd\code.ll");
+var llPath = @"C:\Users\colton\Downloads\dfgfgfgd\code.ll";
+var compiledAsmPath = @"C:\Users\colton\Downloads\dfgfgfgd\code.asm";
+var wasmTextPath = @"C:\Users\colton\Downloads\dfgfgfgd\code.wat";
+var wasmBinaryPath = @"C:\Users\colton\Downloads\dfgfgfgd\code.wasm";
+var compiledExePath = @"C:\Users\colton\Downloads\dfgfgfgd\code.exe";
+llvmLifter.Module.PrintToFile(llPath);
+llvmLifter.Module.WriteBitcodeToFile(@"C:\Users\colton\Downloads\dfgfgfgd\lifted.bc");
 
+var stackifier = new CfgStackifier();
+stackifier.Stackify(liftedCfg);
+
+Console.WriteLine("Press enter.");
+Console.ReadLine();
+// Compile the bitcode to a native executable.
+var nativeDecompiler = new LLVMDecompiler();
+//nativeDecompiler.RunClang($"{llPath} -S -o {compiledAsmPath} -O3 -target x86_64");
+//nativeDecompiler.RunClang($"{compiledAsmPath} -target x86_64 -O3 -c -o {compiledExePath}");
+
+// Compile the bitcode to wasm text.
+/*
+nativeDecompiler.RunClang($"{llPath} -o {compiledAsmPath} -O3 -target wasm64");
+var cmd = $"{llPath} -S -o {wasmTextPath} -O3 -target wasm64";
+Console.WriteLine(cmd);
+nativeDecompiler.RunClang(cmd);
+
+// Compile the bitcode to wasm binary.
+var cmd2 = $"wat2wasm {wasmTextPath} -o {wasmBinaryPath}";
+Console.WriteLine(cmd2);
+nativeDecompiler.RunClang(cmd2);
+*/
+
+
+var cmd = $"{llPath} -S -o {wasmTextPath} -O3 -target wasm64";
+//nativeDecompiler.RunClang(cmd);
+//nativeDecompiler.RunClang($"{llPath} -S -o {wasmBinaryPath} -O3 -target wasm64");
+//nativeDecompiler.RunClang($"--target=wasm64 -O3 -nostdlib {llPath} -o {wasmBinaryPath} -Wl,--no-entry");
+// Decompile the bitcode to pseudo C.
+nativeDecompiler.Decompile(wasmBinaryPath);
+Console.WriteLine("Press enter to run rellic.");
+Console.ReadLine();
 // Optionally decompile the lifted function to go-to free pseudo C, via Rellic.
 // On my machine, a fork of Rellic runs under WSL2 and communiucates via gRPC.
 // If you are not hosting this server at localhost:50051, then the API
