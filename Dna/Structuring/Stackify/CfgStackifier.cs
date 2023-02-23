@@ -28,11 +28,11 @@ namespace Dna.Structuring.Stackify
 
         private HashSet<BasicBlock<AbstractInst>> loopHeaders;
 
-        private HashSet<BasicBlock<AbstractInst>> mergeNodes;
+        private HashSet<BasicBlock<AbstractInst>> thismergeNodes;
 
         Dictionary<Node, int> rpoPositions;
 
-        public void Stackify(ControlFlowGraph<AbstractInst> cfg)
+        public List<WasmBlock> Stackify(ControlFlowGraph<AbstractInst> cfg)
         {
             // Compute merge nodes and loop headers.
             this.cfg = cfg;
@@ -43,6 +43,7 @@ namespace Dna.Structuring.Stackify
             HandleDomSubtree(cfg.GetBlocks().First(), ref body);
 
             Console.WriteLine("Done");
+            return body;
 
             //Console.WriteLine(info);
         }
@@ -50,7 +51,7 @@ namespace Dna.Structuring.Stackify
         private (HashSet<BasicBlock<AbstractInst>> mergeNodes, HashSet<BasicBlock<AbstractInst>> loopHeaders) ComputeMergeNodesAndLoopHeaders()
         {
             loopHeaders = new HashSet<BasicBlock<AbstractInst>>();
-            mergeNodes = new HashSet<BasicBlock<AbstractInst>>();
+            thismergeNodes = new HashSet<BasicBlock<AbstractInst>>();
             var branchedOnce = new HashSet<BasicBlock<AbstractInst>>();
 
             // Record a reverse postorder traversal of the control flow.
@@ -86,7 +87,7 @@ namespace Dna.Structuring.Stackify
                     else
                     {
                         if(!branchedOnce.Add(successor))
-                            mergeNodes.Add(successor);
+                            thismergeNodes.Add(successor);
                     }
                 }
             }
@@ -95,7 +96,7 @@ namespace Dna.Structuring.Stackify
             // TODO: Handle switch statements.
             if (cfg.Nodes.Any(x => x.OutgoingEdges.Count > 2))
                 throw new InvalidOperationException("TODO: Handle switch cases");
-            return (mergeNodes, loopHeaders);
+            return (thismergeNodes, loopHeaders);
         }
 
         private void Compute()
@@ -105,10 +106,28 @@ namespace Dna.Structuring.Stackify
 
         private void HandleDomSubtree(BasicBlock<AbstractInst> block, ref List<WasmBlock> into)
         {
+
+            /*
             var mergeNodeChildren = dominatorTree[block]
                 .Where(x => mergeNodes.Contains(x))
                 .Cast<BasicBlock<AbstractInst>>()
                 .ToList();
+            
+
+            
+            
+            var mergeNodeChildren = dominatorTree.Keys
+                .Where(x => dominatorTree[x].Contains(block) && x != block)
+                .Cast<BasicBlock<AbstractInst>>()
+                .ToList();
+            */
+
+            var dominatorChildren = dominatorTree.Keys.Where(x => dominatorTree[x].Contains(block))
+                .Cast<BasicBlock<AbstractInst>>()
+                .ToHashSet();
+
+            dominatorChildren.Remove(block);
+            var mergeNodeChildren = dominatorChildren.Where(x => thismergeNodes.Contains(x));
 
             // Sort merge nodes so the highest RPO number comes first.
             mergeNodeChildren.OrderByDescending(x => rpoPositions[x]);
@@ -205,7 +224,7 @@ namespace Dna.Structuring.Stackify
             // This will be a branch to some entry in the control stack if
             // the target is either a merge block, or is a backward branch
             // (by RPO number).
-            if(mergeNodes.Contains(target) || rpoPositions[target] <= rpoPositions[source])
+            if(thismergeNodes.Contains(target) || rpoPositions[target] <= rpoPositions[source])
             {
                 var index = ResolveTarget(target);
                 DoBlockParamTransfer(ref into);
@@ -232,12 +251,16 @@ namespace Dna.Structuring.Stackify
             var index = ctrlStack
                 .Reverse()
                 .ToList()
-                .FindIndex(x => x.Label() == target);
+                .FirstOrDefault(x => x.Label() == target);
 
-            if (index == -1)
-                throw new InvalidOperationException();
+            {
+                if (index == null)
+                {
+                    Console.WriteLine("Failed to find target for {0}", target.Address);
+                }
+            }
 
-            return new WasmLabel(index);
+            return new WasmLabel(index?.Label());
         }
 
         private void DoBlockParamTransfer(ref List<WasmBlock> into)

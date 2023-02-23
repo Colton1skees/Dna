@@ -27,17 +27,17 @@ using Dna.Structuring.Stackify;
 
 // Load the 64 bit PE file.
 // Note: This file is automatically copied to the build directory.
-var path = @"SampleExecutable";
+var path = @"C:\Users\colton\source\repos\ObfuscationTester\x64\Release\ObfuscationTester.exe";
 var binary = new WindowsBinary(64, File.ReadAllBytes(path), 0x140000000);
 
 // Instantiate dna.
 var dna = new Dna.Dna(binary);
 
 // Parse a control flow graph from the binary.
-ulong funcAddr = 0x140001670;
+ulong funcAddr = 0x140001730;
 var cfg = dna.RecursiveDescent.ReconstructCfg(funcAddr);
-Console.WriteLine("Disassembled cfg:\n{0}", GraphFormatter.FormatGraph(cfg));
-Console.WriteLine(GraphFormatter.FormatGraph(cfg));
+//Console.WriteLine("Disassembled cfg:\n{0}", GraphFormatter.FormatGraph(cfg));
+//Console.WriteLine(GraphFormatter.FormatGraph(cfg));
 
 // Instantiate the cpu architecture.
 var architecture = new X86CpuArchitecture(ArchitectureId.ARCH_X86_64);
@@ -47,6 +47,7 @@ var cfgLifter = new CfgLifter(architecture);
 
 // Lift the control flow graph to TTIR.
 var liftedCfg = cfgLifter.LiftCfg(cfg);
+// var liftedCfg = StructuringTest.GetSimpleComparison();
 
 for (int i = 0; i < 3; i++)
     Console.WriteLine("");
@@ -79,6 +80,7 @@ for (int i = 0; i < 3; i++)
 var llvmLifter = new LLVMLifter(architecture);
 llvmLifter.Lift(liftedCfg);
 
+var exitNodes = liftedCfg.Nodes.Where(x => x.OutgoingEdges.Count == 0);
 
 
 var passManager = llvmLifter.Module.CreateFunctionPassManager();
@@ -110,7 +112,7 @@ passManager.FinalizeFunctionPassManager();
 
 
 // Optionally write the llvm IR to the console.
-bool printLLVM = false;
+bool printLLVM = true;
 if (printLLVM)
     llvmLifter.Module.Dump();
 
@@ -122,11 +124,24 @@ var compiledExePath = @"C:\Users\colton\Downloads\dfgfgfgd\code.exe";
 llvmLifter.Module.PrintToFile(llPath);
 llvmLifter.Module.WriteBitcodeToFile(@"C:\Users\colton\Downloads\dfgfgfgd\lifted.bc");
 
-var stackifier = new CfgStackifier();
-stackifier.Stackify(liftedCfg);
+//var test = new StructuringTest();
+//test.Run();
+
+Console.WriteLine("Ran tests... press enter");
+Console.WriteLine("\n\n\n");
+//Console.ReadLine();
+
+//var stackifier = new CfgStackifier();
+//var wasm = stackifier.Stackify(liftedCfg);
+
+//var astEmitter = new ASTEmitter();
+//astEmitter.Emit(wasm);
+//Console.WriteLine(astEmitter.builder.ToString());
+Console.WriteLine();
+
 
 Console.WriteLine("Press enter.");
-Console.ReadLine();
+//Console.ReadLine();
 // Compile the bitcode to a native executable.
 var nativeDecompiler = new LLVMDecompiler();
 //nativeDecompiler.RunClang($"{llPath} -S -o {compiledAsmPath} -O3 -target x86_64");

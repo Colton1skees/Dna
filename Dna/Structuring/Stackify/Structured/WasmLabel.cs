@@ -11,9 +11,9 @@ namespace Dna.Structuring.Stackify.Structured
 {
     public class WasmLabel
     {
-        public int Index { get; set; }
+        public BasicBlock<AbstractInst> Index { get; set; }
 
-        public WasmLabel(int index)
+        public WasmLabel(BasicBlock<AbstractInst> index)
         {
             Index = index;  
         }

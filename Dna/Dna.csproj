@@ -23,7 +23,15 @@
   </ItemGroup>
 
   <ItemGroup>
+    <Compile Remove="Structuring\Stackify\CfgStackifier2.cs" />
+  </ItemGroup>
+
+  <ItemGroup>
     <Folder Include="Binary\Linux\" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <None Include="Structuring\Stackify\CfgStackifier2.cs" />
   </ItemGroup>
 
   <ItemGroup>
