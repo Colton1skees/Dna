@@ -9,8 +9,6 @@ using TritonTranslator.Intermediate;
 
 namespace Dna.Structuring.Stackify
 {
-    
-
     public class ASTEmitter
     {
         public CodeBuilder builder = new CodeBuilder();
@@ -18,6 +16,8 @@ namespace Dna.Structuring.Stackify
         List<WasmBlock> og;
 
         private HashSet<BasicBlock<AbstractInst>> loops = new();
+
+        private bool isInLoop = false;
 
         public void Emit(List<WasmBlock> ast)
         {
@@ -58,9 +58,11 @@ namespace Dna.Structuring.Stackify
                     break;
                 case Loop wasm:
                     // This is incorrect.
+                    isInLoop = true;
                     loops.Add(wasm.Header);
-                    builder.StartForLoop("loop", "loop", "loop");
+                    builder.StartWhileLoop("true");
                     Emit(wasm.Body);
+                    isInLoop = false;
                     builder.EndClause();
                     break;
                 case Br wasm:
@@ -71,7 +73,8 @@ namespace Dna.Structuring.Stackify
                     }
                     else
                     {
-                        builder.AppendLine("break;");
+                        if(isInLoop)
+                            builder.AppendLine("break;");
                     }
                     break;
                 default:

@@ -100,5 +100,17 @@ namespace Dna.Extensions
 
             return @this;
         }
+
+        public static void Push<T>(this List<T> @this, T item)
+        {
+            @this.Add(item);
+        }
+
+        public static T Pop<T>(this List<T> @this)
+        {
+            var last = @this.Last();
+            @this.RemoveAt(@this.Count- 1);
+            return last;
+        }
     }
 }

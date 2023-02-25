@@ -34,7 +34,7 @@ var binary = new WindowsBinary(64, File.ReadAllBytes(path), 0x140000000);
 var dna = new Dna.Dna(binary);
 
 // Parse a control flow graph from the binary.
-ulong funcAddr = 0x140001730;
+ulong funcAddr = 0x14000136C;
 var cfg = dna.RecursiveDescent.ReconstructCfg(funcAddr);
 //Console.WriteLine("Disassembled cfg:\n{0}", GraphFormatter.FormatGraph(cfg));
 //Console.WriteLine(GraphFormatter.FormatGraph(cfg));
@@ -131,17 +131,18 @@ Console.WriteLine("Ran tests... press enter");
 Console.WriteLine("\n\n\n");
 //Console.ReadLine();
 
-//var stackifier = new CfgStackifier();
-//var wasm = stackifier.Stackify(liftedCfg);
+var stackifier = new StackifierTwo();
+var wasm = stackifier.Stackify(liftedCfg);
 
-//var astEmitter = new ASTEmitter();
-//astEmitter.Emit(wasm);
-//Console.WriteLine(astEmitter.builder.ToString());
+
+var astEmitter = new ASTEmitter();
+astEmitter.Emit(wasm);
+Console.WriteLine(astEmitter.builder.ToString());
 Console.WriteLine();
 
 
 Console.WriteLine("Press enter.");
-//Console.ReadLine();
+Console.ReadLine();
 // Compile the bitcode to a native executable.
 var nativeDecompiler = new LLVMDecompiler();
 //nativeDecompiler.RunClang($"{llPath} -S -o {compiledAsmPath} -O3 -target x86_64");
