@@ -15,6 +15,9 @@
   </ItemGroup>
 
   <ItemGroup>
+    <None Update="ProtectedExecutable.bin">
+      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+    </None>
     <None Update="SampleExecutable">
       <CopyToOutputDirectory>Always</CopyToOutputDirectory>
     </None>
