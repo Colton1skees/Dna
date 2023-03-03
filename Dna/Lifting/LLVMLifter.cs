@@ -213,6 +213,11 @@ namespace Dna.Lifting
                 register_e.ID_REG_X86_AX,
                 register_e.ID_REG_X86_AL,
                 register_e.ID_REG_X86_AH,
+
+                register_e.ID_REG_X86_R11,
+                register_e.ID_REG_X86_RCX,
+
+                register_e.ID_REG_X86_RIP,
             };
 
             foreach(var block in liftedBlockMapping.Where(x => x.Key.OutgoingEdges.Count == 0).Select(x => x.Value))
@@ -224,7 +229,8 @@ namespace Dna.Lifting
 
                 foreach(var register in liftedLocalRegisters.Keys)
                 {
-                    if (architecture.GetRootParentRegister(register).Id != register_e.ID_REG_X86_RAX)
+                    var rootParent = architecture.GetRootParentRegister(register);
+                    if (rootParent.Id != register_e.ID_REG_X86_RAX && rootParent.Id != register_e.ID_REG_X86_R11 && rootParent.Id != register_e.ID_REG_X86_RCX && rootParent.Id != register_e.ID_REG_X86_RIP)
                         continue;
                     // Get a triton register operand.
                     var regOperand = architecture.GetRegister(register);

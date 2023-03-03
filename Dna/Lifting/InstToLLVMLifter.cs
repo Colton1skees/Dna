@@ -100,7 +100,7 @@ namespace Dna.Lifting
                     var rolIntrinsicFunc = module.AddFunction("llvm.fshl.i" + inst.Bitsize, rolFnType);
 
                     // Execute and store the result.
-                    var rol = builder.BuildCall(rolIntrinsicFunc, new LLVMValueRef[] { op1(), op1(), op2() }, "rol");
+                    var rol = builder.BuildCall2(rolFnType, rolIntrinsicFunc, new LLVMValueRef[] { op1(), op1(), op2() }, "rol");
                     store(rol);
                     break;
                 case InstRor inst:
@@ -110,12 +110,16 @@ namespace Dna.Lifting
                     var rorIntrinsicFunc = module.AddFunction("llvm.fshr.i" + inst.Bitsize, rorFnType);
 
                     // Invoke the intrinsic and store the result.
-                    var ror = builder.BuildCall(rorIntrinsicFunc, new LLVMValueRef[] { op1(), op1(), op2() }, "ror");
+                    var ror = builder.BuildCall2(rorFnType, rorIntrinsicFunc, new LLVMValueRef[] { op1(), op1(), op2() }, "ror");
                     store(ror);
                     break;
                 case InstSdiv inst:
                     var sdiv = builder.BuildSDiv(op1(), op2(), "sdiv");
                     store(sdiv);
+                    break;
+                case InstShl inst:
+                    var shl = builder.BuildShl(op1(), op2(), "shl");
+                    store(shl);
                     break;
                 case InstCond inst:
                     var predicateType = GetLlvmPredicateType(inst.CondType);

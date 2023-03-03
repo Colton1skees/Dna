@@ -27,16 +27,44 @@ using Dna.Structuring.Stackify;
 
 // Load the 64 bit PE file.
 // Note: This file is automatically copied to the build directory.
-var path = @"C:\Users\colton\source\repos\ObfuscationTester\x64\Release\ObfuscationTester.exe";
+var path = @"protected_executable.bin";
 var binary = new WindowsBinary(64, File.ReadAllBytes(path), 0x140000000);
 
 // Instantiate dna.
 var dna = new Dna.Dna(binary);
 
 // Parse a control flow graph from the binary.
-ulong funcAddr = 0x14000136C;
+ulong funcAddr = 0x1400F2947;
 var cfg = dna.RecursiveDescent.ReconstructCfg(funcAddr);
-//Console.WriteLine("Disassembled cfg:\n{0}", GraphFormatter.FormatGraph(cfg));
+
+var target = cfg.GetBlocks().First();
+target.Instructions.Insert(0, dna.BinaryDisassembler.GetInstructionAt(0x14000177E));
+target.Instructions.Insert(1, dna.BinaryDisassembler.GetInstructionAt(0x140001783));
+target.Instructions.Insert(2, dna.BinaryDisassembler.GetInstructionAt(0x140001789));
+target.Instructions.Insert(3, dna.BinaryDisassembler.GetInstructionAt(0x14000178F));
+
+// Here we skip the call.
+target.Instructions.Insert(4, dna.BinaryDisassembler.GetInstructionAt(0x140001794)); 
+
+
+target.Instructions.Insert(5, dna.BinaryDisassembler.GetInstructionAt(0x140002CA0));
+target.Instructions.Insert(6, dna.BinaryDisassembler.GetInstructionAt(0x140002CA5));
+target.Instructions.Insert(7, dna.BinaryDisassembler.GetInstructionAt(0x140002CAA));
+target.Instructions.Insert(8, dna.BinaryDisassembler.GetInstructionAt(0x140002CAE));
+target.Instructions.Insert(9, dna.BinaryDisassembler.GetInstructionAt(0x140002CB2));
+target.Instructions.Insert(10, dna.BinaryDisassembler.GetInstructionAt(0x140002CB6));
+target.Instructions.Insert(11, dna.BinaryDisassembler.GetInstructionAt(0x140019225));
+target.Instructions.Insert(12, dna.BinaryDisassembler.GetInstructionAt(0x14001922A));
+
+/*
+target.Instructions.Insert(13, dna.BinaryDisassembler.GetInstructionAt(0x14000177E));
+target.Instructions.Insert(14, dna.BinaryDisassembler.GetInstructionAt(0x14000177E));
+target.Instructions.Insert(15, dna.BinaryDisassembler.GetInstructionAt(0x14000177E));
+target.Instructions.Insert(16, dna.BinaryDisassembler.GetInstructionAt(0x14000177E));
+target.Instructions.Insert(17, dna.BinaryDisassembler.GetInstructionAt(0x14000177E));
+*/
+
+Console.WriteLine("Disassembled cfg:\n{0}", GraphFormatter.FormatGraph(cfg));
 //Console.WriteLine(GraphFormatter.FormatGraph(cfg));
 
 // Instantiate the cpu architecture.
@@ -57,7 +85,7 @@ for (int i = 0; i < 3; i++)
 //blockDcePass.Run();
 
 // Print the optimized control flow graph.
-//Console.WriteLine("Optimized cfg:\n{0}", GraphFormatter.FormatGraph(liftedCfg));
+Console.WriteLine("Optimized cfg:\n{0}", GraphFormatter.FormatGraph(liftedCfg));
 
 // Create a .DOT file for visualizing the IR cfg.
 //var dotGraph = GraphVisualizer.GetDotGraph(liftedCfg);
@@ -80,11 +108,12 @@ for (int i = 0; i < 3; i++)
 var llvmLifter = new LLVMLifter(architecture);
 llvmLifter.Lift(liftedCfg);
 
+//llvmLifter.Module.Dump();
+
+llvmLifter.Module.PrintToFile(@"C:\Users\colton\Downloads\lifted.ll");
 var exitNodes = liftedCfg.Nodes.Where(x => x.OutgoingEdges.Count == 0);
 
-
 var passManager = llvmLifter.Module.CreateFunctionPassManager();
-
 passManager.AddBasicAliasAnalysisPass();
 passManager.AddTypeBasedAliasAnalysisPass();
 passManager.AddScopedNoAliasAAPass();
@@ -116,7 +145,7 @@ bool printLLVM = true;
 if (printLLVM)
     llvmLifter.Module.Dump();
 
-var llPath = @"C:\Users\colton\Downloads\dfgfgfgd\code.ll";
+var llPath = @"C:\Users\colton\Downloads\lifted.ll";
 var compiledAsmPath = @"C:\Users\colton\Downloads\dfgfgfgd\code.asm";
 var wasmTextPath = @"C:\Users\colton\Downloads\dfgfgfgd\code.wat";
 var wasmBinaryPath = @"C:\Users\colton\Downloads\dfgfgfgd\code.wasm";
@@ -130,6 +159,20 @@ llvmLifter.Module.WriteBitcodeToFile(@"C:\Users\colton\Downloads\dfgfgfgd\lifted
 Console.WriteLine("Ran tests... press enter");
 Console.WriteLine("\n\n\n");
 //Console.ReadLine();
+
+bool decompile = true;
+if (decompile)
+{
+    // Create a decompiler instance.
+    var decompiler = new Decompiler(architecture);
+
+    // Decompile the lifted function to pseudo C.
+    var ast = decompiler.Decompile(llvmLifter.Module);
+
+    // Print the decompiled routine.
+    Console.WriteLine("Decompiled routine:\n{0}", ast);
+}
+
 
 var stackifier = new StackifierTwo();
 var wasm = stackifier.Stackify(liftedCfg);
@@ -175,18 +218,6 @@ Console.ReadLine();
 // If you are not hosting this server at localhost:50051, then the API
 // call will fail. You can find the service here(https://github.com/Colton1skees/rellic-api),
 // although it will take a bit of leg work for outside use.
-bool decompile = true;
-if (decompile)
-{
-    // Create a decompiler instance.
-    var decompiler = new Decompiler(architecture);
-
-    // Decompile the lifted function to pseudo C.
-    var ast = decompiler.Decompile(llvmLifter.Module);
-
-    // Print the decompiled routine.
-    Console.WriteLine("Decompiled routine:\n{0}", ast);
-}
 
 Console.WriteLine("Finished.");
 Console.ReadLine();
