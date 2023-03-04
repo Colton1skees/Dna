@@ -1,4 +1,4 @@
-<Project Sdk="Microsoft.NET.Sdk">
+﻿<Project Sdk="Microsoft.NET.Sdk">
 
   <PropertyGroup>
     <TargetFramework>net7.0</TargetFramework>
@@ -17,21 +17,24 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <Compile Remove="Binary\Linux\**" />
     <Compile Remove="Lifting\X86\**" />
+    <EmbeddedResource Remove="Binary\Linux\**" />
     <EmbeddedResource Remove="Lifting\X86\**" />
+    <None Remove="Binary\Linux\**" />
     <None Remove="Lifting\X86\**" />
   </ItemGroup>
 
   <ItemGroup>
-    <Folder Include="Binary\Linux\" />
+    <None Include="..\llvm-15.0.3-win64\bin\LLVM-C.dll" />
+    <None Include="..\x64\Release\Dna.LLVMInterop.dll" Link="Dna.LLVMInterop.dll" />
   </ItemGroup>
 
   <ItemGroup>
     <PackageReference Include="AsmResolver" Version="4.9.0" />
     <PackageReference Include="AsmResolver.PE.File" Version="4.9.0" />
-    <PackageReference Include="ELFSharp" Version="2.15.0" />
+    <PackageReference Include="ELFSharp" Version="2.16.1" />
     <PackageReference Include="Iced" Version="1.17.0" />
-    <PackageReference Include="libLLVM.runtime.win-x64" Version="15.0.0" />
     <PackageReference Include="LLVMSharp" Version="15.0.0-beta1" />
     <PackageReference Include="Microsoft.Z3" Version="4.11.2" />
     <PackageReference Include="Rivers" Version="0.1.0" />
@@ -41,8 +44,19 @@
   <ItemGroup>
     <ProjectReference Include="..\Dna.ControlFlow\Dna.ControlFlow.csproj" />
     <ProjectReference Include="..\Dna.DataStructures\Dna.DataStructures.csproj" />
+    <ProjectReference Include="..\Dna.LLVMInterop\Dna.LLVMInterop.vcxproj">
+      <IncludeAssets>..\llvm-15.0.3-win64\bin\LLVM-C.dll</IncludeAssets>
+      <Private>True</Private>
+      <CopyLocalSatelliteAssemblies>True</CopyLocalSatelliteAssemblies>
+    </ProjectReference>
     <ProjectReference Include="..\TritonTranslator\TritonTranslator\TritonTranslator.csproj" />
     <ProjectReference Include="..\unicorn-net\src\Unicorn.Net\Unicorn.Net.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <None Update="..\llvm-15.0.3-win64\bin\LLVM-C.dll" Link="LLVM-C.dll">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
   </ItemGroup>
 
 </Project>

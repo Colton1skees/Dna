@@ -104,6 +104,11 @@ namespace Dna.Emulation.Unicorn
         /// </summary>
         private bool UnmappedMemoryHook(Emulator emulator, MemoryType type, ulong address, int size, ulong value, object userData)
         {
+
+            //Console.WriteLine("rax: 0x{0}", rax);
+            Console.WriteLine("rip: 0x{0}", GetRegister(register_e.ID_REG_X86_RIP).ToString("X"));
+            Console.WriteLine("rdx: 0x{0}", GetRegister(register_e.ID_REG_X86_RDX).ToString("X"));
+            Console.WriteLine("r8: 0x{0}", GetRegister(register_e.ID_REG_X86_R8).ToString("X"));
             throw new InvalidOperationException($"Emulator accessed unmapped memory. (type: {type}), (address: {address})");
         }
 
@@ -119,13 +124,45 @@ namespace Dna.Emulation.Unicorn
 
         public void CodeHook(Emulator genericEmu, ulong address, int size, object userToken)
         {
-            Console.WriteLine("executing {0}:", ((ulong)Emulator.Registers.RIP).ToString("X"));
+            var rax = GetRegister(register_e.ID_REG_X86_RIP);
+            if (rax == 0x140001799)
+            {
+                Debugger.Break();
+            }
 
+            if(rax == 0x1400F17E1)
+            {
+                SetRegister(register_e.ID_REG_X86_RDI, 0x9A67F99000);
+            }
+
+            if(rax == 0x1400F17DD)
+            {
+                //SetRegister(register_e.ID_REG_X86_RDI, 0x0000009A67F99000);
+            }
+
+            // Cpuid
+            if(rax == 0x1400F27F1)
+            {
+                SetRegister(register_e.ID_REG_X86_RAX, 0x00000000000A0655);
+                SetRegister(register_e.ID_REG_X86_RBX, 0x000000000A200800);
+                SetRegister(register_e.ID_REG_X86_RCX, 0x00000000FEDAF387);
+                SetRegister(register_e.ID_REG_X86_RDX, 0x00000000BFEBFBFF);
+            }
+
+            if(rax == 0x140001799)
+            {
+                Debugger.Break();
+            }
+
+              //  Console.WriteLine("Code hook");
+           // Console.WriteLine("executing {0}:", ((ulong)Emulator.Registers.RIP).ToString("X"));
+            /*
             if (Emulator.Registers.RIP == 0x140001753)
             {
                 Console.WriteLine("RAX: 0x{0}", Emulator.Registers.RAX.ToString("X"));
                 Debugger.Break();
             }
+            */
         }
 
         public void SetMemoryReadCallback(dgOnMemoryRead callback)

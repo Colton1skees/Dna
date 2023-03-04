@@ -23,3 +23,9 @@ You can find an example usage [here](https://github.com/Colton1skees/Dna/blob/ma
  * [X] Decompilation to pseudo C
  * [ ] Jump table recovery
  * [ ] Compiler back to x86/x64
+ 
+ # Setup
+ 
+The .NET component of Dna is supported on Windows, Linux, and Mac OSX. The C++ component(LLVM.Interop) has been used exclusively on windows. 
+
+To get the C++ component building, extract [this precompiled version of llvm](https://github.com/LLVMParty/REVIDE/releases/download/libraries/llvm-15.0.3-win64.7z) to the root directory of Dna. 

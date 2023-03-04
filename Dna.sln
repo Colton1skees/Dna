@@ -26,6 +26,8 @@ Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Solution Items", "Solution 
 		.editorconfig = .editorconfig
 	EndProjectSection
 EndProject
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "Dna.LLVMInterop", "Dna.LLVMInterop\Dna.LLVMInterop.vcxproj", "{E6A58095-9B8B-4830-BFEA-2947C4F2681A}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -258,6 +260,30 @@ Global
 		{47D397E7-098D-4058-9B19-DC01124ED897}.RelWithDebInfo|x64.Build.0 = Release|Any CPU
 		{47D397E7-098D-4058-9B19-DC01124ED897}.RelWithDebInfo|x86.ActiveCfg = Release|Any CPU
 		{47D397E7-098D-4058-9B19-DC01124ED897}.RelWithDebInfo|x86.Build.0 = Release|Any CPU
+		{E6A58095-9B8B-4830-BFEA-2947C4F2681A}.Debug|Any CPU.ActiveCfg = Debug|x64
+		{E6A58095-9B8B-4830-BFEA-2947C4F2681A}.Debug|Any CPU.Build.0 = Debug|x64
+		{E6A58095-9B8B-4830-BFEA-2947C4F2681A}.Debug|x64.ActiveCfg = Release|x64
+		{E6A58095-9B8B-4830-BFEA-2947C4F2681A}.Debug|x64.Build.0 = Release|x64
+		{E6A58095-9B8B-4830-BFEA-2947C4F2681A}.Debug|x86.ActiveCfg = Debug|Win32
+		{E6A58095-9B8B-4830-BFEA-2947C4F2681A}.Debug|x86.Build.0 = Debug|Win32
+		{E6A58095-9B8B-4830-BFEA-2947C4F2681A}.MinSizeRel|Any CPU.ActiveCfg = Debug|x64
+		{E6A58095-9B8B-4830-BFEA-2947C4F2681A}.MinSizeRel|Any CPU.Build.0 = Debug|x64
+		{E6A58095-9B8B-4830-BFEA-2947C4F2681A}.MinSizeRel|x64.ActiveCfg = Debug|x64
+		{E6A58095-9B8B-4830-BFEA-2947C4F2681A}.MinSizeRel|x64.Build.0 = Debug|x64
+		{E6A58095-9B8B-4830-BFEA-2947C4F2681A}.MinSizeRel|x86.ActiveCfg = Debug|Win32
+		{E6A58095-9B8B-4830-BFEA-2947C4F2681A}.MinSizeRel|x86.Build.0 = Debug|Win32
+		{E6A58095-9B8B-4830-BFEA-2947C4F2681A}.Release|Any CPU.ActiveCfg = Release|x64
+		{E6A58095-9B8B-4830-BFEA-2947C4F2681A}.Release|Any CPU.Build.0 = Release|x64
+		{E6A58095-9B8B-4830-BFEA-2947C4F2681A}.Release|x64.ActiveCfg = Release|x64
+		{E6A58095-9B8B-4830-BFEA-2947C4F2681A}.Release|x64.Build.0 = Release|x64
+		{E6A58095-9B8B-4830-BFEA-2947C4F2681A}.Release|x86.ActiveCfg = Release|Win32
+		{E6A58095-9B8B-4830-BFEA-2947C4F2681A}.Release|x86.Build.0 = Release|Win32
+		{E6A58095-9B8B-4830-BFEA-2947C4F2681A}.RelWithDebInfo|Any CPU.ActiveCfg = Release|x64
+		{E6A58095-9B8B-4830-BFEA-2947C4F2681A}.RelWithDebInfo|Any CPU.Build.0 = Release|x64
+		{E6A58095-9B8B-4830-BFEA-2947C4F2681A}.RelWithDebInfo|x64.ActiveCfg = Release|x64
+		{E6A58095-9B8B-4830-BFEA-2947C4F2681A}.RelWithDebInfo|x64.Build.0 = Release|x64
+		{E6A58095-9B8B-4830-BFEA-2947C4F2681A}.RelWithDebInfo|x86.ActiveCfg = Release|Win32
+		{E6A58095-9B8B-4830-BFEA-2947C4F2681A}.RelWithDebInfo|x86.Build.0 = Release|Win32
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
