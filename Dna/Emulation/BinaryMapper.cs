@@ -3,6 +3,7 @@ using Dna.Binary.Windows;
 using ELFSharp.ELF.Sections;
 using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
@@ -17,7 +18,7 @@ namespace Dna.Emulation
         public static void MapELFFile(ICpuEmulator state, LinuxBinary binary)
         {
             // TODO: Actually map the correct amount of memory.
-            state.MapMemory(binary.BaseAddress, 0x1000 * 1000);
+            state.MapMemory(binary.BaseAddress, 0x1000 * 100000);
 
             // Get all mappable sections.
             var elfFile = binary.ELFFile;
@@ -27,8 +28,13 @@ namespace Dna.Emulation
 
             foreach(var section in sections)
             {
+                if (section.LoadAddress == 0)
+                    continue;
                 // Compute the address to map the section at.
-                var address = section.Offset + binary.BaseAddress;
+                var address = section.LoadAddress;
+
+                // Write the section to memory.
+                state.WriteMemory(address, section.GetContents());
             }
         }
 

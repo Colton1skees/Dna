@@ -109,6 +109,7 @@ namespace Dna.Emulation.Unicorn
             Console.WriteLine("rip: 0x{0}", GetRegister(register_e.ID_REG_X86_RIP).ToString("X"));
             Console.WriteLine("rdx: 0x{0}", GetRegister(register_e.ID_REG_X86_RDX).ToString("X"));
             Console.WriteLine("r8: 0x{0}", GetRegister(register_e.ID_REG_X86_R8).ToString("X"));
+            Console.WriteLine("r9: 0x{0}", GetRegister(register_e.ID_REG_X86_R9).ToString("X"));
             throw new InvalidOperationException($"Emulator accessed unmapped memory. (type: {type}), (address: {address})");
         }
 
@@ -155,7 +156,7 @@ namespace Dna.Emulation.Unicorn
             }
 
               //  Console.WriteLine("Code hook");
-           // Console.WriteLine("executing {0}:", ((ulong)Emulator.Registers.RIP).ToString("X"));
+            //Console.WriteLine("executing {0}:", ((ulong)Emulator.Registers.RIP).ToString("X"));
             /*
             if (Emulator.Registers.RIP == 0x140001753)
             {

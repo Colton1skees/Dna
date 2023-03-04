@@ -26,16 +26,17 @@ using Dna.Decompilation;
 using Dna.Structuring.Stackify;
 // Load the 64 bit PE file.
 // Note: This file is automatically copied to the build directory.
-var path = @"C:\Users\Public\Documents\VMProtect\Code Markers\MSVC\x64\Release\Project1.vmp.exe";
-var binary = new WindowsBinary(64, File.ReadAllBytes(path));
+var path = @"C:\Users\colton\Downloads\sample1.vmp.bin";
+var binary = new LinuxBinary(64, File.ReadAllBytes(path), 0x400000);
 
 // Instantiate dna.
 var dna = new Dna.Dna(binary);
 
 // Parse a (virtualized) control flow graph from the binary.
-ulong funcAddr = 0x14000177E;
+ulong funcAddr = 0x401146;
 var cfg = dna.RecursiveDescent.ReconstructCfg(funcAddr);
 
+/*
 // The VM entry spans across multiple routines. To avoid disassembling multiple
 // control flow graphs, we selectively insert instructions needed to have a
 // correct CFG for the entirety of the vm entry.
@@ -53,6 +54,7 @@ target.Instructions.Insert(9, dna.BinaryDisassembler.GetInstructionAt(0x140002CB
 target.Instructions.Insert(10, dna.BinaryDisassembler.GetInstructionAt(0x140002CB6));
 target.Instructions.Insert(11, dna.BinaryDisassembler.GetInstructionAt(0x140019225));
 target.Instructions.Insert(12, dna.BinaryDisassembler.GetInstructionAt(0x14001922A));
+*/
 
 // Print the disassembled control flow graph.
 var prompt = () =>
@@ -92,18 +94,19 @@ prompt();
 var dotGraph = GraphVisualizer.GetDotGraph(liftedCfg);
 File.WriteAllText("graph.dot", dotGraph.Compile(false, false));
 
-bool emulate = false;
-if(emulate)
+bool emulate = true;
+
+if (emulate)
 {
     // Load the binary into unicorn engine.
     var emulator = new UnicornEmulator(architecture);
-    //PEMapper.MapBinary(emulator, binary);
+    BinaryMapper.MapELFFile(emulator, binary);
 
     ulong tebBase = 0x7fded000;
     ulong tebSize = 0x10000;
     emulator.MapMemory(tebBase, (int)tebSize);
 
-    //emulator.MapMemory(0, (int)tebSize);
+    //emulator.MapMemory(0, (int)tebSize * 0x1000);
 
     //var igt = new GdtHelper(emulator.Emulator, 0x0, 0x1000);
     //igt.Setup(tebBase);
@@ -120,8 +123,8 @@ if(emulate)
 
 
     int theSize = 0x1000 * 10;
-    emulator.MapMemory(0, theSize);
-    for(int i = 0; i < theSize; i++)
+    emulator.MapMemory(0, 0x1000);
+    for (int i = 0; i < theSize; i++)
     {
         // emulator.WriteMemory((ulong)i, new byte[] { 0xFF });
     }
@@ -135,11 +138,12 @@ if(emulate)
     //emulator.SetRegister(register_e.ID_REG_X86_RIP, 0x14000177E);
 
     // Execute the function.
-    emulator.Start(0x14000177E);
+    emulator.Start(0x401194);
 }
 
 
 Console.WriteLine("Started");
+Thread.Sleep(100000);
 
 
 // Lift the control flow graph to LLVM IR.

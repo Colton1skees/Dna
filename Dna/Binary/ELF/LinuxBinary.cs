@@ -41,20 +41,20 @@ namespace Dna.Binary.Windows
         public byte[] ReadBytes(ulong address, int count = 15)
         {
             // Compute a zero based offset for the address.
-            var offset = address - BaseAddress;
+            var offset = address;
 
             // Compute the segment containing the address.
             // TODO: Properly handle data split across multiple segments.
             var section = ELFFile.Sections
                 .Where(x => x is Section<ulong>)
                 .Cast<Section<ulong>>()
-                .Single(x => x.Offset <= offset && (x.Offset + x.Size) >= (offset + (ulong)count));
+                .Single(x => x.LoadAddress <= offset && (x.LoadAddress + x.Size) >= (offset + (ulong)count));
 
             // Allocate a buffer to store the results in.
             byte[] buffer = new byte[count];
 
             // Read the raw data from the binary.
-            var segmentOffset = offset - section.Offset;
+            var segmentOffset = offset - section.LoadAddress;
             Array.Copy(section.GetContents(), (int)segmentOffset, buffer, 0, count);
             return buffer;
         }
