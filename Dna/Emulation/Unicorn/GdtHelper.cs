@@ -106,13 +106,12 @@ namespace Dna.Emulation.Unicorn
                 gdts.Add(CreateGdtEntry(0, 0, 0, 0));
             }
 
-            gdts[15] = CreateGdtEntry()
 
             var ds = CreateSegmentSelector(17, 0x0, 0xfffff, A_PRESENT | A_PRIV_0 | A_DATA | A_DATA_WRITABLE | A_DIRECTION_UP);
             var es = CreateSegmentSelector(28, 0x0, 0xfffff, A_PRESENT | A_PRIV_0 | A_DATA | A_DATA_WRITABLE | A_DIRECTION_UP);
-            var fs = CreateSegmentSelector(32, teb, 1, A_PRESENT | A_PRIV_0 | A_DATA | A_DATA_WRITABLE);  // FIXME: Correct the limit
-            var gs = CreateSegmentSelector(33, 0x0, 0xfffff, A_PRESENT | A_PRIV_0 | A_DATA | A_DATA_WRITABLE | A_DIRECTION_UP);
-            var cs = CreateSegmentSelector(11, 0x0, 0xfffff, A_PRESENT | A_PRIV_0 | A_CODE | A_CODE_READABLE | A_CONFORMING);
+           // var fs = CreateSegmentSelector(32, teb, 1, A_PRESENT | A_PRIV_0 | A_DATA | A_DATA_WRITABLE);  // FIXME: Correct the limit
+            //var gs = CreateSegmentSelector(33, 0x0, 0xfffff, A_PRESENT | A_PRIV_0 | A_DATA | A_DATA_WRITABLE | A_DIRECTION_UP);
+            //var cs = CreateSegmentSelector(11, 0x0, 0xfffff, A_PRESENT | A_PRIV_0 | A_CODE | A_CODE_READABLE | A_CONFORMING);
         }
     }
 }

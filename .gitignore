@@ -34,6 +34,9 @@ x64/
 [Tt]est[Rr]esult*/
 [Bb]uild[Ll]og.*
 
+# Pre-built LLVM binaries.
+llvm-15.0.3-win64/
+
 *_i.c
 *_p.c
 *.ilk

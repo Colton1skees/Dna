@@ -26,14 +26,14 @@ using Dna.Decompilation;
 using Dna.Structuring.Stackify;
 // Load the 64 bit PE file.
 // Note: This file is automatically copied to the build directory.
-var path = @"ProtectedExecutable.bin";
-var binary = new WindowsBinary(64, File.ReadAllBytes(path), 0x140000000);
+var path = @"C:\Users\Public\Documents\VMProtect\Code Markers\MSVC\x64\Release\Project1.vmp.exe";
+var binary = new WindowsBinary(64, File.ReadAllBytes(path));
 
 // Instantiate dna.
 var dna = new Dna.Dna(binary);
 
 // Parse a (virtualized) control flow graph from the binary.
-ulong funcAddr = 0x1400F2947;
+ulong funcAddr = 0x14000177E;
 var cfg = dna.RecursiveDescent.ReconstructCfg(funcAddr);
 
 // The VM entry spans across multiple routines. To avoid disassembling multiple
@@ -92,31 +92,39 @@ prompt();
 var dotGraph = GraphVisualizer.GetDotGraph(liftedCfg);
 File.WriteAllText("graph.dot", dotGraph.Compile(false, false));
 
-bool emulate = true;
-
+bool emulate = false;
 if(emulate)
 {
     // Load the binary into unicorn engine.
     var emulator = new UnicornEmulator(architecture);
-    PEMapper.MapBinary(emulator, binary);
+    //PEMapper.MapBinary(emulator, binary);
 
     ulong tebBase = 0x7fded000;
     ulong tebSize = 0x10000;
     emulator.MapMemory(tebBase, (int)tebSize);
 
-    emulator.MapMemory(0, (int)tebSize);
+    //emulator.MapMemory(0, (int)tebSize);
 
-    var igt = new GdtHelper(emulator.Emulator, 0x0, 0x1000);
-    igt.Setup(tebBase);
+    //var igt = new GdtHelper(emulator.Emulator, 0x0, 0x1000);
+    //igt.Setup(tebBase);
 
     // Setup the stack.
     ulong rsp = 0x100000000;
     emulator.MapMemory(rsp, 0x1000 * 1200);
     rsp += 0x20000;
 
+    ulong pebAddr = 0x9A67F99120;
+    emulator.MapMemory(pebAddr - 0x120, 0x1000);
+    UInt16 val = 0x4A63;
+    emulator.WriteMemory(pebAddr, BitConverter.GetBytes(val));
 
 
-    //emulator.MapMemory(0, 0x1000 * 10);
+    int theSize = 0x1000 * 10;
+    emulator.MapMemory(0, theSize);
+    for(int i = 0; i < theSize; i++)
+    {
+        // emulator.WriteMemory((ulong)i, new byte[] { 0xFF });
+    }
     //ulong gs = 0x1000;
     //emulator.MapMemory(0, 0x1000 * 1000);
     //emulator.SetRegister(register_e.ID_REG_X86_GS, 0);
@@ -124,14 +132,14 @@ if(emulate)
 
     emulator.SetRegister(register_e.ID_REG_X86_RSP, rsp);
     emulator.SetRegister(register_e.ID_REG_X86_RBP, rsp);
-    emulator.SetRegister(register_e.ID_REG_X86_RIP, 0x14000177E);
+    //emulator.SetRegister(register_e.ID_REG_X86_RIP, 0x14000177E);
 
     // Execute the function.
     emulator.Start(0x14000177E);
 }
 
 
-Thread.Sleep(100000);
+Console.WriteLine("Started");
 
 
 // Lift the control flow graph to LLVM IR.
