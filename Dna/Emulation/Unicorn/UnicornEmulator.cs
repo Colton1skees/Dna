@@ -28,7 +28,7 @@ namespace Dna.Emulation.Unicorn
             this.architecture = architecture;
 
             // Insert a hook to throw an exception when unmapped memory usages occur.
-            Emulator.Hooks.Code.Add(CodeHook, null);
+            //Emulator.Hooks.Code.Add(CodeHook, null);
             Emulator.Hooks.Memory.Add(MemoryEventHookType.UnmappedFetch | MemoryEventHookType.UnmappedRead | MemoryEventHookType.UnmappedWrite, UnmappedMemoryHook, null);
             Emulator.Hooks.Memory.Add(MemoryHookType.Read, OnMemoryRead, null);
             Emulator.Hooks.Memory.Add(MemoryHookType.Write, OnMemoryWrite, null);
@@ -104,6 +104,9 @@ namespace Dna.Emulation.Unicorn
         /// </summary>
         private bool UnmappedMemoryHook(Emulator emulator, MemoryType type, ulong address, int size, ulong value, object userData)
         {
+            
+            //Console.WriteLine("rax: 0x{0}", rax);
+            Console.WriteLine("rip: 0x{0}", GetRegister(register_e.ID_REG_X86_RIP).ToString("X"));
             throw new InvalidOperationException($"Emulator accessed unmapped memory. (type: {type}), (address: {address})");
         }
 
@@ -119,6 +122,13 @@ namespace Dna.Emulation.Unicorn
 
         public void CodeHook(Emulator genericEmu, ulong address, int size, object userToken)
         {
+            var rax = GetRegister(register_e.ID_REG_X86_RIP);
+            if (rax == 0x140001799)
+            {
+                Debugger.Break();
+            }
+            /*
+            Console.WriteLine("Code hook");
             Console.WriteLine("executing {0}:", ((ulong)Emulator.Registers.RIP).ToString("X"));
 
             if (Emulator.Registers.RIP == 0x140001753)
@@ -126,6 +136,7 @@ namespace Dna.Emulation.Unicorn
                 Console.WriteLine("RAX: 0x{0}", Emulator.Registers.RAX.ToString("X"));
                 Debugger.Break();
             }
+            */
         }
 
         public void SetMemoryReadCallback(dgOnMemoryRead callback)

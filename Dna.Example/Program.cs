@@ -58,7 +58,7 @@ target.Instructions.Insert(12, dna.BinaryDisassembler.GetInstructionAt(0x1400192
 var prompt = () =>
 {
     Console.WriteLine("Press enter to continue...");
-    Console.ReadLine();
+    //Console.ReadLine();
 };
 Console.WriteLine("Disassembled cfg:\n{0}", GraphFormatter.FormatGraph(cfg));
 Console.WriteLine(GraphFormatter.FormatGraph(cfg));
@@ -92,22 +92,46 @@ prompt();
 var dotGraph = GraphVisualizer.GetDotGraph(liftedCfg);
 File.WriteAllText("graph.dot", dotGraph.Compile(false, false));
 
-bool emulate = false;
+bool emulate = true;
+
 if(emulate)
 {
     // Load the binary into unicorn engine.
     var emulator = new UnicornEmulator(architecture);
     PEMapper.MapBinary(emulator, binary);
 
+    ulong tebBase = 0x7fded000;
+    ulong tebSize = 0x10000;
+    emulator.MapMemory(tebBase, (int)tebSize);
+
+    emulator.MapMemory(0, (int)tebSize);
+
+    var igt = new GdtHelper(emulator.Emulator, 0x0, 0x1000);
+    igt.Setup(tebBase);
+
     // Setup the stack.
     ulong rsp = 0x100000000;
-    emulator.MapMemory(rsp, 0x1000 * 12);
-    rsp += 0x100;
+    emulator.MapMemory(rsp, 0x1000 * 1200);
+    rsp += 0x20000;
+
+
+
+    //emulator.MapMemory(0, 0x1000 * 10);
+    //ulong gs = 0x1000;
+    //emulator.MapMemory(0, 0x1000 * 1000);
+    //emulator.SetRegister(register_e.ID_REG_X86_GS, 0);
+    //emulator.SetRegister(register_e.ID_REG_X86_FS, 0);
+
     emulator.SetRegister(register_e.ID_REG_X86_RSP, rsp);
+    emulator.SetRegister(register_e.ID_REG_X86_RBP, rsp);
+    emulator.SetRegister(register_e.ID_REG_X86_RIP, 0x14000177E);
 
     // Execute the function.
-    emulator.Start(0x140001747);
+    emulator.Start(0x14000177E);
 }
+
+
+Thread.Sleep(100000);
 
 
 // Lift the control flow graph to LLVM IR.

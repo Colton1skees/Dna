@@ -35,7 +35,6 @@ namespace Dna.Emulation.Unicorn
                 var getRegister = (X86Emulator emu) =>
                 {
                     var rip = emu.Registers.RIP;
-                    Console.WriteLine(rip);
                     var value = property.GetValue(emu.Registers);
                     return (ulong)(long)value;
                 };
