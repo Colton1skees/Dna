@@ -11,6 +11,8 @@ namespace Dna.Emulation
 
     public delegate void dgOnMemoryWrite(ulong address, int size, ulong value);
 
+    public delegate void dgOnInstExecuted(ulong address, int size);
+
     public interface ICpuEmulator
     {
         /// <summary>
@@ -69,5 +71,11 @@ namespace Dna.Emulation
         /// </summary>
         /// <param name="callback"></param>
         public void SetMemoryWriteCallback(dgOnMemoryWrite callback);
+
+        /// <summary>
+        /// Sets a callback which will be invoked on each instruction execution.
+        /// </summary>
+        /// <param name="callback"></param>
+        public void SetInstExecutedCallback(dgOnInstExecuted callback);
     }
 }

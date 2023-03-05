@@ -20,6 +20,8 @@ namespace Dna.Emulation.Unicorn
 
         private dgOnMemoryWrite memWriteCallback;
 
+        private dgOnInstExecuted instExecutedCallback;
+
         public X86Emulator Emulator { get;}
 
         public UnicornEmulator(ICpuArchitecture architecture)
@@ -115,6 +117,8 @@ namespace Dna.Emulation.Unicorn
 
         private void OnMemoryRead(Emulator emulator, MemoryType type, ulong address, int size, ulong value, object userData)
         {
+            if (address == 0x00100020000 + 0x51)
+                Debugger.Break();
             memReadCallback?.Invoke(address, size);
         }
 
@@ -123,8 +127,12 @@ namespace Dna.Emulation.Unicorn
             memWriteCallback?.Invoke(address, size, value);
         }
 
+        int count = 0;
         public void CodeHook(Emulator genericEmu, ulong address, int size, object userToken)
         {
+            instExecutedCallback?.Invoke(address, size);
+
+            count++;
             var rax = GetRegister(register_e.ID_REG_X86_RIP);
             if (rax == 0x140001799)
             {
@@ -155,6 +163,13 @@ namespace Dna.Emulation.Unicorn
                 Debugger.Break();
             }
 
+            if(rax == 0x1400012A8)
+            {
+                Console.WriteLine("Count: {0}", count);
+                Console.WriteLine("rax: 0x{0}", GetRegister(register_e.ID_REG_X86_RAX));
+                Debugger.Break();
+            }
+
               //  Console.WriteLine("Code hook");
             //Console.WriteLine("executing {0}:", ((ulong)Emulator.Registers.RIP).ToString("X"));
             /*
@@ -174,6 +189,11 @@ namespace Dna.Emulation.Unicorn
         public void SetMemoryWriteCallback(dgOnMemoryWrite callback)
         {
             memWriteCallback = callback;
+        }
+
+        public void SetInstExecutedCallback(dgOnInstExecuted callback)
+        {
+            throw new NotImplementedException();
         }
     }
 }

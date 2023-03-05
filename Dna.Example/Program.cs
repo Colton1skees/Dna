@@ -26,20 +26,21 @@ using Dna.Decompilation;
 using Dna.Structuring.Stackify;
 // Load the 64 bit PE file.
 // Note: This file is automatically copied to the build directory.
-var path = @"C:\Users\colton\Downloads\sample1.vmp.bin";
-var binary = new LinuxBinary(64, File.ReadAllBytes(path), 0x400000);
+var path = @"C:\Users\colton\source\repos\ObfuscationTester\x64\Release\ObfuscationTester.themida.exe";
+var binary = new WindowsBinary(64, File.ReadAllBytes(path), 0x140000000);
 
 // Instantiate dna.
 var dna = new Dna.Dna(binary);
 
 // Parse a (virtualized) control flow graph from the binary.
-ulong funcAddr = 0x401146;
+ulong funcAddr = 0x14000123C;
 var cfg = dna.RecursiveDescent.ReconstructCfg(funcAddr);
 
-/*
+
 // The VM entry spans across multiple routines. To avoid disassembling multiple
 // control flow graphs, we selectively insert instructions needed to have a
 // correct CFG for the entirety of the vm entry.
+/*
 var target = cfg.GetBlocks().First();
 target.Instructions.Insert(0, dna.BinaryDisassembler.GetInstructionAt(0x14000177E));
 target.Instructions.Insert(1, dna.BinaryDisassembler.GetInstructionAt(0x140001783));
@@ -100,11 +101,12 @@ if (emulate)
 {
     // Load the binary into unicorn engine.
     var emulator = new UnicornEmulator(architecture);
-    BinaryMapper.MapELFFile(emulator, binary);
 
-    ulong tebBase = 0x7fded000;
-    ulong tebSize = 0x10000;
-    emulator.MapMemory(tebBase, (int)tebSize);
+    BinaryMapper.MapPEFile(emulator, binary);
+
+    //ulong tebBase = 0x7fded000;
+    //ulong tebSize = 0x10000;
+    //emulator.MapMemory(tebBase, (int)tebSize);
 
     //emulator.MapMemory(0, (int)tebSize * 0x1000);
 
@@ -116,29 +118,29 @@ if (emulate)
     emulator.MapMemory(rsp, 0x1000 * 1200);
     rsp += 0x20000;
 
-    ulong pebAddr = 0x9A67F99120;
-    emulator.MapMemory(pebAddr - 0x120, 0x1000);
-    UInt16 val = 0x4A63;
-    emulator.WriteMemory(pebAddr, BitConverter.GetBytes(val));
+    //ulong pebAddr = 0x9A67F99120;
+   // emulator.MapMemory(pebAddr - 0x120, 0x1000);
+   // UInt16 val = 0x4A63;
+   // emulator.WriteMemory(pebAddr, BitConverter.GetBytes(val));
 
 
     int theSize = 0x1000 * 10;
-    emulator.MapMemory(0, 0x1000);
+    //emulator.MapMemory(0, 0x1000);
     for (int i = 0; i < theSize; i++)
     {
         // emulator.WriteMemory((ulong)i, new byte[] { 0xFF });
     }
     //ulong gs = 0x1000;
-    //emulator.MapMemory(0, 0x1000 * 1000);
+    emulator.MapMemory(0, 0x1000 * 1000);
     //emulator.SetRegister(register_e.ID_REG_X86_GS, 0);
     //emulator.SetRegister(register_e.ID_REG_X86_FS, 0);
 
     emulator.SetRegister(register_e.ID_REG_X86_RSP, rsp);
     emulator.SetRegister(register_e.ID_REG_X86_RBP, rsp);
-    //emulator.SetRegister(register_e.ID_REG_X86_RIP, 0x14000177E);
+    emulator.SetRegister(register_e.ID_REG_X86_RIP, 0x140001299);
 
     // Execute the function.
-    emulator.Start(0x401194);
+    emulator.Start(0x140001299);
 }
 
 
@@ -179,7 +181,7 @@ if (optimize)
 }
 
 // Optionally write the llvm IR to the console.
-bool printLLVM = true;
+bool printLLVM = false;
 if (printLLVM)
     llvmLifter.Module.Dump();
 prompt();

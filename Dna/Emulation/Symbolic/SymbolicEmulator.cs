@@ -180,6 +180,10 @@ namespace Dna.Emulation.Symbolic
             memWriteCallback = callback;
         }
 
+        public void SetInstExecutedCallback(dgOnInstExecuted callback)
+        {
+            throw new NotImplementedException();
+        }
 
         private ulong? FastEvaluate(AbstractNode node)
         {
