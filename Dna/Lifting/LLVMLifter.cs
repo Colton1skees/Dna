@@ -38,6 +38,8 @@ namespace Dna.Lifting
 
         private LLVMValueRef memoryPtr;
 
+        private LLVMValueRef localMemVariable;
+
         // Current control flow graph to lift.
         private ControlFlowGraph<AbstractInst> irCfg;
 
@@ -57,14 +59,19 @@ namespace Dna.Lifting
             builder = Module.Context.CreateBuilder();
 
             // Create an i64* pointer to store memory.
-            var memoryPtrType = LLVMTypeRef.CreateInt(64);
+            var memoryPtrType = LLVMTypeRef.CreatePointer(LLVMTypeRef.CreateInt(8), 0);
             memoryPtr = Module.AddGlobal(memoryPtrType, "memory");
             memoryPtr.Linkage = LLVMLinkage.LLVMCommonLinkage;
-            var memoryPtrNull = LLVMValueRef.CreateConstInt(memoryPtrType, 0, false);
+            var memoryPtrNull = LLVMValueRef.CreateConstPointerNull(memoryPtrType);
             memoryPtr.Initializer = memoryPtrNull;
 
             // Construct an LLVM lifter for translating individual instructions.
-            lifter = new InstToLLVMLifter(module, builder, memoryPtr, LoadSourceOperand, StoreToOperand);
+            var getLocalMemVariable = () =>
+            {
+                return localMemVariable;
+            };
+
+            lifter = new InstToLLVMLifter(module, builder, getLocalMemVariable, LoadSourceOperand, StoreToOperand);
 
             // Initialize x86 target info.
             LLVM.LinkInMCJIT();
@@ -115,6 +122,9 @@ namespace Dna.Lifting
             // Position the builder at the entry block.
             builder.PositionAtEnd(llvmFunction.EntryBasicBlock);
 
+            // Create a variable for local memory ptr.
+            localMemVariable = builder.BuildLoad2(LLVMTypeRef.CreatePointer(LLVMTypeRef.CreateInt(64), 0), memoryPtr);
+
             // At the entry point of the LLVM routine, copy each lifted register
             // into a local variable.
             CopyRegistersToLocalVariables();
@@ -129,10 +139,10 @@ namespace Dna.Lifting
             };
 
             // Lift each block to LLVM IR.
-            foreach(var block in irBlocks)
+            foreach (var block in irBlocks)
             {
                 builder.PositionAtEnd(liftedBlockMapping[block]);
-                foreach(var inst in block.Instructions)
+                foreach (var inst in block.Instructions)
                 {
                     lifter.LiftInstructionToLLVM(inst, getBlockByAddress);
                 }
@@ -182,7 +192,7 @@ namespace Dna.Lifting
 
         private void CopyRegistersToLocalVariables()
         {
-            foreach(var registerId in liftedRegisterGlobalVariableMapping.Keys)
+            foreach (var registerId in liftedRegisterGlobalVariableMapping.Keys)
             {
                 // Construct an integer type of the register width.
                 var valueType = LLVMTypeRef.CreateInt(architecture.GetRegister(registerId).BitSize);
@@ -220,17 +230,17 @@ namespace Dna.Lifting
                 register_e.ID_REG_X86_RIP,
             };
 
-            foreach(var block in liftedBlockMapping.Where(x => x.Key.OutgoingEdges.Count == 0).Select(x => x.Value))
+            foreach (var block in liftedBlockMapping.Where(x => x.Key.OutgoingEdges.Count == 0).Select(x => x.Value))
             {
                 // Assume that the last instruction is a RET.
                 builder.PositionBefore(block.LastInstruction);
                 if (!block.LastInstruction.ToString().ToLower().Contains("ret"))
-                   throw new InvalidOperationException("Basic block must exit with a RET.");
+                    throw new InvalidOperationException("Basic block must exit with a RET.");
 
-                foreach(var register in liftedLocalRegisters.Keys)
+                foreach (var register in liftedLocalRegisters.Keys)
                 {
                     var rootParent = architecture.GetRootParentRegister(register);
-                    if (rootParent.Id != register_e.ID_REG_X86_RAX && rootParent.Id != register_e.ID_REG_X86_R11 && rootParent.Id != register_e.ID_REG_X86_RCX && rootParent.Id != register_e.ID_REG_X86_RIP)
+                    if (rootParent.Id != register_e.ID_REG_X86_RIP)
                         continue;
                     // Get a triton register operand.
                     var regOperand = architecture.GetRegister(register);

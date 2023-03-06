@@ -24,10 +24,19 @@ using Dna.Decompiler;
 using Dna.Emulation.Unicorn;
 using Dna.Decompilation;
 using Dna.Structuring.Stackify;
+using Dna.Emulation.Symbolic;
 // Load the 64 bit PE file.
 // Note: This file is automatically copied to the build directory.
 var path = @"C:\Users\colton\source\repos\ObfuscationTester\x64\Release\ObfuscationTester.themida.exe";
 var binary = new WindowsBinary(64, File.ReadAllBytes(path), 0x140000000);
+
+// Replace themida spinlock with nop.
+binary.WriteBytes(0x000000014001552B, new byte[]
+{
+    0x90, 0x90, 0x90, 0x90, 0x90, 0x90,
+    0x90, 0x90,
+    0x90, 0x90, 0x90, 0x90, 0x90
+});
 
 // Instantiate dna.
 var dna = new Dna.Dna(binary);
@@ -63,8 +72,8 @@ var prompt = () =>
     Console.WriteLine("Press enter to continue...");
     //Console.ReadLine();
 };
+
 Console.WriteLine("Disassembled cfg:\n{0}", GraphFormatter.FormatGraph(cfg));
-Console.WriteLine(GraphFormatter.FormatGraph(cfg));
 prompt();
 
 // Instantiate the cpu architecture.
@@ -88,65 +97,76 @@ if (dce)
 }
 
 // Print the optimized control flow graph.
-Console.WriteLine("Lifted cfg:\n{0}", GraphFormatter.FormatGraph(liftedCfg));
-prompt();
+bool printLiftedCfg = false;
+if (printLiftedCfg)
+{
+    Console.WriteLine("Lifted cfg:\n{0}", GraphFormatter.FormatGraph(liftedCfg));
+    prompt();
+}
 
-// Create a .DOT file for visualizing the IR cfg.
-var dotGraph = GraphVisualizer.GetDotGraph(liftedCfg);
-File.WriteAllText("graph.dot", dotGraph.Compile(false, false));
+bool writeDotGraph = false;
+if (writeDotGraph)
+{
+    // Create a .DOT file for visualizing the IR cfg.
+    var dotGraph = GraphVisualizer.GetDotGraph(liftedCfg);
+    File.WriteAllText("graph.dot", dotGraph.Compile(false, false));
+}
 
-bool emulate = true;
-
+bool emulate = false;
 if (emulate)
 {
     // Load the binary into unicorn engine.
-    var emulator = new UnicornEmulator(architecture);
+    var unicornEmulator = new UnicornEmulator(architecture);
+    var symbolicEmulator = new SymbolicEmulator(architecture);
 
-    BinaryMapper.MapPEFile(emulator, binary);
-
-    //ulong tebBase = 0x7fded000;
-    //ulong tebSize = 0x10000;
-    //emulator.MapMemory(tebBase, (int)tebSize);
-
-    //emulator.MapMemory(0, (int)tebSize * 0x1000);
-
-    //var igt = new GdtHelper(emulator.Emulator, 0x0, 0x1000);
-    //igt.Setup(tebBase);
+    BinaryMapper.MapPEFile(unicornEmulator, binary);
+    BinaryMapper.MapPEFile(symbolicEmulator, binary);
 
     // Setup the stack.
     ulong rsp = 0x100000000;
-    emulator.MapMemory(rsp, 0x1000 * 1200);
+    unicornEmulator.MapMemory(rsp, 0x1000 * 1200);
+    symbolicEmulator.MapMemory(rsp, 0x1000 * 1200);
     rsp += 0x20000;
 
-    //ulong pebAddr = 0x9A67F99120;
-   // emulator.MapMemory(pebAddr - 0x120, 0x1000);
-   // UInt16 val = 0x4A63;
-   // emulator.WriteMemory(pebAddr, BitConverter.GetBytes(val));
+    // Setup the segment registers.g
+    unicornEmulator.MapMemory(0, 0x1000 * 1000);
+    symbolicEmulator.MapMemory(0, 0x1000 * 1000);
 
-
-    int theSize = 0x1000 * 10;
-    //emulator.MapMemory(0, 0x1000);
-    for (int i = 0; i < theSize; i++)
+    for (ulong i = 0; i < 32; i++)
     {
-        // emulator.WriteMemory((ulong)i, new byte[] { 0xFF });
+        ulong baseAddr = 0x14006C45D;
+        unicornEmulator.WriteMemory(baseAddr + i, new byte[] { 0x90 });
+        symbolicEmulator.WriteMemory(baseAddr + i, new byte[] { 0x90 });
     }
-    //ulong gs = 0x1000;
-    emulator.MapMemory(0, 0x1000 * 1000);
-    //emulator.SetRegister(register_e.ID_REG_X86_GS, 0);
-    //emulator.SetRegister(register_e.ID_REG_X86_FS, 0);
 
-    emulator.SetRegister(register_e.ID_REG_X86_RSP, rsp);
-    emulator.SetRegister(register_e.ID_REG_X86_RBP, rsp);
-    emulator.SetRegister(register_e.ID_REG_X86_RIP, 0x140001299);
+    unicornEmulator.SetRegister(register_e.ID_REG_X86_RSP, rsp);
+    unicornEmulator.SetRegister(register_e.ID_REG_X86_RBP, rsp);
+    unicornEmulator.SetRegister(register_e.ID_REG_X86_RIP, 0x140001299);
+    symbolicEmulator.SetRegister(register_e.ID_REG_X86_RSP, rsp);
+    symbolicEmulator.SetRegister(register_e.ID_REG_X86_RBP, rsp);
+    symbolicEmulator.SetRegister(register_e.ID_REG_X86_RIP, 0x140001299);
+
+    unicornEmulator.SetInstExecutedCallback((ulong address, int size) =>
+    {
+        var symbolicRip = symbolicEmulator.GetRegister(register_e.ID_REG_X86_RIP);
+        var unicornRip = unicornEmulator.GetRegister(register_e.ID_REG_X86_RIP);
+        Console.WriteLine($"Symbolic rip: 0x{symbolicRip.ToString("X")}");
+        Console.WriteLine($"Unicorn rip: 0x{unicornRip.ToString("X")}");
+        if (symbolicRip != unicornRip)
+        {
+            Debugger.Break();
+        }
+
+        symbolicEmulator.ExecuteNext();
+    });
 
     // Execute the function.
-    emulator.Start(0x140001299);
+    unicornEmulator.Start(0x140001299);
+    symbolicEmulator.Start(0x140001299);
+
+    Console.WriteLine("Started");
+    Thread.Sleep(100000);
 }
-
-
-Console.WriteLine("Started");
-Thread.Sleep(100000);
-
 
 // Lift the control flow graph to LLVM IR.
 var llvmLifter = new LLVMLifter(architecture);
@@ -179,6 +199,9 @@ if (optimize)
 
     passManager.FinalizeFunctionPassManager();
 }
+
+
+llvmLifter.Module.PrintToFile(@"optimized.ll");
 
 // Optionally write the llvm IR to the console.
 bool printLLVM = false;

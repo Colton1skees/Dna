@@ -21,17 +21,17 @@ namespace Dna.Lifting
 
         private readonly LLVMBuilderRef builder;
 
-        private readonly LLVMValueRef memoryPtr;
+        private readonly Func<LLVMValueRef> getLocalMemVariable;
 
         private readonly Func<IOperand, LLVMValueRef> load;
 
         private readonly Action<IOperand, LLVMValueRef> storeToOperand;
 
-        public InstToLLVMLifter(LLVMModuleRef module, LLVMBuilderRef builder, LLVMValueRef memoryPtr, Func<IOperand, LLVMValueRef> load, Action<IOperand, LLVMValueRef> storeToOperand)
+        public InstToLLVMLifter(LLVMModuleRef module, LLVMBuilderRef builder, Func<LLVMValueRef> getLocalMemVariable, Func<IOperand, LLVMValueRef> load, Action<IOperand, LLVMValueRef> storeToOperand)
         {
             this.module = module;
             this.builder = builder;
-            this.memoryPtr = memoryPtr;
+            this.getLocalMemVariable = getLocalMemVariable;
             this.load = load;
             this.storeToOperand = storeToOperand;
         }
@@ -206,12 +206,17 @@ namespace Dna.Lifting
                     break;
                 case InstLoad inst:
                     // Cast the address to a pointer.
-                    var loadValType = LLVMTypeRef.CreateInt(inst.Bitsize);
-                    var ptrType = LLVMTypeRef.CreatePointer(loadValType, 0);
+                    //var loadValType = LLVMTypeRef.CreateInt(inst.Bitsize);
+                    //var ptrType = LLVMTypeRef.CreatePointer(loadValType, 0);
                     //var loadPointer = builder.BuildInBoundsGEP2(ptrType, op1(), new LLVMValueRef[] {});
-                    var loadPointer = builder.BuildIntToPtr(op1(), ptrType, "loadPtr");
+                    //var loadPointer = builder.BuildIntToPtr(op1(), ptrType, "loadPtr");
 
+                    var loadValType = LLVMTypeRef.CreateInt(inst.Bitsize);
+                    //builder.BuildInBoundsGEP2(,)
+                    var loadPointer = builder.BuildInBoundsGEP2(LLVMTypeRef.CreateInt(8), getLocalMemVariable(), new LLVMValueRef[] { op1()});
+                    loadPointer = builder.BuildBitCast(loadPointer, LLVMTypeRef.CreatePointer(loadValType, 0));
                     // Dereference the pointer.
+
                     var loadValue = builder.BuildLoad2(loadValType, loadPointer, "load");
                     store(loadValue);
                     break;
@@ -222,13 +227,19 @@ namespace Dna.Lifting
                     // Get the value being stored.
                     var storeValue = load(inst.Op1);
 
+                    /*
                     // Cast the destination address to a pointer of the source value width.
                     var storeIntType = LLVMTypeRef.CreateInt(inst.Op1.Bitsize);
                     var storePtrType = LLVMTypeRef.CreatePointer(storeIntType, 0);
                     var storePtr = builder.BuildIntToPtr(storeAddr, storePtrType, "storePtr");
+                    */
+
+                    var storeIntType = LLVMTypeRef.CreateInt(inst.Op1.Bitsize);
+                    var storePointer = builder.BuildInBoundsGEP2(LLVMTypeRef.CreateInt(8), getLocalMemVariable(), new LLVMValueRef[] { storeAddr });
 
                     // Write to memory.
-                    builder.BuildStore(storeValue, storePtr);
+                    storePointer = builder.BuildBitCast(storePointer, LLVMTypeRef.CreatePointer(storeIntType, 0));
+                    builder.BuildStore(storeValue, storePointer);
                     break;
                 case InstJmp inst:
                     var jmpAddr = inst.Op1 as ImmediateOperand;

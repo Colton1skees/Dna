@@ -48,6 +48,7 @@ namespace Dna.Symbolic
                 InstCond inst => FromCond(inst),
                 InstSmod => new BvsmodNode(op1(), op2()),
                 InstSrem => new BvsremNode(op1(), op2()),
+                InstShl => new BvshlNode(op1(), op2()),
                 InstSub => new BvsubNode(op1(), op2()),
                 InstUdiv => new BvudivNode(op1(), op2()),
                 InstUrem => new BvuremNode(op1(), op2()),

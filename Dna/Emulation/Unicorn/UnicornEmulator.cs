@@ -193,7 +193,7 @@ namespace Dna.Emulation.Unicorn
 
         public void SetInstExecutedCallback(dgOnInstExecuted callback)
         {
-            throw new NotImplementedException();
+            instExecutedCallback = callback;
         }
     }
 }

@@ -4,6 +4,7 @@ using Iced.Intel;
 using Microsoft.Z3;
 using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.Drawing;
 using System.Linq;
 using System.Text;
@@ -98,9 +99,19 @@ namespace Dna.Emulation.Symbolic
             var buffer = new byte[size];
             for(int i = 0; i < size; i++)
             {
+                if(addr == 0x0140001299)
+                {
+
+                }
+
+                /*
                 var value = engine.MemoryDefinitions
                     .Single(x => FastEvaluate(x.Key) == addr + (ulong)i)
                     .Value;
+                */
+
+                var memNode = new MemoryNode(new IntegerNode(addr + (ulong)i, 64), 8);
+                var value = engine.MemoryDefinitions[memNode];
 
                 buffer[i] = (byte)FastEvaluate(value);
             }
@@ -111,10 +122,8 @@ namespace Dna.Emulation.Symbolic
         {
             for (int i = 0; i < buffer.Length; i++)
             {
-                var target = engine.MemoryDefinitions
-                    .Single(x => FastEvaluate(x.Key) == addr + (ulong)i);
-
-                engine.StoreMemoryDefinition(target.Key, new IntegerNode(buffer[i], 1));
+                var memNode = new MemoryNode(new IntegerNode(addr + (ulong)i, 64), 8);
+                engine.StoreMemoryDefinition(memNode, new IntegerNode(buffer[i], 8));
             }
         }
 
@@ -130,6 +139,10 @@ namespace Dna.Emulation.Symbolic
         {
             // Fetch and decode the instruction at the current symbolic RIP.
             var rip = GetRegister(register_e.ID_REG_X86_RIP);
+
+            //if (rip == 0x1400012A3)
+                //Debugger.Break();
+
             var bytes = ReadMemory(rip, 16);
             var instruction = GetInstructionFromBytes(rip, bytes);
 
@@ -145,6 +158,10 @@ namespace Dna.Emulation.Symbolic
             // Symbolically execute each lifted linear instruction.
             foreach(var lifted in liftedInstructions)
             {
+                /*
+                if (lifted.ToString().Contains("Reg(rip):64 ="))
+                    Debugger.Break();
+                */
                 engine.ExecuteInstruction(lifted);
             }
         }
@@ -187,6 +204,8 @@ namespace Dna.Emulation.Symbolic
 
         private ulong? FastEvaluate(AbstractNode node)
         {
+            if(node is MemoryNode memNode)
+                node = memNode.Children[0];
             if (node is BvNode bvNode)
                 node = (IntegerNode)bvNode.Expr1;
             if (node is IntegerNode intNode)

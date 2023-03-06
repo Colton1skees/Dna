@@ -47,14 +47,16 @@ namespace Dna.Symbolic
             {
                 // Note: Users are optionally allowed 
                 var ast = astBuilder.GetStoreAst(storeInst);
-                if(memoryWriteCallback?.Invoke(ast.destination, ast.source) == true)
+                //if(memoryWriteCallback?.Invoke(ast.destination, ast.source) == true)
+                if(true)
                     memoryDefinitions[ast.destination] = ast.source;
             }
 
             else
             {
                 var ast = astBuilder.GetAst(inst);
-                if(variableWriteCallback?.Invoke(inst.Dest, ast.source) == true)
+                //if(variableWriteCallback?.Invoke(inst.Dest, ast.source) == true)
+                if(true)
                     variableDefinitions[inst.Dest] = ast.source;
             }
         }
