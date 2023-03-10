@@ -39,6 +39,8 @@ namespace Dna.Emulation.Symbolic
             translator = new X86Translator(architecture);
             astConverter = new AstToIntermediateConverter();
             engine = new SymbolicExecutionEngine(EvaluateSymbolicAst);
+            engine.SetSymbolicVariableWriteCallback(HandleSymbolicVariableWrite);
+            engine.SetSymbolicMemoryWriteCallback(HandleSymbolicMemoryWrite);
         }
 
         private AbstractNode EvaluateSymbolicAst(IOperand operand)
@@ -59,7 +61,35 @@ namespace Dna.Emulation.Symbolic
             else if (operand is SsaOperand ssaOp)
                 return new SsaVariableNode((VariableNode)CreateOperandNode(ssaOp.BaseOperand), ssaOp.Version);
             else
-                throw new InvalidOperationException(String.Format("Cannot create operand node for type {0}", operand.GetType().FullName));
+                throw new InvalidOperationException(string.Format("Cannot create operand node for type {0}", operand.GetType().FullName));
+        }
+
+        private void HandleSymbolicVariableWrite(IOperand operand, AbstractNode value)
+        {
+            var z3Ast = (BitVecNum)GetZ3Ast(value).Simplify();
+            engine.StoreOperandDefinition(operand, new IntegerNode(z3Ast.UInt64, value.BitSize));
+        }
+
+        private void HandleSymbolicMemoryWrite(MemoryNode memoryNode, AbstractNode value)
+        {
+            // Evaluate the memory store address.
+            var addr = ((BitVecNum)GetZ3Ast(memoryNode.Expr1).Simplify()).UInt64;
+
+            // Evaluate the memory store value.
+            var memValue = ((BitVecNum)GetZ3Ast(value).Simplify()).UInt64;
+
+            // Convert the byte array to bytes.
+            var bytes = value.BitSize switch
+            {
+                8 => new byte[] { (byte)memValue },
+                16 => BitConverter.GetBytes((ushort)memValue),
+                32 => BitConverter.GetBytes((uint)memValue),
+                64 => BitConverter.GetBytes(memValue),
+                _ => throw new InvalidOperationException()
+            };
+
+            // Update symbolic memory.
+            WriteMemory(addr, bytes);
         }
 
         public ulong GetRegister(register_e regId)

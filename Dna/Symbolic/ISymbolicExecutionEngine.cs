@@ -11,9 +11,9 @@ using TritonTranslator.Intermediate.Operands;
 
 namespace Dna.Symbolic
 {
-    public delegate bool dgOnSymbolicVariableWrite(IOperand operand, AbstractNode value);
+    public delegate void dgOnSymbolicVariableWrite(IOperand operand, AbstractNode value);
 
-    public delegate bool dgOnSymbolicMemoryWrite(MemoryNode memoryNode, AbstractNode value);
+    public delegate void dgOnSymbolicMemoryWrite(MemoryNode memoryNode, AbstractNode value);
 
     public interface ISymbolicExecutionEngine
     {

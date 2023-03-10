@@ -146,7 +146,9 @@ if (emulate)
     symbolicEmulator.SetRegister(register_e.ID_REG_X86_RBP, rsp);
     symbolicEmulator.SetRegister(register_e.ID_REG_X86_RIP, 0x140001299);
 
-    symbolicEmulator.SetMemoryWriteCallback(())
+    unicornEmulator.SetRegister(register_e.ID_REG_X86_ID, 0);
+    symbolicEmulator.SetRegister(register_e.ID_REG_X86_ID, 0);
+
 
     unicornEmulator.SetInstExecutedCallback((ulong address, int size) =>
     {

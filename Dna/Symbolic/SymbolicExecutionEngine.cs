@@ -77,7 +77,7 @@ namespace Dna.Symbolic
             variableWriteCallback = callback;
         }
 
-        public void SetSymbolicMemoryWriteCallback(dgOnSymbolicMemoryWrite callback)
+        public void SetSymbolicMemoryWriteCallback(dgOnSymbolicMemoryWrite   callback)
         {
             memoryWriteCallback = callback;
         }
