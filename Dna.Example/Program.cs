@@ -112,7 +112,7 @@ if (writeDotGraph)
     File.WriteAllText("graph.dot", dotGraph.Compile(false, false));
 }
 
-bool emulate = false;
+bool emulate = true;
 if (emulate)
 {
     // Load the binary into unicorn engine.
@@ -145,6 +145,8 @@ if (emulate)
     symbolicEmulator.SetRegister(register_e.ID_REG_X86_RSP, rsp);
     symbolicEmulator.SetRegister(register_e.ID_REG_X86_RBP, rsp);
     symbolicEmulator.SetRegister(register_e.ID_REG_X86_RIP, 0x140001299);
+
+    symbolicEmulator.SetMemoryWriteCallback(())
 
     unicornEmulator.SetInstExecutedCallback((ulong address, int size) =>
     {

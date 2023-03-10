@@ -213,7 +213,7 @@ namespace Dna.Emulation.Symbolic
             return null;
         }
 
-        private Microsoft.Z3.Expr GetZ3Ast(AbstractNode ast)
+        public Microsoft.Z3.Expr GetZ3Ast(AbstractNode ast)
         {
             return z3Translator.GetZ3Ast(ast);
         }

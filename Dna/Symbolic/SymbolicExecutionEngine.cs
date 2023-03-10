@@ -45,18 +45,29 @@ namespace Dna.Symbolic
         {
             if (inst is InstStore storeInst)
             {
-                // Note: Users are optionally allowed 
+                // If we encounter a memory store, then first we need to compute symbolic
+                // expressions for the source and destination.
                 var ast = astBuilder.GetStoreAst(storeInst);
-                //if(memoryWriteCallback?.Invoke(ast.destination, ast.source) == true)
-                if(true)
+
+                // The symbolic execution engine allows users to specify a callback to intercept
+                // and handle memory writes themselves. If this callback is provided, then we
+                // allow a consumer to intercept and handle the memory write event.
+                // If a callback is not provided, then we store a symbolic memory
+                // write at the symbolic memory location. 
+                if (memoryWriteCallback != null)
+                    memoryWriteCallback.Invoke(ast.destination, ast.source);
+                else
                     memoryDefinitions[ast.destination] = ast.source;
             }
 
             else
             {
+                // Symbolic register assignments are handled in the same manner as memory 
+                // stores - a callback exists for the consumer to overwrite and handle these events.
                 var ast = astBuilder.GetAst(inst);
-                //if(variableWriteCallback?.Invoke(inst.Dest, ast.source) == true)
-                if(true)
+                if (variableWriteCallback != null)
+                    variableWriteCallback.Invoke(inst.Dest, ast.source);
+                else
                     variableDefinitions[inst.Dest] = ast.source;
             }
         }
