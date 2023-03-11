@@ -3,6 +3,7 @@ using LLVMSharp;
 using Microsoft.Z3;
 using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
@@ -47,6 +48,8 @@ namespace Dna.Symbolic
             {
                 // If we encounter a memory store, then first we need to compute symbolic
                 // expressions for the source and destination.
+                if (inst.Op1.ToString().Contains("t127"))
+                    Debugger.Break();
                 var ast = astBuilder.GetStoreAst(storeInst);
 
                 // The symbolic execution engine allows users to specify a callback to intercept

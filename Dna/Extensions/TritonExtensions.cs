@@ -18,7 +18,7 @@ namespace Dna.Extensions
                 case register_e.ID_REG_X86_PF:
                     return 2;
                 case register_e.ID_REG_X86_AF:
-                    return 3;
+                    return 4;
                 case register_e.ID_REG_X86_ZF:
                     return 6;
                 case register_e.ID_REG_X86_SF:

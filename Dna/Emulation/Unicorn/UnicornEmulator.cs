@@ -124,6 +124,10 @@ namespace Dna.Emulation.Unicorn
 
         private void OnMemoryWrite(Emulator emulator, MemoryType type, ulong address, int size, ulong value, object userData)
         {
+            if(address == 0x0010001ff40)
+            {
+                Debugger.Break();
+            }
             memWriteCallback?.Invoke(address, size, value);
         }
 

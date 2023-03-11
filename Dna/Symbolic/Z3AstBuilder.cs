@@ -10,11 +10,15 @@ namespace Dna.Symbolic
 {
     public class Z3AstBuilder
     {
-        private Context ctx;
+        public Context Ctx { get; }
+
+        public Solver Solver { get; }
 
         public Z3AstBuilder(Context context)
         {
-            this.ctx = context;
+            Ctx = context;
+            Solver = Ctx.MkSolver("QF_BV");
+            Solver.Check();
         }
 
         /// <summary>
@@ -47,50 +51,50 @@ namespace Dna.Symbolic
 
             // Wrapper for evaluating symbolic variables(e.g. registers, ssa variables, etc.)
             var evaluateVariable = (AbstractNode node) => isDefined(node) ? 
-                GetZ3Ast(getVar(node), isDefined, getVar) : ctx.MkBVConst(GetVariableNode(node), node.BitSize);
+                GetZ3Ast(getVar(node), isDefined, getVar) : Ctx.MkBVConst(GetVariableNode(node), node.BitSize);
 
             Expr? z3Ast = expression switch
             {
                 // Evaluate expressions.
-                BvaddNode => ctx.MkBVAdd(bv1(), bv2()),
-                BvandNode => ctx.MkBVAND(bv1(), bv2()),
-                BvashrNode => ctx.MkBVASHR(bv1(), bv2()),
-                BvlshrNode => ctx.MkBVLSHR(bv1(), bv2()),
-                BvmulNode => ctx.MkBVMul(bv1(), bv2()),
-                BvnegNode => ctx.MkBVNeg(bv1()),
-                BvnotNode => ctx.MkBVNot(bv1()),
-                BvorNode => ctx.MkBVOR(bv1(), bv2()),
-                BvrolNode => ctx.MkBVRotateLeft(bv1(), bv2()),
-                BvrorNode => ctx.MkBVRotateRight(bv1(), bv2()),
-                BvsdivNode => ctx.MkBVSDiv(bv1(), bv2()),
-                EqualNode => ctx.MkITE(ctx.MkEq(op1(), op2()), ctx.MkBV(1, 1), ctx.MkBV(0, 1)),
-                BvsgeNode => ctx.MkITE(ctx.MkBVSGE(bv1(), bv2()), ctx.MkBV(1, 1), ctx.MkBV(0, 1)),
-                BvsgtNode => ctx.MkITE(ctx.MkBVSGT(bv1(), bv2()), ctx.MkBV(1, 1), ctx.MkBV(0, 1)),
-                BvsleNode => ctx.MkITE(ctx.MkBVSLE(bv1(), bv2()), ctx.MkBV(1, 1), ctx.MkBV(0, 1)),
-                BvsltNode => ctx.MkITE(ctx.MkBVSLT(bv1(), bv2()), ctx.MkBV(1, 1), ctx.MkBV(0, 1)),
-                BvugeNode => ctx.MkITE(ctx.MkBVUGE(bv1(), bv2()), ctx.MkBV(1, 1), ctx.MkBV(0, 1)),
-                BvugtNode => ctx.MkITE(ctx.MkBVUGT(bv1(), bv2()), ctx.MkBV(1, 1), ctx.MkBV(0, 1)),
-                BvuleNode => ctx.MkITE(ctx.MkBVULE(bv1(), bv2()), ctx.MkBV(1, 1), ctx.MkBV(0, 1)),
-                BvultNode => ctx.MkITE(ctx.MkBVULT(bv1(), bv2()), ctx.MkBV(1, 1), ctx.MkBV(0, 1)),
-                BvsmodNode => ctx.MkBVSMod(bv1(), bv2()),
-                BvsremNode => ctx.MkBVSRem(bv1(), bv2()),
-                BvsubNode => ctx.MkBVSub(bv1(), bv2()),
-                BvudivNode => ctx.MkBVUDiv(bv1(), bv2()),
-                BvuremNode => ctx.MkBVURem(bv1(), bv2()),
-                BvxorNode => ctx.MkBVXOR(bv1(), bv2()),
-                ConcatNode node => FromConcat(node, (AbstractNode expr) => GetZ3Ast(expression, isDefined, getVar)),
-                ExtractNode node => ctx.MkExtract((uint)node.High.Value, (uint)node.Low.Value, bv3()),
-                IteNode node => ctx.MkITE(ctx.MkEq(op1(), ctx.MkBV(1, 1)), op2(), op3()),
-                SxNode node => ctx.MkSignExt((uint)node.SizeExt.Value, bv2()),
-                ZxNode node => ctx.MkZeroExt((uint)node.SizeExt.Value, bv2()),
+                BvaddNode => Ctx.MkBVAdd(bv1(), bv2()),
+                BvandNode => Ctx.MkBVAND(bv1(), bv2()),
+                BvashrNode => Ctx.MkBVASHR(bv1(), bv2()),
+                BvlshrNode => Ctx.MkBVLSHR(bv1(), bv2()),
+                BvmulNode => Ctx.MkBVMul(bv1(), bv2()),
+                BvnegNode => Ctx.MkBVNeg(bv1()),
+                BvnotNode => Ctx.MkBVNot(bv1()),
+                BvorNode => Ctx.MkBVOR(bv1(), bv2()),
+                BvrolNode => Ctx.MkBVRotateLeft(bv1(), bv2()),
+                BvrorNode => Ctx.MkBVRotateRight(bv1(), bv2()),
+                BvsdivNode => Ctx.MkBVSDiv(bv1(), bv2()),
+                EqualNode => Ctx.MkITE(Ctx.MkEq(op1(), op2()), Ctx.MkBV(1, 1), Ctx.MkBV(0, 1)),
+                BvsgeNode => Ctx.MkITE(Ctx.MkBVSGE(bv1(), bv2()), Ctx.MkBV(1, 1), Ctx.MkBV(0, 1)),
+                BvsgtNode => Ctx.MkITE(Ctx.MkBVSGT(bv1(), bv2()), Ctx.MkBV(1, 1), Ctx.MkBV(0, 1)),
+                BvsleNode => Ctx.MkITE(Ctx.MkBVSLE(bv1(), bv2()), Ctx.MkBV(1, 1), Ctx.MkBV(0, 1)),
+                BvsltNode => Ctx.MkITE(Ctx.MkBVSLT(bv1(), bv2()), Ctx.MkBV(1, 1), Ctx.MkBV(0, 1)),
+                BvugeNode => Ctx.MkITE(Ctx.MkBVUGE(bv1(), bv2()), Ctx.MkBV(1, 1), Ctx.MkBV(0, 1)),
+                BvugtNode => Ctx.MkITE(Ctx.MkBVUGT(bv1(), bv2()), Ctx.MkBV(1, 1), Ctx.MkBV(0, 1)),
+                BvuleNode => Ctx.MkITE(Ctx.MkBVULE(bv1(), bv2()), Ctx.MkBV(1, 1), Ctx.MkBV(0, 1)),
+                BvultNode => Ctx.MkITE(Ctx.MkBVULT(bv1(), bv2()), Ctx.MkBV(1, 1), Ctx.MkBV(0, 1)),
+                BvsmodNode => Ctx.MkBVSMod(bv1(), bv2()),
+                BvsremNode => Ctx.MkBVSRem(bv1(), bv2()),
+                BvsubNode => Ctx.MkBVSub(bv1(), bv2()),
+                BvudivNode => Ctx.MkBVUDiv(bv1(), bv2()),
+                BvuremNode => Ctx.MkBVURem(bv1(), bv2()),
+                BvxorNode => Ctx.MkBVXOR(bv1(), bv2()),
+                ConcatNode node => FromConcat(node, evaluateVariable),
+                ExtractNode node => Ctx.MkExtract((uint)node.High.Value, (uint)node.Low.Value, bv3()),
+                IteNode node => Ctx.MkITE(Ctx.MkEq(op1(), Ctx.MkBV(1, 1)), op2(), op3()),
+                SxNode node => Ctx.MkSignExt((uint)node.SizeExt.Value, bv2()),
+                ZxNode node => Ctx.MkZeroExt((uint)node.SizeExt.Value, bv2()),
 
                 // Evaluate variables(e.g. registers, ssa variables) using the provided callback.
                 // The callback allows the user to substitute symbolic or concrete values without modifying the AST.
-                UndefNode node => ctx.MkBVConst("undef" + node.BitSize, node.BitSize),
+                UndefNode node => Ctx.MkBVConst("undef" + node.BitSize, node.BitSize),
                 RegisterNode node => evaluateVariable(node),
                 SsaVariableNode node => evaluateVariable(node),
                 TemporaryNode node => evaluateVariable(node),
-                IntegerNode node => ctx.MkBV(node.Value, node.BitSize),
+                IntegerNode node => Ctx.MkBV(node.Value, node.BitSize),
 
                 _ => throw new InvalidOperationException(String.Format("Cannot get AST for type: {0}", expression.GetType().Name))
             };
@@ -111,7 +115,7 @@ namespace Dna.Symbolic
 
             foreach(var child in concat.Children.Skip(1))
             {
-                currentValue = ctx.MkConcat((BitVecExpr)currentValue, (BitVecExpr)evaluate(child));
+                currentValue = Ctx.MkConcat((BitVecExpr)currentValue, (BitVecExpr)evaluate(child));
             }
 
             return currentValue;
