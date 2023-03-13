@@ -60,6 +60,7 @@ namespace Dna.Symbolic
                 BvandNode => Ctx.MkBVAND(bv1(), bv2()),
                 BvashrNode => Ctx.MkBVASHR(bv1(), bv2()),
                 BvlshrNode => Ctx.MkBVLSHR(bv1(), bv2()),
+                BvshlNode => Ctx.MkBVSHL(bv1(), bv2()),
                 BvmulNode => Ctx.MkBVMul(bv1(), bv2()),
                 BvnegNode => Ctx.MkBVNeg(bv1()),
                 BvnotNode => Ctx.MkBVNot(bv1()),
@@ -105,7 +106,7 @@ namespace Dna.Symbolic
         private string GetVariableNode(AbstractNode node)
         {
             var text = node.ToString().Replace("(", "").Replace(")", "");
-            Console.WriteLine(text);
+            //Console.WriteLine(text);
             return text;
         }
 

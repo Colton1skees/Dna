@@ -38,7 +38,7 @@ namespace Dna.Emulation.Symbolic
         {
             this.architecture = architecture;
             translator = new X86Translator(architecture);
-            astConverter = new AstToIntermediateConverter();
+            astConverter = new AstToIntermediateConverter(architecture);
             engine = new SymbolicExecutionEngine(EvaluateSymbolicAst);
             engine.SetSymbolicVariableWriteCallback(HandleSymbolicVariableWrite);
             engine.SetSymbolicMemoryWriteCallback(HandleSymbolicMemoryWrite);
@@ -73,18 +73,19 @@ namespace Dna.Emulation.Symbolic
                 var addrNode = memNode.Expr1;
                 var addr = EvaluateToUlong(addrNode);
                 var bytes = ReadMemory(addr, (int)(value.BitSize / 8));
-                z3Value = BitConverter.ToUInt64(bytes);
+                z3Value = value.BitSize switch
+                {
+                    8 => bytes[0],
+                    16 => BitConverter.ToUInt16(bytes),
+                    32 => BitConverter.ToUInt32(bytes),
+                    64 => BitConverter.ToUInt64(bytes),
+                    _ => throw new InvalidOperationException()
+                };
             }
 
             else
             {
                 z3Value = EvaluateToUlong(value);
-            }
-
-            if(operand is RegisterOperand regOp)
-            {
-                if (regOp.Register.Id == register_e.ID_REG_X86_AF)
-                    Debugger.Break();
             }
 
             engine.StoreOperandDefinition(operand, new IntegerNode(z3Value, value.BitSize));
@@ -142,6 +143,13 @@ namespace Dna.Emulation.Symbolic
             // an assigned AST to be 'unmapped'.
         }
 
+        public T ReadMemory<T>(ulong addr)
+        {
+            var size = MarshalType<T>.Size;
+            var buffer = ReadMemory(addr, size);
+            return MarshalType<T>.ByteArrayToObject(buffer);
+        }
+
         public byte[] ReadMemory(ulong addr, int size)
         {
             // This is O(n) which is definitely not ideal given that we can do it in O(1).
@@ -174,11 +182,17 @@ namespace Dna.Emulation.Symbolic
             return buffer;
         }
 
+        public void WriteMemory<T>(ulong addr, T value)
+        {
+            var buffer = MarshalType<T>.ObjectToByteArray(value);
+            WriteMemory(addr, buffer);
+        }
+
         public void WriteMemory(ulong addr, byte[] buffer)
         {
             if (addr == 0x010001ffb8)
             {
-                Debugger.Break();
+                //Debugger.Break();
             }
             for (int i = 0; i < buffer.Length; i++)
             {
@@ -218,11 +232,12 @@ namespace Dna.Emulation.Symbolic
             // Symbolically execute each lifted linear instruction.
             foreach(var lifted in liftedInstructions)
             {
-                Console.WriteLine(lifted);
-                /*
-                if (lifted.ToString().Contains("Reg(rip):64 ="))
-                    Debugger.Break();
-                */
+                if(rip == 0x14004605F)
+                    Console.WriteLine(lifted);
+                    /*
+                    if (lifted.ToString().Contains("Reg(rip):64 ="))
+                        Debugger.Break();
+                    */
                 engine.ExecuteInstruction(lifted);
             }
         }
@@ -307,39 +322,19 @@ namespace Dna.Emulation.Symbolic
 
         private ulong EvaluateToUlong(AbstractNode ast)
         {
-            if (ast.ToString().Contains("Concat(0x0:I1),0x0:I1),0x0:I1),0x0:I1),0x0:I1),0x"))
-                Debugger.Break();
-            Console.WriteLine("ast: " + ast);
             var z3Ast = GetZ3Ast(ast);
 
-            //z3Ast = z3Ast.Simplify();
+            //var solver = z3Translator.Solver;
 
-            var solver = z3Translator.Ctx.MkSolver("QF_BV");
+            var evaluated = z3Ast.Simplify();
 
-            //if(ast.BitSize > 8)
-                //solver.Add(z3Translator.Ctx.MkNot(z3Translator.Ctx.MkEq(z3Translator.Ctx.MkBV(0x5545445453, ast.BitSize), z3Ast)));
+           // var solver = z3Translator.Ctx.MkSolver("QF_BV");
 
-            var checkd = solver.Check();
+          //  var checkd = solver.Check();
 
 
-            var evaluated = solver.Model.Eval(z3Translator.Ctx.MkBV2Int((BitVecExpr)z3Ast, false), false);
-            Console.WriteLine(ast);
-            Console.WriteLine(evaluated.ToString());
-            var idk = evaluated.Simplify();
-
-            if (idk is IntExpr)
-            {
-                var evaluated2 = solver.Model.Eval(z3Translator.Ctx.MkInt2BV(ast.BitSize, (IntExpr)idk), false);
-
-                var simplified2 = evaluated2.Simplify();
-
-                Console.WriteLine(simplified2);
-                //Debugger.Break();
-            }
-
-            Console.WriteLine($"Value: 0x{((IntNum)evaluated).UInt64.ToString("X")}");
-
-            return ((IntNum)evaluated).UInt64;
+            //var evaluated = solver.Model.Eval(z3Translator.Ctx.MkBV2Int((BitVecExpr)z3Ast, false), false);
+            return ((BitVecNum)evaluated).UInt64;
         }
     }
 }

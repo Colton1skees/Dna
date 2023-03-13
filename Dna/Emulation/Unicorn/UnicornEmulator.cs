@@ -83,11 +83,24 @@ namespace Dna.Emulation.Unicorn
             Emulator.Memory.Map(address, size, MemoryPermissions.All);
         }
 
+        public T ReadMemory<T>(ulong addr)
+        {
+            var size = MarshalType<T>.Size;
+            var buffer = ReadMemory(addr, size);
+            return MarshalType<T>.ByteArrayToObject(buffer);
+        }
+
         public byte[] ReadMemory(ulong addr, int size)
         {
             var buffer = new byte[size];
             Emulator.Memory.Read(addr, buffer, buffer.Length);
             return buffer;
+        }
+
+        public void WriteMemory<T>(ulong addr, T value)
+        {
+            var buffer = MarshalType<T>.ObjectToByteArray(value);
+            WriteMemory(addr, buffer);
         }
 
         public void WriteMemory(ulong addr, byte[] buffer)
@@ -117,16 +130,17 @@ namespace Dna.Emulation.Unicorn
 
         private void OnMemoryRead(Emulator emulator, MemoryType type, ulong address, int size, ulong value, object userData)
         {
-            if (address == 0x00100020000 + 0x51)
-                Debugger.Break();
-            memReadCallback?.Invoke(address, size);
+            value = ReadMemory<ulong>(address);
+         //   if (address == 0x00100020000 + 0x51)
+           //     Debugger.Break();
+            memReadCallback?.Invoke(address, size, value);
         }
 
         private void OnMemoryWrite(Emulator emulator, MemoryType type, ulong address, int size, ulong value, object userData)
         {
             if(address == 0x0010001ff40)
             {
-                Debugger.Break();
+               // Debugger.Break();
             }
             memWriteCallback?.Invoke(address, size, value);
         }

@@ -25,6 +25,9 @@ using Dna.Emulation.Unicorn;
 using Dna.Decompilation;
 using Dna.Structuring.Stackify;
 using Dna.Emulation.Symbolic;
+using TritonTranslator.Intermediate;
+using System;
+using TritonTranslator.Conversion;
 // Load the 64 bit PE file.
 // Note: This file is automatically copied to the build directory.
 var path = @"C:\Users\colton\source\repos\ObfuscationTester\x64\Release\ObfuscationTester.themida.exe";
@@ -82,8 +85,23 @@ var architecture = new X86CpuArchitecture(ArchitectureId.ARCH_X86_64);
 // Instantiate a class for lifting control flow graphs to our intermediate language.
 var cfgLifter = new CfgLifter(architecture);
 
+
+var inst = architecture.Disassembly(dna.BinaryDisassembler.GetInstructionAt(0x140015410));
+
+var translator = new X86Translator(architecture);
+var astConverter = new AstToIntermediateConverter(architecture);
+
+var translated = translator.TranslateInstruction(inst);
+var flatInstructions = translated.SelectMany(x => astConverter.ConvertFromSymbolicExpression(x));
+
+foreach (var flatInst in flatInstructions)
+{
+    Console.WriteLine(flatInst);
+}
+
 // Lift the control flow graph to TTIR.
 var liftedCfg = cfgLifter.LiftCfg(cfg);
+// ControlFlowGraph<AbstractInst> liftedCfg = null;
 
 for (int i = 0; i < 3; i++)
     Console.WriteLine("");
@@ -97,7 +115,7 @@ if (dce)
 }
 
 // Print the optimized control flow graph.
-bool printLiftedCfg = true;
+bool printLiftedCfg = false;
 if (printLiftedCfg)
 {
     Console.WriteLine("Lifted cfg:\n{0}", GraphFormatter.FormatGraph(liftedCfg));
@@ -111,6 +129,9 @@ if (writeDotGraph)
     var dotGraph = GraphVisualizer.GetDotGraph(liftedCfg);
     File.WriteAllText("graph.dot", dotGraph.Compile(false, false));
 }
+
+
+List<Iced.Intel.Instruction> icedInstructions = new();
 
 bool emulate = true;
 if (emulate)
@@ -139,11 +160,33 @@ if (emulate)
         symbolicEmulator.WriteMemory(baseAddr + i, new byte[] { 0x90 });
     }
 
+    for (ulong i = 0; i < 0x1000; i++)
+    {
+        ulong baseAddr = 0;
+        unicornEmulator.WriteMemory(baseAddr + i, new byte[] { 0x0 });
+        symbolicEmulator.WriteMemory(baseAddr + i, new byte[] { 0x0 });
+    }
+
     unicornEmulator.SetRegister(register_e.ID_REG_X86_RSP, rsp);
     unicornEmulator.SetRegister(register_e.ID_REG_X86_RBP, rsp);
     unicornEmulator.SetRegister(register_e.ID_REG_X86_RIP, 0x140001299);
     symbolicEmulator.SetRegister(register_e.ID_REG_X86_RSP, rsp);
     symbolicEmulator.SetRegister(register_e.ID_REG_X86_RBP, rsp);
+
+    // Update low parts of rbp.
+    var casted = (uint)rsp;
+    var casted2 = (ushort)rsp;
+    symbolicEmulator.SetRegister(register_e.ID_REG_X86_RBP, rsp);
+    symbolicEmulator.SetRegister(register_e.ID_REG_X86_EBP, casted);
+    symbolicEmulator.SetRegister(register_e.ID_REG_X86_BP, casted2);
+    symbolicEmulator.SetRegister(register_e.ID_REG_X86_BPL, (byte)casted);
+
+    // Update low parts of RSP.
+    symbolicEmulator.SetRegister(register_e.ID_REG_X86_ESP, casted);
+    symbolicEmulator.SetRegister(register_e.ID_REG_X86_SP, casted2);
+    symbolicEmulator.SetRegister(register_e.ID_REG_X86_SPL, (byte)casted);
+
+
     symbolicEmulator.SetRegister(register_e.ID_REG_X86_RIP, 0x140001299);
 
     unicornEmulator.SetRegister(register_e.ID_REG_X86_CF, 0);
@@ -175,6 +218,27 @@ if (emulate)
     unicornEmulator.SetRegister(register_e.ID_REG_X86_ID, 0);
     symbolicEmulator.SetRegister(register_e.ID_REG_X86_ID, 0);
 
+    unicornEmulator.SetRegister(register_e.ID_REG_X86_R14, 0);
+    symbolicEmulator.SetRegister(register_e.ID_REG_X86_R14, 0);
+
+    symbolicEmulator.WriteMemory<ulong>(0x10001FFE0, 0);
+
+    foreach (var register in X86Registers.RegisterMapping.Values)
+    {
+        var parent = register.ParentId;
+        if (parent == register_e.ID_REG_X86_RIP || parent == register_e.ID_REG_X86_RSP || parent == register_e.ID_REG_X86_RCX
+            || parent == register_e.ID_REG_X86_RDX || parent == register_e.ID_REG_X86_RBP || parent == register_e.ID_REG_INVALID
+            || parent == register_e.ID_REG_X86_MXCSR)
+            continue;
+
+        if (X86Registers.RegisterMapping[parent].BitSize != 64)
+            continue;
+
+        Console.WriteLine($"Setting register: {register.Id}");
+        symbolicEmulator.SetRegister(register.Id, 0);
+        unicornEmulator.SetRegister(register.Id, 0);
+    }
+
     /*
     unicornEmulator.SetRegister(register_e.ID_REG_X86_ID, 0);
     symbolicEmulator.SetRegister(register_e.ID_REG_X86_ID, 0);
@@ -192,33 +256,127 @@ if (emulate)
     symbolicEmulator.SetRegister(register_e.ID_REG_X86_ID, 0);
     */
 
-    unicornEmulator.SetRegister(register_e.ID_REG_X86_R14, 0);
-    symbolicEmulator.SetRegister(register_e.ID_REG_X86_R14, 0);
-
     Dictionary<ulong, byte> unicornMemoryWrites = new Dictionary<ulong, byte>();
+    Dictionary<ulong, byte> unicornMemoryReads = new Dictionary<ulong, byte>();
     unicornEmulator.SetMemoryWriteCallback((ulong address, int size, ulong value) =>
     {
         var bytes = BitConverter.GetBytes(value);
-        for(ulong i = 0; i < (ulong)size; i++)
+        for (ulong i = 0; i < (ulong)size; i++)
         {
             unicornMemoryWrites[address + i] = bytes[i];
         }
     });
 
+    unicornEmulator.SetMemoryReadCallback((ulong address, int size, ulong value) =>
+    {
+        var bytes = BitConverter.GetBytes(value);
+        for (ulong i = 0; i < (ulong)size; i++)
+        {
+            unicornMemoryReads[address + i] = bytes[i];
+        }
+    });
+
+    int count = 0;
     unicornEmulator.SetInstExecutedCallback((ulong address, int size) =>
     {
+        Console.WriteLine($"count: {count}");
+        count++;
         var symbolicRip = symbolicEmulator.GetRegister(register_e.ID_REG_X86_RIP);
         var unicornRip = unicornEmulator.GetRegister(register_e.ID_REG_X86_RIP);
 
+
+        var disassembled = dna.BinaryDisassembler.GetInstructionAt(symbolicRip);
+        icedInstructions.Add(disassembled);
+        if (unicornRip == 0x1400012A8)
+        {
+            var uniCfg = new ControlFlowGraph<Iced.Intel.Instruction>(0x140001299);
+            var entryBlock = uniCfg.CreateBlock(0x140001299);
+            foreach (var insn in icedInstructions)
+                entryBlock.Instructions.Add(insn);
+
+
+            var myIrCfg = cfgLifter.LiftCfg(uniCfg);
+            var targetBlk = myIrCfg.GetBlocks().First();
+            var clone = targetBlk.Instructions.ToList();
+            targetBlk.Instructions.Clear();
+            foreach (var irInst in clone)
+            {
+                if (irInst is InstJmp || irInst is InstJcc || irInst is InstJmpInd || irInst is InstRet)
+                    continue;
+
+                targetBlk.Instructions.Add(irInst);
+            }
+
+            targetBlk.Instructions.Add(new InstRet());
+
+            // Lift the control flow graph to LLVM IR.
+            var uniLlvmLifter = new LLVMLifter(architecture);
+            uniLlvmLifter.Lift(myIrCfg);
+
+            uniLlvmLifter.Module.PrintToFile(@"unicorn.ll");
+            var passManager = uniLlvmLifter.Module.CreateFunctionPassManager();
+            passManager.AddBasicAliasAnalysisPass();
+            passManager.AddTypeBasedAliasAnalysisPass();
+            passManager.AddScopedNoAliasAAPass();
+            passManager.AddLowerExpectIntrinsicPass();
+            passManager.AddCFGSimplificationPass();
+            passManager.AddPromoteMemoryToRegisterPass();
+            passManager.AddEarlyCSEPass();
+            passManager.AddDCEPass();
+            passManager.AddAggressiveDCEPass();
+            passManager.AddDeadStoreEliminationPass();
+            passManager.AddInstructionCombiningPass();
+            passManager.AddCFGSimplificationPass();
+            passManager.AddDeadStoreEliminationPass();
+            passManager.AddAggressiveDCEPass();
+            passManager.InitializeFunctionPassManager();
+            for (int i = 0; i < 10; i++)
+            {
+                passManager.RunFunctionPassManager(uniLlvmLifter.llvmFunction);
+            }
+
+            passManager.FinalizeFunctionPassManager();
+
+            uniLlvmLifter.Module.PrintToFile(@"liftedUnicornOptimized.ll");
+            Console.WriteLine("Done...");
+            Debugger.Break();
+        }
+
+        var unicornRax = unicornEmulator.GetRegister(register_e.ID_REG_X86_RAX);
+
+        if (symbolicRip == 0x14004485a)
+        {
+            var mem = unicornEmulator.ReadMemory<ulong>(0x10001FFE0);
+            Console.WriteLine($"unicorn rax: 0x{unicornRax.ToString("X")}");
+            Console.WriteLine($"unicorn mem: 0x{mem.ToString("X")}");
+            Debugger.Break();
+        }
+
+        var symbolicCf = symbolicEmulator.GetRegister(register_e.ID_REG_X86_CF);
+        var unicornCf = unicornEmulator.GetRegister(register_e.ID_REG_X86_CF);
+
+        if (symbolicRip == 0x140015410)
+        {
+            var symbolicEsi = symbolicEmulator.GetRegister(register_e.ID_REG_X86_ESI);
+            var unicornEsi = unicornEmulator.GetRegister(register_e.ID_REG_X86_ESI);
+
+            Debugger.Break();
+        }
+
         var symbolicRsp = symbolicEmulator.GetRegister(register_e.ID_REG_X86_RSP);
         var unicornRsp = unicornEmulator.GetRegister(register_e.ID_REG_X86_RSP);
+
+        var symbolicRax = symbolicEmulator.GetRegister(register_e.ID_REG_X86_RAX);
 
         //var symbolicRflags = symbolicEmulator.GetRegister(register_e.ID_REG_X86_EFLAGS);
         var unicornRflags = unicornEmulator.GetRegister(register_e.ID_REG_X86_EFLAGS);
 
         Console.WriteLine($"Symbolic rip: 0x{symbolicRip.ToString("X")}");
         Console.WriteLine($"Unicorn rip: 0x{unicornRip.ToString("X")}");
-        Console.WriteLine($"Unicorn rip: 0x{unicornRip.ToString("X")}");
+
+        Console.WriteLine($"Symbolic rax: 0x{symbolicRax.ToString("X")}");
+        Console.WriteLine($"Unicorn rax: 0x{unicornRax.ToString("X")}");
+
         Console.WriteLine($"Symbolic rsp: 0x{symbolicRsp.ToString("X")}");
         Console.WriteLine($"Unicorn rsp: 0x{unicornRsp.ToString("X")}");
         // Console.WriteLine($"Symbolic rflags: 0x{symbolicRflags.ToString("X")}");
@@ -232,13 +390,80 @@ if (emulate)
             Debugger.Break();
         }
 
+
+        var symbolicZf = symbolicEmulator.GetRegister(register_e.ID_REG_X86_ZF);
+        var unicornZf = unicornEmulator.GetRegister(register_e.ID_REG_X86_ZF);
+        if (symbolicZf != unicornZf)
+        {
+            Console.WriteLine("ZFs don't match.");
+            Debugger.Break();
+        }
+
+        if (symbolicCf != unicornCf)
+        {
+            Console.WriteLine("CFs don't match.");
+            Debugger.Break();
+        }
+
+        var symbolicR12 = symbolicEmulator.GetRegister(register_e.ID_REG_X86_R12B);
+        var unicornR12 = unicornEmulator.GetRegister(register_e.ID_REG_X86_R12B);
+
+        var symbolicR11 = symbolicEmulator.GetRegister(register_e.ID_REG_X86_R11);
+        var unicornR11 = unicornEmulator.GetRegister(register_e.ID_REG_X86_R11);
+        if (symbolicR12 != unicornR12)
+        {
+            Console.WriteLine("R12Bs don't match.");
+            Debugger.Break();
+        }
+
         var symbolicAf = symbolicEmulator.GetRegister(register_e.ID_REG_X86_AF);
         var unicornAf = unicornEmulator.GetRegister(register_e.ID_REG_X86_AF);
         var unicornFlags = unicornEmulator.Emulator.Registers.EFLAGS;
+
+        if (symbolicRip != unicornRip)
+        {
+            Debugger.Break();
+        }
+
         if (symbolicAf != unicornAf)
         {
             Console.WriteLine("AFs don't match");
             Debugger.Break();
+        }
+
+        if (unicornRip != symbolicRip)
+        {
+            Console.WriteLine("RIPs don't match.");
+            Debugger.Break();
+        }
+
+
+        var symbolicR14 = symbolicEmulator.GetRegister(register_e.ID_REG_X86_R14);
+        var unicornR14 = unicornEmulator.GetRegister(register_e.ID_REG_X86_R14);
+        foreach (var register in X86Registers.RegisterMapping.Values)
+        {
+            var parent = register.ParentId;
+            if (parent == register_e.ID_REG_X86_RIP || parent == register_e.ID_REG_X86_RCX
+                || parent == register_e.ID_REG_X86_RDX || parent == register_e.ID_REG_INVALID
+                || parent == register_e.ID_REG_X86_MXCSR)
+                continue;
+
+            // Ignore eflags since we don't treat eflags in the same manner as unicorn engine.
+            if (register.Id == register_e.ID_REG_X86_EFLAGS)
+                continue;
+
+            if (X86Registers.RegisterMapping[parent].BitSize != 64)
+                continue;
+
+            //Console.WriteLine($"Setting register: {register.Id}");
+            var symReg = symbolicEmulator.GetRegister(register.Id);
+            var uReg = unicornEmulator.GetRegister(register.Id);
+            if (symReg != uReg)
+            {
+                Console.WriteLine($"Unicorn value: 0x{uReg.ToString("X")}\n Sym value: {symReg.ToString("X")}");
+                Console.WriteLine($"Unicorn and symbolic values don't match for reg {register.Id}");
+                Debugger.Break();
+            }
         }
 
         foreach (var unicornMemAddr in unicornMemoryWrites)
@@ -246,17 +471,39 @@ if (emulate)
             var symbolicMemValue = symbolicEmulator.ReadMemory(unicornMemAddr.Key, 1)[0];
             if (symbolicMemValue != unicornMemAddr.Value)
             {
-                throw new InvalidOperationException("Unicorn memory mapping does not match.");
+                //throw new InvalidOperationException("Unicorn memory mapping does not match.");
+                Console.WriteLine("Written symbolic memory does not match.");
+                Debugger.Break();
             }
         }
 
-        if (symbolicRip != unicornRip)
+        foreach (var unicornMemAddr in unicornMemoryReads)
         {
-            Debugger.Break();
+            var symbolicMemValue = symbolicEmulator.ReadMemory(unicornMemAddr.Key, 1)[0];
+            if (symbolicMemValue != unicornMemAddr.Value && !unicornMemoryWrites.ContainsKey(unicornMemAddr.Key))
+            {
+                //throw new InvalidOperationException("Unicorn memory mapping does not match.");
+                Console.WriteLine("Read symbolic memory does not match.");
+                Debugger.Break();
+            }
         }
 
         unicornMemoryWrites.Clear();
+        unicornMemoryReads.Clear();
         symbolicEmulator.ExecuteNext();
+
+
+
+        symbolicAf = symbolicEmulator.GetRegister(register_e.ID_REG_X86_AF);
+        unicornAf = unicornEmulator.GetRegister(register_e.ID_REG_X86_AF);
+        unicornFlags = unicornEmulator.Emulator.Registers.EFLAGS;
+        if (symbolicAf != unicornAf)
+        {
+            Console.WriteLine("AFs don't match");
+            // Debugger.Break();
+        }
+
+        Console.WriteLine("");
     });
 
     // Execute the function.
@@ -275,28 +522,28 @@ llvmLifter.Module.PrintToFile(@"lifted.ll");
 bool optimize = true;
 if (optimize)
 {
-    var passManager = llvmLifter.Module.CreateFunctionPassManager();
-    passManager.AddBasicAliasAnalysisPass();
-    passManager.AddTypeBasedAliasAnalysisPass();
-    passManager.AddScopedNoAliasAAPass();
-    passManager.AddLowerExpectIntrinsicPass();
-    passManager.AddCFGSimplificationPass();
-    passManager.AddPromoteMemoryToRegisterPass();
-    passManager.AddEarlyCSEPass();
-    passManager.AddDCEPass();
-    passManager.AddAggressiveDCEPass();
-    passManager.AddDeadStoreEliminationPass();
-    passManager.AddInstructionCombiningPass();
-    passManager.AddCFGSimplificationPass();
-    passManager.AddDeadStoreEliminationPass();
-    passManager.AddAggressiveDCEPass();
-    passManager.InitializeFunctionPassManager();
+    var passManager2 = llvmLifter.Module.CreateFunctionPassManager();
+    passManager2.AddBasicAliasAnalysisPass();
+    passManager2.AddTypeBasedAliasAnalysisPass();
+    passManager2.AddScopedNoAliasAAPass();
+    passManager2.AddLowerExpectIntrinsicPass();
+    passManager2.AddCFGSimplificationPass();
+    passManager2.AddPromoteMemoryToRegisterPass();
+    passManager2.AddEarlyCSEPass();
+    passManager2.AddDCEPass();
+    passManager2.AddAggressiveDCEPass();
+    passManager2.AddDeadStoreEliminationPass();
+    passManager2.AddInstructionCombiningPass();
+    passManager2.AddCFGSimplificationPass();
+    passManager2.AddDeadStoreEliminationPass();
+    passManager2.AddAggressiveDCEPass();
+    passManager2.InitializeFunctionPassManager();
     for (int i = 0; i < 10; i++)
     {
-        passManager.RunFunctionPassManager(llvmLifter.llvmFunction);
+        passManager2.RunFunctionPassManager(llvmLifter.llvmFunction);
     }
 
-    passManager.FinalizeFunctionPassManager();
+    passManager2.FinalizeFunctionPassManager();
 }
 
 

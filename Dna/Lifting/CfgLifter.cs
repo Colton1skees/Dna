@@ -31,7 +31,7 @@ namespace Dna.Lifting
         {
             this.architecture = architecture;
             translator = new X86Translator(architecture);
-            astConverter = new AstToIntermediateConverter();
+            astConverter = new AstToIntermediateConverter(architecture);
         }
 
         public ControlFlowGraph<AbstractInst> LiftCfg(ControlFlowGraph<Iced.Intel.Instruction> inGraph)
@@ -94,8 +94,11 @@ namespace Dna.Lifting
 
             // Discard all redundant temporaries.
             var sw = Stopwatch.StartNew();
-            IOptimizationPass pass = new BlockTemporaryPropagationPass(liftedInstructions);
-            pass.Run();
+            for (int i = 0; i < 3; i++)
+            {
+                IOptimizationPass pass = new BlockTemporaryPropagationPass(liftedInstructions);
+                pass.Run();
+            }
 
             /*
             pass = new BlockDeadcodeElimination(architecture, liftedInstructions);

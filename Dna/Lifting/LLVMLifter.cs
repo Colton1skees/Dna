@@ -240,7 +240,7 @@ namespace Dna.Lifting
                 foreach (var register in liftedLocalRegisters.Keys)
                 {
                     var rootParent = architecture.GetRootParentRegister(register);
-                    if (rootParent.Id != register_e.ID_REG_X86_RIP)
+                    if (rootParent.Id != register_e.ID_REG_X86_RAX)
                         continue;
                     // Get a triton register operand.
                     var regOperand = architecture.GetRegister(register);

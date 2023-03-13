@@ -7,7 +7,7 @@ using TritonTranslator.Arch;
 
 namespace Dna.Emulation
 {
-    public delegate void dgOnMemoryRead(ulong address, int size);
+    public delegate void dgOnMemoryRead(ulong address, int size, ulong value);
 
     public delegate void dgOnMemoryWrite(ulong address, int size, ulong value);
 
@@ -34,12 +34,7 @@ namespace Dna.Emulation
         /// <summary>
         /// Reads memory contents at the provided address.
         /// </summary>
-        public T ReadMemory<T>(ulong addr)
-        {
-            var size = MarshalType<T>.Size;
-            var buffer = ReadMemory(addr, size);
-            return MarshalType<T>.ByteArrayToObject(buffer);
-        }
+        public T ReadMemory<T>(ulong addr);
 
         /// <summary>
         /// Reads memory contents at the provided address.
@@ -49,11 +44,7 @@ namespace Dna.Emulation
         /// <summary>
         /// Writes memory contents at the provided address.
         /// </summary>
-        public void WriteMemory<T>(ulong addr, T value)
-        {
-            var buffer = MarshalType<T>.ObjectToByteArray(value);
-            WriteMemory(addr, buffer);
-        }
+        public void WriteMemory<T>(ulong addr, T value);
 
         /// <summary>
         /// Writes memory contents at the provided address.
