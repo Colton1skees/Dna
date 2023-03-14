@@ -85,7 +85,6 @@ var architecture = new X86CpuArchitecture(ArchitectureId.ARCH_X86_64);
 // Instantiate a class for lifting control flow graphs to our intermediate language.
 var cfgLifter = new CfgLifter(architecture);
 
-
 var inst = architecture.Disassembly(dna.BinaryDisassembler.GetInstructionAt(0x140015410));
 
 var translator = new X86Translator(architecture);
@@ -94,6 +93,8 @@ var astConverter = new AstToIntermediateConverter(architecture);
 var translated = translator.TranslateInstruction(inst);
 var flatInstructions = translated.SelectMany(x => astConverter.ConvertFromSymbolicExpression(x));
 
+
+
 foreach (var flatInst in flatInstructions)
 {
     Console.WriteLine(flatInst);
@@ -101,7 +102,6 @@ foreach (var flatInst in flatInstructions)
 
 // Lift the control flow graph to TTIR.
 var liftedCfg = cfgLifter.LiftCfg(cfg);
-// ControlFlowGraph<AbstractInst> liftedCfg = null;
 
 for (int i = 0; i < 3; i++)
     Console.WriteLine("");
@@ -133,7 +133,7 @@ if (writeDotGraph)
 
 List<Iced.Intel.Instruction> icedInstructions = new();
 
-bool emulate = true;
+bool emulate = false;
 if (emulate)
 {
     // Load the binary into unicorn engine.
@@ -283,7 +283,16 @@ if (emulate)
         count++;
         var symbolicRip = symbolicEmulator.GetRegister(register_e.ID_REG_X86_RIP);
         var unicornRip = unicornEmulator.GetRegister(register_e.ID_REG_X86_RIP);
+        if (symbolicRip == 0x140015A94)
+            Debugger.Break();
 
+        var symbolicBytes = symbolicEmulator.ReadMemory(unicornRip, 16);
+        var uniBytes = unicornEmulator.ReadMemory(symbolicRip, 16);
+
+        var symbolicDisassembly = dna.BinaryDisassembler.GetInstructionFromBytes(symbolicRip, symbolicBytes);
+        var uniDisassembly = dna.BinaryDisassembler.GetInstructionFromBytes(unicornRip, uniBytes);
+        Console.WriteLine($"Symbolic inst: {symbolicDisassembly}");
+        Console.WriteLine($"Uni inst: {uniDisassembly}");
 
         var disassembled = dna.BinaryDisassembler.GetInstructionAt(symbolicRip);
         icedInstructions.Add(disassembled);
@@ -437,7 +446,6 @@ if (emulate)
             Debugger.Break();
         }
 
-
         var symbolicR14 = symbolicEmulator.GetRegister(register_e.ID_REG_X86_R14);
         var unicornR14 = unicornEmulator.GetRegister(register_e.ID_REG_X86_R14);
         foreach (var register in X86Registers.RegisterMapping.Values)
@@ -458,6 +466,7 @@ if (emulate)
             //Console.WriteLine($"Setting register: {register.Id}");
             var symReg = symbolicEmulator.GetRegister(register.Id);
             var uReg = unicornEmulator.GetRegister(register.Id);
+
             if (symReg != uReg)
             {
                 Console.WriteLine($"Unicorn value: 0x{uReg.ToString("X")}\n Sym value: {symReg.ToString("X")}");
@@ -517,7 +526,7 @@ if (emulate)
 // Lift the control flow graph to LLVM IR.
 var llvmLifter = new LLVMLifter(architecture);
 llvmLifter.Lift(liftedCfg);
-llvmLifter.Module.PrintToFile(@"lifted.ll");
+llvmLifter.Module.PrintToFile(@"lifted_cfg.ll");
 
 bool optimize = true;
 if (optimize)
@@ -547,10 +556,10 @@ if (optimize)
 }
 
 
-llvmLifter.Module.PrintToFile(@"optimized.ll");
+llvmLifter.Module.PrintToFile(@"lifted_cfg_optimized.ll");
 
 // Optionally write the llvm IR to the console.
-bool printLLVM = false;
+bool printLLVM = true;
 if (printLLVM)
     llvmLifter.Module.Dump();
 prompt();

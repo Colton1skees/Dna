@@ -92,29 +92,10 @@ namespace Dna.Lifting
                 .SelectMany(x => astConverter.ConvertFromSymbolicExpression(x))
                 .ToList();
 
-            // Discard all redundant temporaries.
-            var sw = Stopwatch.StartNew();
-            for (int i = 0; i < 3; i++)
-            {
-                IOptimizationPass pass = new BlockTemporaryPropagationPass(liftedInstructions);
-                pass.Run();
-            }
-
-            /*
-            pass = new BlockDeadcodeElimination(architecture, liftedInstructions);
-            pass.Run();
-
-            pass = new BlockTemporaryPropagationPass(liftedInstructions);
-            pass.Run();
-            pass = new BlockDeadcodeElimination(architecture, liftedInstructions);
-            pass.Run();
-            */
-
-            Console.WriteLine("Took {0} ms to run optimization pass.", sw.ElapsedMilliseconds);
-
             // Move the lifted instructions into the basic block.
             var liftedBlock = blockMapping[inputBlock];
             liftedBlock.Instructions.AddRange(liftedInstructions);
+
             UpdateBlockExitInstruction(liftedBlock);
         }
 
@@ -125,17 +106,36 @@ namespace Dna.Lifting
         /// <exception cref="Exception"></exception>
         private void UpdateBlockExitInstruction(BasicBlock<AbstractInst> block)
         {
-            var outgoingEdges = block.GetOutgoingEdges();
-            var count = outgoingEdges.Count();
-
-            // Insert a RET if the block has no outgoing edges.
-            if(count == 0)
+            // Collect all outgoing edges.
+            var outgoingEdges = block.GetOutgoingEdges().ToList();
+            if (outgoingEdges.Count == 0)
             {
                 block.Instructions.Add(new InstRet());
+                return;
             }
 
-            else if (count == 1)
+            // Backwards slice the possible values of RIP.
+            // This ensures that the information contained in the control flow graph and lifted IR match up.
+            // It would be a problem if the control flow graph and lifted IR returned two unmatching sets of outgoing destinations.
+            var sw = Stopwatch.StartNew();
+            var backtrackPass = new InstructionPointerBackTracker();
+            var sliceInfo = backtrackPass.BacktrackInstructionPointer(block);
+            sw.Stop();
+            Console.WriteLine($"Took {sw.ElapsedMilliseconds} ms to backwards slice RIP.");
+            var slicedRips = sliceInfo.Item1;
+            var jccCond = sliceInfo.Item2;
+            if (slicedRips.Count != outgoingEdges.Count)
+                throw new InvalidOperationException("Found incorrect number of outgoing branch destinations.");
+            if (!slicedRips.SequenceEqual(outgoingEdges.Select(x => x.TargetBlock.Address)))
+                throw new InvalidOperationException("The control flow graphs and lifted IR are communicating two different sets of outgoing edges.");
+
+            // Insert a RET if the block has no outgoing edges.
+            var ripOperand = new RegisterOperand(X86Registers.Rip);
+            if (outgoingEdges.Count == 1)
             {
+                // Update the basic block such that the last instruction is always guaranteed to update the instruction pointers.
+                block.Instructions.Add(new InstCopy(ripOperand, new ImmediateOperand(slicedRips.Single(), 64)));
+
                 // Since the AST form IR we lift from has no concept of branching,
                 // we attempt to pattern match the "rip = copy immX" assignment and confirm 
                 // that it matches up with our cfg.
@@ -163,8 +163,13 @@ namespace Dna.Lifting
                 block.Instructions.Add(new InstJmp(immDest));
             }
 
-            else if (count == 2)
+            else if (outgoingEdges.Count == 2)
             {
+                // Update the basic block such that the last instruction is always guaranteed to update the instruction pointers.
+                var d1 = new ImmediateOperand(slicedRips[0], 64);
+                var d2 = new ImmediateOperand(slicedRips[1], 64);
+                block.Instructions.Add(new InstSelect(ripOperand, jccCond, d1, d2));
+
                 // Since the AST form IR we lift from has no concept of branching,
                 // we attempt to pattern match the "rip = select cond, i64, i64" assignment and confirm 
                 // that it matches up with our cfg.

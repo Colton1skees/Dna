@@ -206,9 +206,6 @@ namespace Dna.Lifting
                 // Load the register value from it's global variable.
                 var value = builder.BuildLoad2(valueType, liftedRegisterGlobalVariableMapping[registerId]);
 
-                // Finally, store the register value to it's local variable.
-                // This local variable will then be used for all further
-                // local variable accesses.
                 builder.BuildStore(value, alloca);
             }
         }
@@ -240,7 +237,7 @@ namespace Dna.Lifting
                 foreach (var register in liftedLocalRegisters.Keys)
                 {
                     var rootParent = architecture.GetRootParentRegister(register);
-                    if (rootParent.Id != register_e.ID_REG_X86_RAX)
+                    if (rootParent.Id != register_e.ID_REG_X86_RIP)
                         continue;
                     // Get a triton register operand.
                     var regOperand = architecture.GetRegister(register);

@@ -28,6 +28,8 @@ Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Solution Items", "Solution 
 EndProject
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "Dna.LLVMInterop", "Dna.LLVMInterop\Dna.LLVMInterop.vcxproj", "{E6A58095-9B8B-4830-BFEA-2947C4F2681A}"
 EndProject
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "TritonTranslator.Examples", "TritonTranslator\TritonTranslator.Examples\TritonTranslator.Examples.csproj", "{48698C75-4175-417F-B240-867BF49AD07D}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -284,6 +286,30 @@ Global
 		{E6A58095-9B8B-4830-BFEA-2947C4F2681A}.RelWithDebInfo|x64.Build.0 = Release|x64
 		{E6A58095-9B8B-4830-BFEA-2947C4F2681A}.RelWithDebInfo|x86.ActiveCfg = Release|Win32
 		{E6A58095-9B8B-4830-BFEA-2947C4F2681A}.RelWithDebInfo|x86.Build.0 = Release|Win32
+		{48698C75-4175-417F-B240-867BF49AD07D}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{48698C75-4175-417F-B240-867BF49AD07D}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{48698C75-4175-417F-B240-867BF49AD07D}.Debug|x64.ActiveCfg = Debug|x64
+		{48698C75-4175-417F-B240-867BF49AD07D}.Debug|x64.Build.0 = Debug|x64
+		{48698C75-4175-417F-B240-867BF49AD07D}.Debug|x86.ActiveCfg = Debug|Any CPU
+		{48698C75-4175-417F-B240-867BF49AD07D}.Debug|x86.Build.0 = Debug|Any CPU
+		{48698C75-4175-417F-B240-867BF49AD07D}.MinSizeRel|Any CPU.ActiveCfg = Debug|Any CPU
+		{48698C75-4175-417F-B240-867BF49AD07D}.MinSizeRel|Any CPU.Build.0 = Debug|Any CPU
+		{48698C75-4175-417F-B240-867BF49AD07D}.MinSizeRel|x64.ActiveCfg = Debug|Any CPU
+		{48698C75-4175-417F-B240-867BF49AD07D}.MinSizeRel|x64.Build.0 = Debug|Any CPU
+		{48698C75-4175-417F-B240-867BF49AD07D}.MinSizeRel|x86.ActiveCfg = Debug|Any CPU
+		{48698C75-4175-417F-B240-867BF49AD07D}.MinSizeRel|x86.Build.0 = Debug|Any CPU
+		{48698C75-4175-417F-B240-867BF49AD07D}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{48698C75-4175-417F-B240-867BF49AD07D}.Release|Any CPU.Build.0 = Release|Any CPU
+		{48698C75-4175-417F-B240-867BF49AD07D}.Release|x64.ActiveCfg = Release|Any CPU
+		{48698C75-4175-417F-B240-867BF49AD07D}.Release|x64.Build.0 = Release|Any CPU
+		{48698C75-4175-417F-B240-867BF49AD07D}.Release|x86.ActiveCfg = Release|Any CPU
+		{48698C75-4175-417F-B240-867BF49AD07D}.Release|x86.Build.0 = Release|Any CPU
+		{48698C75-4175-417F-B240-867BF49AD07D}.RelWithDebInfo|Any CPU.ActiveCfg = Release|Any CPU
+		{48698C75-4175-417F-B240-867BF49AD07D}.RelWithDebInfo|Any CPU.Build.0 = Release|Any CPU
+		{48698C75-4175-417F-B240-867BF49AD07D}.RelWithDebInfo|x64.ActiveCfg = Release|Any CPU
+		{48698C75-4175-417F-B240-867BF49AD07D}.RelWithDebInfo|x64.Build.0 = Release|Any CPU
+		{48698C75-4175-417F-B240-867BF49AD07D}.RelWithDebInfo|x86.ActiveCfg = Release|Any CPU
+		{48698C75-4175-417F-B240-867BF49AD07D}.RelWithDebInfo|x86.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
