@@ -28,6 +28,8 @@ using Dna.Emulation.Symbolic;
 using TritonTranslator.Intermediate;
 using System;
 using TritonTranslator.Conversion;
+using LLVMSharp.Interop;
+using Dna.Decompiler.Rellic;
 // Load the 64 bit PE file.
 // Note: This file is automatically copied to the build directory.
 var path = @"C:\Users\colton\source\repos\ObfuscationTester\x64\Release\ObfuscationTester.themida.exe";
@@ -558,10 +560,40 @@ if (optimize)
 
 llvmLifter.Module.PrintToFile(@"lifted_cfg_optimized.ll");
 
+var ctx = LLVMContextRef.Create();
+var memBuffer = LlvmUtilities.CreateMemoryBuffer(@"C:\Users\colton\source\repos\Dna\Dna.Example\bin\x64\Debug\net7.0\liftedUnicornOptimized.ll");
+ctx.TryParseIR(memBuffer, out LLVMModuleRef unicornTraceModule, out string unicornLoadMsg);
+
 // Optionally write the llvm IR to the console.
 bool printLLVM = true;
 if (printLLVM)
-    llvmLifter.Module.Dump();
+    unicornTraceModule.Dump();
+
+var llvmFunc = unicornTraceModule.FirstFunction;
+var blk = llvmFunc.FirstBasicBlock;
+
+var llvmToIr = new LLVMInstToIR(unicornTraceModule, architecture);
+var nextInst = blk.FirstInstruction;
+while (true)
+{
+    if (nextInst == null)
+        break;
+    llvmToIr.LowerInstruction(nextInst);
+    nextInst = nextInst.NextInstruction;
+}
+
+
+Console.WriteLine("Finished translation to llvm IR.");
+var themidaCfg = new ControlFlowGraph<AbstractInst>(0x14000123C);
+var themidaBlock = themidaCfg.CreateBlock(0x14000123C);
+themidaBlock.Instructions.AddRange(llvmToIr.Output);
+
+Console.WriteLine($"Lifted cfg: {GraphFormatter.FormatGraph(themidaCfg)}");
+Console.WriteLine("Foobar.");
+
+/*
+var llvmLifterModule = llvmLifter.Module;
+
 
 var llvmFunc = llvmLifter.llvmFunction;
 var blk = llvmFunc.FirstBasicBlock;
@@ -573,7 +605,7 @@ while (true)
     llvmToIr.LowerInstruction(nextInst);
     nextInst = nextInst.NextInstruction;
 }
-
+*/
 
 prompt();
 

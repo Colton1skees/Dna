@@ -2,6 +2,7 @@
 using LLVMSharp.Interop;
 using System;
 using System.Collections.Generic;
+using System.IO;
 using System.Linq;
 using System.Runtime.InteropServices;
 using System.Text;
@@ -34,6 +35,23 @@ namespace Dna.Decompiler.Rellic
         public static string SerialzeModuleToString(LLVMModuleRef module)
         {
             return module.PrintToString();
+        }
+
+        public static unsafe LLVMMemoryBufferRef CreateMemoryBuffer(string filePath)
+        {
+            LLVMMemoryBufferRef handle;
+            sbyte* msg;
+            if (LLVM.CreateMemoryBufferWithContentsOfFile(new MarshaledString(filePath), (LLVMOpaqueMemoryBuffer**)&handle, &msg) == 0)
+            {
+ 
+            }
+
+            return handle;
+        }
+
+        public static bool TryParseBitcode(this LLVMContextRef context, LLVMMemoryBufferRef memBuf, out LLVMModuleRef outModule, out string outMessage)
+        {
+            return context.TryParseIR(memBuf, out outModule, out outMessage);
         }
     }
 }
