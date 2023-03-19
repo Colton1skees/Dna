@@ -562,6 +562,19 @@ llvmLifter.Module.PrintToFile(@"lifted_cfg_optimized.ll");
 bool printLLVM = true;
 if (printLLVM)
     llvmLifter.Module.Dump();
+
+var llvmFunc = llvmLifter.llvmFunction;
+var blk = llvmFunc.FirstBasicBlock;
+
+var llvmToIr = new LLVMInstToIR(llvmLifter.Module, architecture);
+var nextInst = blk.FirstInstruction;
+while (true)
+{
+    llvmToIr.LowerInstruction(nextInst);
+    nextInst = nextInst.NextInstruction;
+}
+
+
 prompt();
 
 // Optionally decompile the lifted function to go-to free pseudo C, via Rellic.

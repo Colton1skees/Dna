@@ -4,11 +4,20 @@
     <ClInclude Include="Passes\ControlledNodeSplittingPass.h">
       <Filter>Passes</Filter>
     </ClInclude>
+    <ClInclude Include="Symex\ICpuEmulatorState.h">
+      <Filter>Symex</Filter>
+    </ClInclude>
+    <ClInclude Include="Symex\LLVMSymbolicExecutor.h">
+      <Filter>Symex</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="dllmain.cpp" />
     <ClCompile Include="Passes\ControlledNodeSplittingPass.cpp">
       <Filter>Passes</Filter>
+    </ClCompile>
+    <ClCompile Include="Symex\LLVMSymbolicExecutor.cpp">
+      <Filter>Symex</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
@@ -17,6 +26,9 @@
     </Filter>
     <Filter Include="API">
       <UniqueIdentifier>{ce61e1b2-6444-4d20-b2ac-8d89cdc72726}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Symex">
+      <UniqueIdentifier>{825034fb-6466-4cb8-87df-bdf51b1d497e}</UniqueIdentifier>
     </Filter>
   </ItemGroup>
   <ItemGroup>

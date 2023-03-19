@@ -156,10 +156,13 @@
   </ItemDefinitionGroup>
   <ItemGroup>
     <ClInclude Include="Passes\ControlledNodeSplittingPass.h" />
+    <ClInclude Include="Symex\ICpuEmulatorState.h" />
+    <ClInclude Include="Symex\LLVMSymbolicExecutor.h" />
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="dllmain.cpp" />
     <ClCompile Include="Passes\ControlledNodeSplittingPass.cpp" />
+    <ClCompile Include="Symex\LLVMSymbolicExecutor.cpp" />
   </ItemGroup>
   <ItemGroup>
     <None Include="..\llvm-15.0.3-win64\bin\LLVM-C.dll">
