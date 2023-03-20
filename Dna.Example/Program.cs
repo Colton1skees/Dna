@@ -563,7 +563,7 @@ if (optimize)
 llvmLifter.Module.PrintToFile(@"lifted_cfg_optimized.ll");
 
 var ctx = LLVMContextRef.Create();
-var memBuffer = LlvmUtilities.CreateMemoryBuffer(@"C:\Users\colton\source\repos\Dna\Dna.Example\bin\x64\Debug\net7.0\liftedUnicornOptimized.ll");
+var memBuffer = LlvmUtilities.CreateMemoryBuffer(@"C:\Users\colton\source\repos\Dna\Dna.Example\bin\x64\Debug\net7.0\unicorn_alias_analysis.ll");
 ctx.TryParseIR(memBuffer, out LLVMModuleRef unicornTraceModule, out string unicornLoadMsg);
 
 // Optionally write the llvm IR to the console.
@@ -571,9 +571,9 @@ bool printLLVM = false;
 if (printLLVM)
     unicornTraceModule.Dump();
 
-for (int i = 0; i < 100; i++)
+for (int i = 0; i < 0; i++)
 {
-    LLVMInteropApi.Test(unicornTraceModule);
+   // LLVMInteropApi.Test(unicornTraceModule);
 }
 
 Debugger.Break();
@@ -581,7 +581,7 @@ Debugger.Break();
 Console.WriteLine("Done.");
 //unicornTraceModule.Dump();
 
-unicornTraceModule.PrintToFile(@"unicorn_alias_analysis.ll");
+//unicornTraceModule.PrintToFile(@"unicorn_alias_analysis.ll");
 Debugger.Break();
 
 
@@ -605,7 +605,7 @@ var themidaBlock = themidaCfg.CreateBlock(0x14000123C);
 themidaBlock.Instructions.AddRange(llvmToIr.Output);
 
 
-BlockSsaConstructor.ConstructSsa(themidaBlock);
+//BlockSsaConstructor.ConstructSsa(themidaBlock);
 
 Console.WriteLine($"Lifted cfg: {GraphFormatter.FormatGraph(themidaCfg)}");
 Console.WriteLine("Foobar.");

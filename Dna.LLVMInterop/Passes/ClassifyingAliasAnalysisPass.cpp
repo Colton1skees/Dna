@@ -16,24 +16,16 @@ namespace Dna::Passes {
 
 	bool ClassifyingAAResult::invalidate(llvm::Function& F, const llvm::PreservedAnalyses& PA, llvm::FunctionAnalysisManager::Invalidator& Inv)
 	{
-		printf("invalidating.");
 		return false;
 	}
 
 	llvm::AliasResult ClassifyingAAResult::alias(const llvm::MemoryLocation& locA, const llvm::MemoryLocation& locB, llvm::AAQueryInfo& AAQI)
 	{
 		std::set<const llvm::Value*> visited;
-
-		// printf("executing aliasing information.");
-
 		auto aTy = getPointerType(locA.Ptr, visited);
-
 		auto bTy = getPointerType(locB.Ptr, visited);
 		if ((aTy != PointerType::PtrTyUnk) && (bTy != PointerType::PtrTyUnk) && (aTy != bTy))
-		{
-			//printf("found noalias.");
 			return llvm::AliasResult::NoAlias;
-		}
 
 		// If we cannot prove that the two memory locations are [NoAlias], then we fallback to the default alias analysis.
 		return AAResultBase::alias(locA, locB, AAQI);
@@ -42,16 +34,9 @@ namespace Dna::Passes {
 	PointerType ClassifyingAAResult::getPointerType(const llvm::Value* V, std::set<const llvm::Value*>& visited) const
 	{
 		if (isLocalStackAccess(V))
-		{
-			//printf("found stack access.");
 			return PointerType::PtrTyLocalStack;
-		}
-
-		else if (isBinarySectionAccess(V))
-		{
-			//printf("found binary access.");
+		if (isBinarySectionAccess(V))
 			return PointerType::PtrTyBinarySection;
-		}
 
 		return PointerType::PtrTyUnk;
 	}
@@ -64,29 +49,19 @@ namespace Dna::Passes {
 		if (!success)
 			return false;
 
-		//printf("is local stack access chain: \n");
-
 		for (auto value : chain)
 		{
-			//printf("chain item: ");
-			//value->dump();
 			if (value == gpCtx.rspPtr)
 			{
-				//printf("end of chain found stack access. \n");
 				return true;
 			}
 		}
 
-		//printf("end of chain. didnt find anything. \n");
 		return false;
 	}
 
 	bool ClassifyingAAResult::isBinarySectionAccess(const llvm::Value* V) const
 	{
-		if (false)
-		{
-			printf("foo");
-		}
 		// Compute a chain of elements, and return false if we encounter an unsupported element.
 		std::vector<const llvm::Value*> chain;
 		auto success = GetOperatorChain(V, &chain);
@@ -95,21 +70,13 @@ namespace Dna::Passes {
 
 		for (auto value : chain)
 		{
-			//printf("chain item: ");
-			//value->dump();
 			if (const auto* constInt = llvm::dyn_cast<llvm::ConstantInt>(value))
 			{
 				auto intValue = constInt->getValue().getZExtValue();
-				//printf("%llu", intValue);
 				if (intValue >= 0x140009000 && intValue <= 0x14006C460)
-				{
-					//printf("FOUND CONSTANT ACCESS!!!.");
 					return true;
-				}
 			}
 		}
-
-		//printf("end of chain failed to find stack access. \n");
 
 		return false;
 	}
@@ -130,7 +97,6 @@ namespace Dna::Passes {
 
 		else if (const auto* binop = llvm::dyn_cast<llvm::BinaryOperator>(V))
 		{
-			//V->dump();
 			chain->push_back(binop);
 			bool supportsOp0 = GetOperatorChain(binop->getOperand(0), chain);
 			bool supportsOp1 = GetOperatorChain(binop->getOperand(1), chain);
@@ -172,9 +138,6 @@ namespace Dna::Passes {
 
 	bool SegmentsAAWrapperPass::doInitialization(llvm::Module& M) {
 		GlobalPointerContext GP{
-		//  . = M.getGlobalVariable("RAM"),
-		//  .GS = M.getGlobalVariable("GS"),
-		//  .FS = M.getGlobalVariable("FS")
 			.rspPtr = M.getGlobalVariable("rsp")
 		};
 		mResult.reset(new ClassifyingAAResult(GP));
