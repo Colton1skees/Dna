@@ -10,6 +10,15 @@
     <ClInclude Include="Symex\LLVMSymbolicExecutor.h">
       <Filter>Symex</Filter>
     </ClInclude>
+    <ClInclude Include="Passes\ClassifyingAliasAnalysisPass.h">
+      <Filter>Passes</Filter>
+    </ClInclude>
+    <ClInclude Include="Arch\X86\X86Registers.h">
+      <Filter>Arch\X86</Filter>
+    </ClInclude>
+    <ClInclude Include="ExportedApi.h">
+      <Filter>API</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="dllmain.cpp" />
@@ -18,6 +27,9 @@
     </ClCompile>
     <ClCompile Include="Symex\LLVMSymbolicExecutor.cpp">
       <Filter>Symex</Filter>
+    </ClCompile>
+    <ClCompile Include="Passes\ClassifyingAliasAnalysisPass.cpp">
+      <Filter>Passes</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
@@ -29,6 +41,12 @@
     </Filter>
     <Filter Include="Symex">
       <UniqueIdentifier>{825034fb-6466-4cb8-87df-bdf51b1d497e}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Arch">
+      <UniqueIdentifier>{878f1eec-e2ff-48bd-879f-d7e629bce6e0}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Arch\X86">
+      <UniqueIdentifier>{09c71ae9-f396-44b3-ad96-cc53ada21c2d}</UniqueIdentifier>
     </Filter>
   </ItemGroup>
   <ItemGroup>

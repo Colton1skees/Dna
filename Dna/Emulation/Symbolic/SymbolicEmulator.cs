@@ -26,7 +26,7 @@ namespace Dna.Emulation.Symbolic
 
         private readonly AstToIntermediateConverter astConverter;
 
-        private readonly SymbolicExecutionEngine engine;
+        public readonly SymbolicExecutionEngine engine;
 
         private dgOnMemoryRead memReadCallback;
 

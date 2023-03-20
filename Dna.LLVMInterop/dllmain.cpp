@@ -6,4 +6,6 @@
 #include <llvm/Transforms/Scalar.h>
 #include "llvm/Transforms/Scalar/SimpleLoopUnswitch.h"
 #include "llvm/Transforms/Utils/LowerSwitch.h"
+#include <ExportedApi.h>
+#include "Passes/ClassifyingAliasAnalysisPass.h"
 #include <Windows.h>

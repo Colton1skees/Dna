@@ -30,6 +30,7 @@ using System;
 using TritonTranslator.Conversion;
 using LLVMSharp.Interop;
 using Dna.Decompiler.Rellic;
+using Dna.LLVMInterop;
 // Load the 64 bit PE file.
 // Note: This file is automatically copied to the build directory.
 var path = @"C:\Users\colton\source\repos\ObfuscationTester\x64\Release\ObfuscationTester.themida.exe";
@@ -139,91 +140,91 @@ bool emulate = false;
 if (emulate)
 {
     // Load the binary into unicorn engine.
-    var unicornEmulator = new UnicornEmulator(architecture);
-    var symbolicEmulator = new SymbolicEmulator(architecture);
+    var unicornEmulator2 = new UnicornEmulator(architecture);
+    var symbolicEmulator2 = new SymbolicEmulator(architecture);
 
-    BinaryMapper.MapPEFile(unicornEmulator, binary);
-    BinaryMapper.MapPEFile(symbolicEmulator, binary);
+    BinaryMapper.MapPEFile(unicornEmulator2, binary);
+    BinaryMapper.MapPEFile(symbolicEmulator2, binary);
 
     // Setup the stack.
     ulong rsp = 0x100000000;
-    unicornEmulator.MapMemory(rsp, 0x1000 * 1200);
-    symbolicEmulator.MapMemory(rsp, 0x1000 * 1200);
+    unicornEmulator2.MapMemory(rsp, 0x1000 * 1200);
+    symbolicEmulator2.MapMemory(rsp, 0x1000 * 1200);
     rsp += 0x20000;
 
     // Setup the segment registers.g
-    unicornEmulator.MapMemory(0, 0x1000 * 1000);
-    symbolicEmulator.MapMemory(0, 0x1000 * 1000);
+    unicornEmulator2.MapMemory(0, 0x1000 * 1000);
+    symbolicEmulator2.MapMemory(0, 0x1000 * 1000);
 
     for (ulong i = 0; i < 32; i++)
     {
         ulong baseAddr = 0x14006C45D;
-        unicornEmulator.WriteMemory(baseAddr + i, new byte[] { 0x90 });
-        symbolicEmulator.WriteMemory(baseAddr + i, new byte[] { 0x90 });
+        unicornEmulator2.WriteMemory(baseAddr + i, new byte[] { 0x90 });
+        symbolicEmulator2.WriteMemory(baseAddr + i, new byte[] { 0x90 });
     }
 
     for (ulong i = 0; i < 0x1000; i++)
     {
         ulong baseAddr = 0;
-        unicornEmulator.WriteMemory(baseAddr + i, new byte[] { 0x0 });
-        symbolicEmulator.WriteMemory(baseAddr + i, new byte[] { 0x0 });
+        unicornEmulator2.WriteMemory(baseAddr + i, new byte[] { 0x0 });
+        symbolicEmulator2.WriteMemory(baseAddr + i, new byte[] { 0x0 });
     }
 
-    unicornEmulator.SetRegister(register_e.ID_REG_X86_RSP, rsp);
-    unicornEmulator.SetRegister(register_e.ID_REG_X86_RBP, rsp);
-    unicornEmulator.SetRegister(register_e.ID_REG_X86_RIP, 0x140001299);
-    symbolicEmulator.SetRegister(register_e.ID_REG_X86_RSP, rsp);
-    symbolicEmulator.SetRegister(register_e.ID_REG_X86_RBP, rsp);
+    unicornEmulator2.SetRegister(register_e.ID_REG_X86_RSP, rsp);
+    unicornEmulator2.SetRegister(register_e.ID_REG_X86_RBP, rsp);
+    unicornEmulator2.SetRegister(register_e.ID_REG_X86_RIP, 0x140001299);
+    symbolicEmulator2.SetRegister(register_e.ID_REG_X86_RSP, rsp);
+    symbolicEmulator2.SetRegister(register_e.ID_REG_X86_RBP, rsp);
 
     // Update low parts of rbp.
     var casted = (uint)rsp;
     var casted2 = (ushort)rsp;
-    symbolicEmulator.SetRegister(register_e.ID_REG_X86_RBP, rsp);
-    symbolicEmulator.SetRegister(register_e.ID_REG_X86_EBP, casted);
-    symbolicEmulator.SetRegister(register_e.ID_REG_X86_BP, casted2);
-    symbolicEmulator.SetRegister(register_e.ID_REG_X86_BPL, (byte)casted);
+    symbolicEmulator2.SetRegister(register_e.ID_REG_X86_RBP, rsp);
+    symbolicEmulator2.SetRegister(register_e.ID_REG_X86_EBP, casted);
+    symbolicEmulator2.SetRegister(register_e.ID_REG_X86_BP, casted2);
+    symbolicEmulator2.SetRegister(register_e.ID_REG_X86_BPL, (byte)casted);
 
     // Update low parts of RSP.
-    symbolicEmulator.SetRegister(register_e.ID_REG_X86_ESP, casted);
-    symbolicEmulator.SetRegister(register_e.ID_REG_X86_SP, casted2);
-    symbolicEmulator.SetRegister(register_e.ID_REG_X86_SPL, (byte)casted);
+    symbolicEmulator2.SetRegister(register_e.ID_REG_X86_ESP, casted);
+    symbolicEmulator2.SetRegister(register_e.ID_REG_X86_SP, casted2);
+    symbolicEmulator2.SetRegister(register_e.ID_REG_X86_SPL, (byte)casted);
 
 
-    symbolicEmulator.SetRegister(register_e.ID_REG_X86_RIP, 0x140001299);
+    symbolicEmulator2.SetRegister(register_e.ID_REG_X86_RIP, 0x140001299);
 
-    unicornEmulator.SetRegister(register_e.ID_REG_X86_CF, 0);
-    symbolicEmulator.SetRegister(register_e.ID_REG_X86_CF, 0);
-    unicornEmulator.SetRegister(register_e.ID_REG_X86_PF, 0);
-    symbolicEmulator.SetRegister(register_e.ID_REG_X86_PF, 0);
-    unicornEmulator.SetRegister(register_e.ID_REG_X86_AF, 0);
-    symbolicEmulator.SetRegister(register_e.ID_REG_X86_AF, 0);
-    unicornEmulator.SetRegister(register_e.ID_REG_X86_ZF, 0);
-    symbolicEmulator.SetRegister(register_e.ID_REG_X86_ZF, 0);
-    unicornEmulator.SetRegister(register_e.ID_REG_X86_SF, 0);
-    symbolicEmulator.SetRegister(register_e.ID_REG_X86_SF, 0);
-    unicornEmulator.SetRegister(register_e.ID_REG_X86_TF, 0);
-    symbolicEmulator.SetRegister(register_e.ID_REG_X86_TF, 0);
-    unicornEmulator.SetRegister(register_e.ID_REG_X86_IF, 0);
-    symbolicEmulator.SetRegister(register_e.ID_REG_X86_IF, 0);
-    unicornEmulator.SetRegister(register_e.ID_REG_X86_DF, 0);
-    symbolicEmulator.SetRegister(register_e.ID_REG_X86_DF, 0);
-    unicornEmulator.SetRegister(register_e.ID_REG_X86_OF, 0);
-    symbolicEmulator.SetRegister(register_e.ID_REG_X86_OF, 0);
-    unicornEmulator.SetRegister(register_e.ID_REG_X86_NT, 0);
-    symbolicEmulator.SetRegister(register_e.ID_REG_X86_NT, 0);
-    unicornEmulator.SetRegister(register_e.ID_REG_X86_AC, 0);
-    symbolicEmulator.SetRegister(register_e.ID_REG_X86_AC, 0);
-    unicornEmulator.SetRegister(register_e.ID_REG_X86_VIF, 0);
-    symbolicEmulator.SetRegister(register_e.ID_REG_X86_VIF, 0);
-    unicornEmulator.SetRegister(register_e.ID_REG_X86_VIP, 0);
-    symbolicEmulator.SetRegister(register_e.ID_REG_X86_VIP, 0);
-    unicornEmulator.SetRegister(register_e.ID_REG_X86_ID, 0);
-    symbolicEmulator.SetRegister(register_e.ID_REG_X86_ID, 0);
+    unicornEmulator2.SetRegister(register_e.ID_REG_X86_CF, 0);
+    symbolicEmulator2.SetRegister(register_e.ID_REG_X86_CF, 0);
+    unicornEmulator2.SetRegister(register_e.ID_REG_X86_PF, 0);
+    symbolicEmulator2.SetRegister(register_e.ID_REG_X86_PF, 0);
+    unicornEmulator2.SetRegister(register_e.ID_REG_X86_AF, 0);
+    symbolicEmulator2.SetRegister(register_e.ID_REG_X86_AF, 0);
+    unicornEmulator2.SetRegister(register_e.ID_REG_X86_ZF, 0);
+    symbolicEmulator2.SetRegister(register_e.ID_REG_X86_ZF, 0);
+    unicornEmulator2.SetRegister(register_e.ID_REG_X86_SF, 0);
+    symbolicEmulator2.SetRegister(register_e.ID_REG_X86_SF, 0);
+    unicornEmulator2.SetRegister(register_e.ID_REG_X86_TF, 0);
+    symbolicEmulator2.SetRegister(register_e.ID_REG_X86_TF, 0);
+    unicornEmulator2.SetRegister(register_e.ID_REG_X86_IF, 0);
+    symbolicEmulator2.SetRegister(register_e.ID_REG_X86_IF, 0);
+    unicornEmulator2.SetRegister(register_e.ID_REG_X86_DF, 0);
+    symbolicEmulator2.SetRegister(register_e.ID_REG_X86_DF, 0);
+    unicornEmulator2.SetRegister(register_e.ID_REG_X86_OF, 0);
+    symbolicEmulator2.SetRegister(register_e.ID_REG_X86_OF, 0);
+    unicornEmulator2.SetRegister(register_e.ID_REG_X86_NT, 0);
+    symbolicEmulator2.SetRegister(register_e.ID_REG_X86_NT, 0);
+    unicornEmulator2.SetRegister(register_e.ID_REG_X86_AC, 0);
+    symbolicEmulator2.SetRegister(register_e.ID_REG_X86_AC, 0);
+    unicornEmulator2.SetRegister(register_e.ID_REG_X86_VIF, 0);
+    symbolicEmulator2.SetRegister(register_e.ID_REG_X86_VIF, 0);
+    unicornEmulator2.SetRegister(register_e.ID_REG_X86_VIP, 0);
+    symbolicEmulator2.SetRegister(register_e.ID_REG_X86_VIP, 0);
+    unicornEmulator2.SetRegister(register_e.ID_REG_X86_ID, 0);
+    symbolicEmulator2.SetRegister(register_e.ID_REG_X86_ID, 0);
 
-    unicornEmulator.SetRegister(register_e.ID_REG_X86_R14, 0);
-    symbolicEmulator.SetRegister(register_e.ID_REG_X86_R14, 0);
+    unicornEmulator2.SetRegister(register_e.ID_REG_X86_R14, 0);
+    symbolicEmulator2.SetRegister(register_e.ID_REG_X86_R14, 0);
 
-    symbolicEmulator.WriteMemory<ulong>(0x10001FFE0, 0);
+    symbolicEmulator2.WriteMemory<ulong>(0x10001FFE0, 0);
 
     foreach (var register in X86Registers.RegisterMapping.Values)
     {
@@ -237,8 +238,8 @@ if (emulate)
             continue;
 
         Console.WriteLine($"Setting register: {register.Id}");
-        symbolicEmulator.SetRegister(register.Id, 0);
-        unicornEmulator.SetRegister(register.Id, 0);
+        symbolicEmulator2.SetRegister(register.Id, 0);
+        unicornEmulator2.SetRegister(register.Id, 0);
     }
 
     /*
@@ -260,7 +261,7 @@ if (emulate)
 
     Dictionary<ulong, byte> unicornMemoryWrites = new Dictionary<ulong, byte>();
     Dictionary<ulong, byte> unicornMemoryReads = new Dictionary<ulong, byte>();
-    unicornEmulator.SetMemoryWriteCallback((ulong address, int size, ulong value) =>
+    unicornEmulator2.SetMemoryWriteCallback((ulong address, int size, ulong value) =>
     {
         var bytes = BitConverter.GetBytes(value);
         for (ulong i = 0; i < (ulong)size; i++)
@@ -269,7 +270,7 @@ if (emulate)
         }
     });
 
-    unicornEmulator.SetMemoryReadCallback((ulong address, int size, ulong value) =>
+    unicornEmulator2.SetMemoryReadCallback((ulong address, int size, ulong value) =>
     {
         var bytes = BitConverter.GetBytes(value);
         for (ulong i = 0; i < (ulong)size; i++)
@@ -279,17 +280,17 @@ if (emulate)
     });
 
     int count = 0;
-    unicornEmulator.SetInstExecutedCallback((ulong address, int size) =>
+    unicornEmulator2.SetInstExecutedCallback((ulong address, int size) =>
     {
         Console.WriteLine($"count: {count}");
         count++;
-        var symbolicRip = symbolicEmulator.GetRegister(register_e.ID_REG_X86_RIP);
-        var unicornRip = unicornEmulator.GetRegister(register_e.ID_REG_X86_RIP);
+        var symbolicRip = symbolicEmulator2.GetRegister(register_e.ID_REG_X86_RIP);
+        var unicornRip = unicornEmulator2.GetRegister(register_e.ID_REG_X86_RIP);
         if (symbolicRip == 0x140015A94)
             Debugger.Break();
 
-        var symbolicBytes = symbolicEmulator.ReadMemory(unicornRip, 16);
-        var uniBytes = unicornEmulator.ReadMemory(symbolicRip, 16);
+        var symbolicBytes = symbolicEmulator2.ReadMemory(unicornRip, 16);
+        var uniBytes = unicornEmulator2.ReadMemory(symbolicRip, 16);
 
         var symbolicDisassembly = dna.BinaryDisassembler.GetInstructionFromBytes(symbolicRip, symbolicBytes);
         var uniDisassembly = dna.BinaryDisassembler.GetInstructionFromBytes(unicornRip, uniBytes);
@@ -353,34 +354,34 @@ if (emulate)
             Debugger.Break();
         }
 
-        var unicornRax = unicornEmulator.GetRegister(register_e.ID_REG_X86_RAX);
+        var unicornRax = unicornEmulator2.GetRegister(register_e.ID_REG_X86_RAX);
 
         if (symbolicRip == 0x14004485a)
         {
-            var mem = unicornEmulator.ReadMemory<ulong>(0x10001FFE0);
+            var mem = unicornEmulator2.ReadMemory<ulong>(0x10001FFE0);
             Console.WriteLine($"unicorn rax: 0x{unicornRax.ToString("X")}");
             Console.WriteLine($"unicorn mem: 0x{mem.ToString("X")}");
             Debugger.Break();
         }
 
-        var symbolicCf = symbolicEmulator.GetRegister(register_e.ID_REG_X86_CF);
-        var unicornCf = unicornEmulator.GetRegister(register_e.ID_REG_X86_CF);
+        var symbolicCf = symbolicEmulator2.GetRegister(register_e.ID_REG_X86_CF);
+        var unicornCf = unicornEmulator2.GetRegister(register_e.ID_REG_X86_CF);
 
         if (symbolicRip == 0x140015410)
         {
-            var symbolicEsi = symbolicEmulator.GetRegister(register_e.ID_REG_X86_ESI);
-            var unicornEsi = unicornEmulator.GetRegister(register_e.ID_REG_X86_ESI);
+            var symbolicEsi = symbolicEmulator2.GetRegister(register_e.ID_REG_X86_ESI);
+            var unicornEsi = unicornEmulator2.GetRegister(register_e.ID_REG_X86_ESI);
 
             Debugger.Break();
         }
 
-        var symbolicRsp = symbolicEmulator.GetRegister(register_e.ID_REG_X86_RSP);
-        var unicornRsp = unicornEmulator.GetRegister(register_e.ID_REG_X86_RSP);
+        var symbolicRsp = symbolicEmulator2.GetRegister(register_e.ID_REG_X86_RSP);
+        var unicornRsp = unicornEmulator2.GetRegister(register_e.ID_REG_X86_RSP);
 
-        var symbolicRax = symbolicEmulator.GetRegister(register_e.ID_REG_X86_RAX);
+        var symbolicRax = symbolicEmulator2.GetRegister(register_e.ID_REG_X86_RAX);
 
         //var symbolicRflags = symbolicEmulator.GetRegister(register_e.ID_REG_X86_EFLAGS);
-        var unicornRflags = unicornEmulator.GetRegister(register_e.ID_REG_X86_EFLAGS);
+        var unicornRflags = unicornEmulator2.GetRegister(register_e.ID_REG_X86_EFLAGS);
 
         Console.WriteLine($"Symbolic rip: 0x{symbolicRip.ToString("X")}");
         Console.WriteLine($"Unicorn rip: 0x{unicornRip.ToString("X")}");
@@ -393,8 +394,8 @@ if (emulate)
         // Console.WriteLine($"Symbolic rflags: 0x{symbolicRflags.ToString("X")}");
         Console.WriteLine($"Unicorn rflags: 0x{unicornRflags.ToString("X")}");
 
-        var symbolicPf = symbolicEmulator.GetRegister(register_e.ID_REG_X86_PF);
-        var unicornPf = unicornEmulator.GetRegister(register_e.ID_REG_X86_PF);
+        var symbolicPf = symbolicEmulator2.GetRegister(register_e.ID_REG_X86_PF);
+        var unicornPf = unicornEmulator2.GetRegister(register_e.ID_REG_X86_PF);
         if (symbolicPf != unicornPf)
         {
             Console.WriteLine("PFs don't match");
@@ -402,8 +403,8 @@ if (emulate)
         }
 
 
-        var symbolicZf = symbolicEmulator.GetRegister(register_e.ID_REG_X86_ZF);
-        var unicornZf = unicornEmulator.GetRegister(register_e.ID_REG_X86_ZF);
+        var symbolicZf = symbolicEmulator2.GetRegister(register_e.ID_REG_X86_ZF);
+        var unicornZf = unicornEmulator2.GetRegister(register_e.ID_REG_X86_ZF);
         if (symbolicZf != unicornZf)
         {
             Console.WriteLine("ZFs don't match.");
@@ -416,20 +417,20 @@ if (emulate)
             Debugger.Break();
         }
 
-        var symbolicR12 = symbolicEmulator.GetRegister(register_e.ID_REG_X86_R12B);
-        var unicornR12 = unicornEmulator.GetRegister(register_e.ID_REG_X86_R12B);
+        var symbolicR12 = symbolicEmulator2.GetRegister(register_e.ID_REG_X86_R12B);
+        var unicornR12 = unicornEmulator2.GetRegister(register_e.ID_REG_X86_R12B);
 
-        var symbolicR11 = symbolicEmulator.GetRegister(register_e.ID_REG_X86_R11);
-        var unicornR11 = unicornEmulator.GetRegister(register_e.ID_REG_X86_R11);
+        var symbolicR11 = symbolicEmulator2.GetRegister(register_e.ID_REG_X86_R11);
+        var unicornR11 = unicornEmulator2.GetRegister(register_e.ID_REG_X86_R11);
         if (symbolicR12 != unicornR12)
         {
             Console.WriteLine("R12Bs don't match.");
             Debugger.Break();
         }
 
-        var symbolicAf = symbolicEmulator.GetRegister(register_e.ID_REG_X86_AF);
-        var unicornAf = unicornEmulator.GetRegister(register_e.ID_REG_X86_AF);
-        var unicornFlags = unicornEmulator.Emulator.Registers.EFLAGS;
+        var symbolicAf = symbolicEmulator2.GetRegister(register_e.ID_REG_X86_AF);
+        var unicornAf = unicornEmulator2.GetRegister(register_e.ID_REG_X86_AF);
+        var unicornFlags = unicornEmulator2.Emulator.Registers.EFLAGS;
 
         if (symbolicRip != unicornRip)
         {
@@ -448,8 +449,8 @@ if (emulate)
             Debugger.Break();
         }
 
-        var symbolicR14 = symbolicEmulator.GetRegister(register_e.ID_REG_X86_R14);
-        var unicornR14 = unicornEmulator.GetRegister(register_e.ID_REG_X86_R14);
+        var symbolicR14 = symbolicEmulator2.GetRegister(register_e.ID_REG_X86_R14);
+        var unicornR14 = unicornEmulator2.GetRegister(register_e.ID_REG_X86_R14);
         foreach (var register in X86Registers.RegisterMapping.Values)
         {
             var parent = register.ParentId;
@@ -466,8 +467,8 @@ if (emulate)
                 continue;
 
             //Console.WriteLine($"Setting register: {register.Id}");
-            var symReg = symbolicEmulator.GetRegister(register.Id);
-            var uReg = unicornEmulator.GetRegister(register.Id);
+            var symReg = symbolicEmulator2.GetRegister(register.Id);
+            var uReg = unicornEmulator2.GetRegister(register.Id);
 
             if (symReg != uReg)
             {
@@ -479,7 +480,7 @@ if (emulate)
 
         foreach (var unicornMemAddr in unicornMemoryWrites)
         {
-            var symbolicMemValue = symbolicEmulator.ReadMemory(unicornMemAddr.Key, 1)[0];
+            var symbolicMemValue = symbolicEmulator2.ReadMemory(unicornMemAddr.Key, 1)[0];
             if (symbolicMemValue != unicornMemAddr.Value)
             {
                 //throw new InvalidOperationException("Unicorn memory mapping does not match.");
@@ -490,7 +491,7 @@ if (emulate)
 
         foreach (var unicornMemAddr in unicornMemoryReads)
         {
-            var symbolicMemValue = symbolicEmulator.ReadMemory(unicornMemAddr.Key, 1)[0];
+            var symbolicMemValue = symbolicEmulator2.ReadMemory(unicornMemAddr.Key, 1)[0];
             if (symbolicMemValue != unicornMemAddr.Value && !unicornMemoryWrites.ContainsKey(unicornMemAddr.Key))
             {
                 //throw new InvalidOperationException("Unicorn memory mapping does not match.");
@@ -501,13 +502,13 @@ if (emulate)
 
         unicornMemoryWrites.Clear();
         unicornMemoryReads.Clear();
-        symbolicEmulator.ExecuteNext();
+        symbolicEmulator2.ExecuteNext();
 
 
 
-        symbolicAf = symbolicEmulator.GetRegister(register_e.ID_REG_X86_AF);
-        unicornAf = unicornEmulator.GetRegister(register_e.ID_REG_X86_AF);
-        unicornFlags = unicornEmulator.Emulator.Registers.EFLAGS;
+        symbolicAf = symbolicEmulator2.GetRegister(register_e.ID_REG_X86_AF);
+        unicornAf = unicornEmulator2.GetRegister(register_e.ID_REG_X86_AF);
+        unicornFlags = unicornEmulator2.Emulator.Registers.EFLAGS;
         if (symbolicAf != unicornAf)
         {
             Console.WriteLine("AFs don't match");
@@ -518,8 +519,8 @@ if (emulate)
     });
 
     // Execute the function.
-    unicornEmulator.Start(0x140001299);
-    symbolicEmulator.Start(0x140001299);
+    unicornEmulator2.Start(0x140001299);
+    symbolicEmulator2.Start(0x140001299);
 
     Console.WriteLine("Started");
     Thread.Sleep(100000);
@@ -528,7 +529,8 @@ if (emulate)
 // Lift the control flow graph to LLVM IR.
 var llvmLifter = new LLVMLifter(architecture);
 llvmLifter.Lift(liftedCfg);
-llvmLifter.Module.PrintToFile(@"lifted_cfg.ll");
+//llvmLifter.Module.PrintToFile(@"lifted_cfg.ll");
+
 
 bool optimize = true;
 if (optimize)
@@ -565,9 +567,23 @@ var memBuffer = LlvmUtilities.CreateMemoryBuffer(@"C:\Users\colton\source\repos\
 ctx.TryParseIR(memBuffer, out LLVMModuleRef unicornTraceModule, out string unicornLoadMsg);
 
 // Optionally write the llvm IR to the console.
-bool printLLVM = true;
+bool printLLVM = false;
 if (printLLVM)
     unicornTraceModule.Dump();
+
+for (int i = 0; i < 100; i++)
+{
+    LLVMInteropApi.Test(unicornTraceModule);
+}
+
+Debugger.Break();
+
+Console.WriteLine("Done.");
+//unicornTraceModule.Dump();
+
+unicornTraceModule.PrintToFile(@"unicorn_alias_analysis.ll");
+Debugger.Break();
+
 
 var llvmFunc = unicornTraceModule.FirstFunction;
 var blk = llvmFunc.FirstBasicBlock;
@@ -588,8 +604,106 @@ var themidaCfg = new ControlFlowGraph<AbstractInst>(0x14000123C);
 var themidaBlock = themidaCfg.CreateBlock(0x14000123C);
 themidaBlock.Instructions.AddRange(llvmToIr.Output);
 
+
+BlockSsaConstructor.ConstructSsa(themidaBlock);
+
 Console.WriteLine($"Lifted cfg: {GraphFormatter.FormatGraph(themidaCfg)}");
 Console.WriteLine("Foobar.");
+
+bool emulateLlvm = true;
+if(emulateLlvm)
+{
+    // Load the binary into unicorn engine.
+    var symbolicEmulator = new SymbolicEmulator(architecture);
+
+    BinaryMapper.MapPEFile(symbolicEmulator, binary);
+
+    // Setup the stack.
+    ulong rsp = 0x100000000;
+    symbolicEmulator.MapMemory(rsp, 0x1000 * 1200);
+    rsp += 0x20000;
+
+    // Setup the segment registers.g
+    symbolicEmulator.MapMemory(0, 0x1000 * 1000);
+
+    for (ulong i = 0; i < 32; i++)
+    {
+        ulong baseAddr = 0x14006C45D;
+        symbolicEmulator.WriteMemory(baseAddr + i, new byte[] { 0x90 });
+    }
+
+    for (ulong i = 0; i < 0x1000; i++)
+    {
+        ulong baseAddr = 0;
+        symbolicEmulator.WriteMemory(baseAddr + i, new byte[] { 0x0 });
+    }
+
+    symbolicEmulator.SetRegister(register_e.ID_REG_X86_RSP, rsp);
+    symbolicEmulator.SetRegister(register_e.ID_REG_X86_RBP, rsp);
+
+    // Update low parts of rbp.
+    var casted = (uint)rsp;
+    var casted2 = (ushort)rsp;
+    symbolicEmulator.SetRegister(register_e.ID_REG_X86_RBP, rsp);
+    symbolicEmulator.SetRegister(register_e.ID_REG_X86_EBP, casted);
+    symbolicEmulator.SetRegister(register_e.ID_REG_X86_BP, casted2);
+    symbolicEmulator.SetRegister(register_e.ID_REG_X86_BPL, (byte)casted);
+
+    // Update low parts of RSP.
+    symbolicEmulator.SetRegister(register_e.ID_REG_X86_ESP, casted);
+    symbolicEmulator.SetRegister(register_e.ID_REG_X86_SP, casted2);
+    symbolicEmulator.SetRegister(register_e.ID_REG_X86_SPL, (byte)casted);
+
+
+    symbolicEmulator.SetRegister(register_e.ID_REG_X86_RIP, 0x140001299);
+
+    symbolicEmulator.SetRegister(register_e.ID_REG_X86_CF, 0);
+    symbolicEmulator.SetRegister(register_e.ID_REG_X86_PF, 0);
+    symbolicEmulator.SetRegister(register_e.ID_REG_X86_AF, 0);
+    symbolicEmulator.SetRegister(register_e.ID_REG_X86_ZF, 0);
+    symbolicEmulator.SetRegister(register_e.ID_REG_X86_SF, 0);
+    symbolicEmulator.SetRegister(register_e.ID_REG_X86_TF, 0);
+    symbolicEmulator.SetRegister(register_e.ID_REG_X86_IF, 0);
+    symbolicEmulator.SetRegister(register_e.ID_REG_X86_DF, 0);
+    symbolicEmulator.SetRegister(register_e.ID_REG_X86_OF, 0);
+    symbolicEmulator.SetRegister(register_e.ID_REG_X86_NT, 0);
+    symbolicEmulator.SetRegister(register_e.ID_REG_X86_AC, 0);
+    symbolicEmulator.SetRegister(register_e.ID_REG_X86_VIF, 0);
+    symbolicEmulator.SetRegister(register_e.ID_REG_X86_VIP, 0);
+    symbolicEmulator.SetRegister(register_e.ID_REG_X86_ID, 0);
+    symbolicEmulator.SetRegister(register_e.ID_REG_X86_R14, 0);
+
+    symbolicEmulator.WriteMemory<ulong>(0x10001FFE0, 0);
+
+    foreach (var register in X86Registers.RegisterMapping.Values)
+    {
+        var parent = register.ParentId;
+        if (parent == register_e.ID_REG_X86_RIP || parent == register_e.ID_REG_X86_RSP || parent == register_e.ID_REG_X86_RCX
+            || parent == register_e.ID_REG_X86_RDX || parent == register_e.ID_REG_X86_RBP || parent == register_e.ID_REG_INVALID
+            || parent == register_e.ID_REG_X86_MXCSR)
+            continue;
+
+        if (X86Registers.RegisterMapping[parent].BitSize != 64)
+            continue;
+
+        Console.WriteLine($"Setting register: {register.Id}");
+        symbolicEmulator.SetRegister(register.Id, 0);
+    }
+
+    foreach(var symbolicInst in themidaBlock.Instructions)
+    {
+        if(symbolicInst is InstRet)
+        {
+            var raxValue = symbolicEmulator.GetRegister(register_e.ID_REG_X86_RAX);
+            Console.WriteLine($"rax value: 0x{raxValue.ToString("X")}");
+            Debugger.Break();
+        }
+        symbolicEmulator.engine.ExecuteInstruction(symbolicInst);
+        Console.WriteLine("symexing inst");
+    }
+
+    Console.WriteLine("Done.");
+}
 
 /*
 var llvmLifterModule = llvmLifter.Module;

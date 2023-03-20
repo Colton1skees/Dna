@@ -1,0 +1,8 @@
+{
+  "profiles": {
+    "Dna": {
+      "commandName": "Project",
+      "nativeDebugging": true
+    }
+  }
+}
