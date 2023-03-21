@@ -127,7 +127,6 @@ namespace Dna::Passes {
 		}
 	}
 
-
 	char SegmentsAAWrapperPass::ID = 0;
 
 	SegmentsAAWrapperPass::SegmentsAAWrapperPass() : llvm::ImmutablePass(ID) {}
