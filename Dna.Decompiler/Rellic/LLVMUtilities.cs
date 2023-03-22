@@ -49,6 +49,15 @@ namespace Dna.Decompiler.Rellic
             return handle;
         }
 
+        public static unsafe void LLVMParseCommandLineOptions(string[] argv)
+        {
+            using var marshaledArgV = new MarshaledStringArray(argv);
+            var pArgV = stackalloc sbyte*[marshaledArgV.Count];
+            marshaledArgV.Fill(pArgV);
+
+            LLVM.ParseCommandLineOptions(argv.Length, pArgV, null);
+        }
+
         public static bool TryParseBitcode(this LLVMContextRef context, LLVMMemoryBufferRef memBuf, out LLVMModuleRef outModule, out string outMessage)
         {
             return context.TryParseIR(memBuf, out outModule, out outMessage);

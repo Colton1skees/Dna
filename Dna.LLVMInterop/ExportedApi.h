@@ -14,6 +14,7 @@
 #include "llvm/Analysis/ScopedNoAliasAA.h"
 #include "llvm/Analysis/TargetLibraryInfo.h"
 #include "llvm/Analysis/TypeBasedAliasAnalysis.h"
+#include "llvm/Analysis/MemoryDependenceAnalysis.h"
 #include "llvm/IR/DataLayout.h"
 #include "llvm/IR/LegacyPassManager.h"
 #include "llvm/IR/Verifier.h"
@@ -39,8 +40,9 @@
 #include "llvm/Transforms/IPO/AlwaysInliner.h"
 
 #include "Passes/ClassifyingAliasAnalysisPass.h"
+#include "Passes/ConstantConcretizationPass.h"
 
-extern "C" __declspec(dllexport) void OptimizeModule(llvm::Module * module)
+extern "C" __declspec(dllexport) void OptimizeModule(llvm::Module * module, Dna::Passes::tReadBinaryContents readBinaryContents)
 {
 	printf("received llvm module.");
 
@@ -81,7 +83,7 @@ extern "C" __declspec(dllexport) void OptimizeModule(llvm::Module * module)
 	FPM.add(llvm::createTypeBasedAAWrapperPass());
 	FPM.add(llvm::createScopedNoAliasAAWrapperPass());
 	FPM.add(Dna::Passes::createSegmentsAAWrapperPass());
-	FPM.add(new Dna::Passes::SegmentsExternalAAWrapperPass());
+	//FPM.add(new Dna::Passes::SegmentsExternalAAWrapperPass());
 	FPM.add(llvm::createSROAPass());
 	FPM.add(llvm::createEarlyCSEPass());
 
@@ -106,13 +108,14 @@ extern "C" __declspec(dllexport) void OptimizeModule(llvm::Module * module)
 	FPM.add(llvm::createDeadStoreEliminationPass());
 	FPM.add(llvm::createCFGSimplificationPass());
 	FPM.add(llvm::createInstructionCombiningPass());
-
 	FPM.add(llvm::createDeadStoreEliminationPass()); // added
 	FPM.add(llvm::createCFGSimplificationPass());    // added
 	FPM.add(llvm::createInstructionCombiningPass()); // added
 	FPM.add(llvm::createCFGSimplificationPass());    // added
 	FPM.add(llvm::createDeadStoreEliminationPass()); // added
 
+	//FPM.add(Dna::Passes::getConstantConcretizationPassPass(readBinaryContents)); // added
+	FPM.add(llvm::createDeadStoreEliminationPass()); // added
 	PMB.populateFunctionPassManager(FPM);
 	PMB.populateModulePassManager(module_manager);
 

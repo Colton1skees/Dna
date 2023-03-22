@@ -3,7 +3,7 @@
 #include <vector>
 #include <stack>
 #include <set>
-
+#include <llvm/Support/raw_ostream.h>
 #include "ClassifyingAliasAnalysisPass.h"
 
 using namespace llvm::PatternMatch;
@@ -24,8 +24,78 @@ namespace Dna::Passes {
 		std::set<const llvm::Value*> visited;
 		auto aTy = getPointerType(locA.Ptr, visited);
 		auto bTy = getPointerType(locB.Ptr, visited);
+
+		/*
+		//locA.Ptr->dump();
+		//printf(locB.Ptr->getName().str().c_str());
+		if (locB.Ptr->getName().contains("241"))
+		{
+			printf("oh no.");
+		}
+
+		std::string str;
+		llvm::raw_string_ostream(str) << *(locA.Ptr);
+
+		if (str.find("%241") != std::string::npos)
+		{
+			printf("oh no");
+		}
+
+		std::string str2;
+		llvm::raw_string_ostream(str2) << *(locB.Ptr);
+
+		if (str2.find("%241") != std::string::npos)
+		{
+			printf("oh no");
+		}
+
+		printf(str2.c_str());
+		*/
+
 		if ((aTy != PointerType::PtrTyUnk) && (bTy != PointerType::PtrTyUnk) && (aTy != bTy))
+		{	
+			/*
+			std::vector<const llvm::Value*> chain;
+			auto success = GetOperatorChain(locA.Ptr, &chain);
+			printf("a instruction: ");
+			locA.Ptr->dump();
+			for (auto& aChain : chain)
+			{
+				printf("    ");
+				aChain->dump();
+
+				if (const auto* constInt = llvm::dyn_cast<llvm::ConstantInt>(aChain))
+				{
+					auto intValue = constInt->getValue().getZExtValue();
+					if (intValue == 224 || intValue == -224)
+					{
+						printf("oh no, found the target...");
+					}
+				}
+			}
+
+			chain.clear();
+			success = GetOperatorChain(locB.Ptr, &chain);
+			printf("b instruction: ");
+			locB.Ptr->dump();
+			for (auto& aChain : chain)
+			{
+				printf("    ");
+				aChain->dump();
+
+				if (const auto* constInt = llvm::dyn_cast<llvm::ConstantInt>(aChain))
+				{
+					auto intValue = constInt->getValue().getZExtValue();
+					if (intValue == 224 || intValue == -224)
+					{
+						printf("oh no, found the target...");
+					}
+				}
+			}
+			*/
+
 			return llvm::AliasResult::NoAlias;
+		}
 
 		// If we cannot prove that the two memory locations are [NoAlias], then we fallback to the default alias analysis.
 		return AAResultBase::alias(locA, locB, AAQI);
@@ -34,9 +104,14 @@ namespace Dna::Passes {
 	PointerType ClassifyingAAResult::getPointerType(const llvm::Value* V, std::set<const llvm::Value*>& visited) const
 	{
 		if (isLocalStackAccess(V))
+		{
 			return PointerType::PtrTyLocalStack;
-		if (isBinarySectionAccess(V))
-			return PointerType::PtrTyBinarySection;
+		}
+
+		{
+			if (isBinarySectionAccess(V))
+				return PointerType::PtrTyBinarySection;
+		}
 
 		return PointerType::PtrTyUnk;
 	}
@@ -65,8 +140,8 @@ namespace Dna::Passes {
 		// Compute a chain of elements, and return false if we encounter an unsupported element.
 		std::vector<const llvm::Value*> chain;
 		auto success = GetOperatorChain(V, &chain);
-		if (!success)
-			return false;
+		//if (!success)
+			//return false;
 
 		for (auto value : chain)
 		{
@@ -118,7 +193,14 @@ namespace Dna::Passes {
 			}
 
 			// Otherwise, we return false. This is likely a load to / from a register, or an unknown store.
-			return false;
+			return true;
+		}
+
+		else if (const auto& store = llvm::dyn_cast<llvm::StoreInst>(V))
+		{
+			chain->push_back(store);
+			chain->push_back(store->getOperand(1));
+			return true;
 		}
 
 		else

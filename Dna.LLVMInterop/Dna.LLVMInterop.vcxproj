@@ -160,13 +160,16 @@
     <ClInclude Include="Arch\X86\X86Registers.h" />
     <ClInclude Include="ExportedApi.h" />
     <ClInclude Include="Passes\ClassifyingAliasAnalysisPass.h" />
+    <ClInclude Include="Passes\ConstantConcretizationPass.h" />
     <ClInclude Include="Passes\ControlledNodeSplittingPass.h" />
+    <ClInclude Include="Passes\PassUtilities.h" />
     <ClInclude Include="Symex\ICpuEmulatorState.h" />
     <ClInclude Include="Symex\LLVMSymbolicExecutor.h" />
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="dllmain.cpp" />
     <ClCompile Include="Passes\ClassifyingAliasAnalysisPass.cpp" />
+    <ClCompile Include="Passes\ConstantConcretizationPass.cpp" />
     <ClCompile Include="Passes\ControlledNodeSplittingPass.cpp" />
     <ClCompile Include="Symex\LLVMSymbolicExecutor.cpp" />
   </ItemGroup>

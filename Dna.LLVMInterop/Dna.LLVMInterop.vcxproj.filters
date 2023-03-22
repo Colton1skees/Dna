@@ -19,6 +19,12 @@
     <ClInclude Include="ExportedApi.h">
       <Filter>API</Filter>
     </ClInclude>
+    <ClInclude Include="Passes\ConstantConcretizationPass.h">
+      <Filter>Passes</Filter>
+    </ClInclude>
+    <ClInclude Include="Passes\PassUtilities.h">
+      <Filter>Passes</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="dllmain.cpp" />
@@ -29,6 +35,9 @@
       <Filter>Symex</Filter>
     </ClCompile>
     <ClCompile Include="Passes\ClassifyingAliasAnalysisPass.cpp">
+      <Filter>Passes</Filter>
+    </ClCompile>
+    <ClCompile Include="Passes\ConstantConcretizationPass.cpp">
       <Filter>Passes</Filter>
     </ClCompile>
   </ItemGroup>

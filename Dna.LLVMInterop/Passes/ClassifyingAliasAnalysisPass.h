@@ -50,8 +50,6 @@ namespace Dna::Passes {
 
 		PointerType getPointerType(const llvm::Value* V, std::set<const llvm::Value*>& visited) const;
 
-		// void debugDump(const llvm::Value* PtrA, const llvm::Value* PtrB, PointerType ATy, PointerType BTy) const;
-
 		GlobalPointerContext gpCtx;
 
 		std::unordered_map<const llvm::Value*, PointerType> ptrTypeCache;

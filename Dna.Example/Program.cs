@@ -31,6 +31,8 @@ using TritonTranslator.Conversion;
 using LLVMSharp.Interop;
 using Dna.Decompiler.Rellic;
 using Dna.LLVMInterop;
+using System.Runtime.InteropServices;
+using static Dna.LLVMInterop.NativeLLVMInterop;
 // Load the 64 bit PE file.
 // Note: This file is automatically copied to the build directory.
 var path = @"C:\Users\colton\source\repos\ObfuscationTester\x64\Release\ObfuscationTester.themida.exe";
@@ -51,6 +53,11 @@ var dna = new Dna.Dna(binary);
 ulong funcAddr = 0x14000123C;
 var cfg = dna.RecursiveDescent.ReconstructCfg(funcAddr);
 
+
+var llLines = File.ReadAllLines(@"C:\Users\colton\Downloads\prototyping\metadata_input.ll").ToList();
+var sanitizedLines = MetadataRemover.RemoveMetadata(llLines);
+File.WriteAllLines(@"C:\Users\colton\Downloads\prototyping\sanitized_output.ll", sanitizedLines);
+Console.WriteLine("Sanitized IL.");
 
 // The VM entry spans across multiple routines. To avoid disassembling multiple
 // control flow graphs, we selectively insert instructions needed to have a
@@ -96,8 +103,27 @@ var astConverter = new AstToIntermediateConverter(architecture);
 var translated = translator.TranslateInstruction(inst);
 var flatInstructions = translated.SelectMany(x => astConverter.ConvertFromSymbolicExpression(x));
 
+/*
+LlvmUtilities.LLVMParseCommandLineOptions(new string[] { "-memdep-block-scan-limit=10000000",
+    "-earlycse-mssa-optimization-cap=1000000",
+    "-dse-memoryssa-defs-per-block-limit=1000000",
+    "-dse-memoryssa-partial-store-limit=1000000",
+    "-dse-memoryssa-path-check-limit=1000000",
+    "-dse-memoryssa-scanlimit=1000000",
+    "-dse-memoryssa-walklimit=1000000",
+    "-dse-memoryssa-otherbb-cost=2",
+    "-memssa-check-limit=1000000",
+    "memdep-block-number-limit=10000",
+    "-memdep-block-scan-limit=1000000",
+    "-gvn-max-block-speculations=1000000",
+    "-gvn-max-num-deps=1000000",
+});
+*/
 
-
+LlvmUtilities.LLVMParseCommandLineOptions(new string[] {
+    "test",
+    "-memdep-block-scan-limit=10000000",
+    });
 foreach (var flatInst in flatInstructions)
 {
     Console.WriteLine(flatInst);
@@ -562,18 +588,102 @@ if (optimize)
 
 llvmLifter.Module.PrintToFile(@"lifted_cfg_optimized.ll");
 
+LlvmUtilities.LLVMParseCommandLineOptions(new string[] {
+    "test",
+    "-memdep-block-scan-limit=1000000000",
+    });
 var ctx = LLVMContextRef.Create();
-var memBuffer = LlvmUtilities.CreateMemoryBuffer(@"C:\Users\colton\source\repos\Dna\Dna.Example\bin\x64\Debug\net7.0\unicorn_alias_analysis.ll");
+
+
+LlvmUtilities.LLVMParseCommandLineOptions(new string[] {
+    "test",
+    "-memdep-block-scan-limit=1000000000",
+    });
+/*
+LlvmUtilities.LLVMParseCommandLineOptions(new string[] { "-memdep-block-scan-limit=10000000",
+    "-earlycse-mssa-optimization-cap=1000000",
+    "-dse-memoryssa-defs-per-block-limit=1000000",
+    "-dse-memoryssa-partial-store-limit=1000000",
+    "-dse-memoryssa-path-check-limit=1000000",
+    "-dse-memoryssa-scanlimit=1000000",
+    "-dse-memoryssa-walklimit=1000000",
+    "-dse-memoryssa-otherbb-cost=2",
+    "-memssa-check-limit=1000000",
+    "memdep-block-number-limit=10000",
+    "-memdep-block-scan-limit=1000000",
+    "-gvn-max-block-speculations=1000000",
+    "-gvn-max-num-deps=1000000",
+});
+*/
+var memBuffer = LlvmUtilities.CreateMemoryBuffer(@"C:\Users\colton\source\repos\Dna\Dna.Example\bin\x64\Debug\net7.0\unicorn_alias_analysis_3_no_segment.txt");
 ctx.TryParseIR(memBuffer, out LLVMModuleRef unicornTraceModule, out string unicornLoadMsg);
 
+/*
+LlvmUtilities.LLVMParseCommandLineOptions(new string[] { "-memdep-block-scan-limit=10000000",
+    "-earlycse-mssa-optimization-cap=1000000",
+    "-dse-memoryssa-defs-per-block-limit=1000000",
+    "-dse-memoryssa-partial-store-limit=1000000",
+    "-dse-memoryssa-path-check-limit=1000000",
+    "-dse-memoryssa-scanlimit=1000000",
+    "-dse-memoryssa-walklimit=1000000",
+    "-dse-memoryssa-otherbb-cost=2",
+    "-memssa-check-limit=1000000",
+    "memdep-block-number-limit=10000",
+    "-memdep-block-scan-limit=1000000",
+    "-gvn-max-block-speculations=1000000",
+    "-gvn-max-num-deps=1000000",
+});
+*/
+
+LlvmUtilities.LLVMParseCommandLineOptions(new string[] {
+    "test",
+    "-memdep-block-scan-limit=100000000",
+    });
 // Optionally write the llvm IR to the console.
 bool printLLVM = false;
 if (printLLVM)
     unicornTraceModule.Dump();
 
-for (int i = 0; i < 0; i++)
+var readBytes = (ulong address, uint size) =>
 {
-   // LLVMInteropApi.Test(unicornTraceModule);
+    var bytes = binary.ReadBytes(address, (int)size);
+    var value = size switch
+    {
+        1 => bytes[0],
+        2 => BitConverter.ToUInt16(bytes),
+        4 => BitConverter.ToUInt32(bytes),
+        8 => BitConverter.ToUInt64(bytes),
+        _ => throw new InvalidOperationException()
+    };
+    return (ulong)value;
+};
+
+var ptr = Marshal.GetFunctionPointerForDelegate(new dgReadBinaryContents(readBytes));
+
+/*
+LlvmUtilities.LLVMParseCommandLineOptions(new string[] { "-memdep-block-scan-limit=10000000",
+    "-earlycse-mssa-optimization-cap=1000000",
+    "-dse-memoryssa-defs-per-block-limit=1000000",
+    "-dse-memoryssa-partial-store-limit=1000000",
+    "-dse-memoryssa-path-check-limit=1000000",
+    "-dse-memoryssa-scanlimit=1000000",
+    "-dse-memoryssa-walklimit=1000000",
+    "-dse-memoryssa-otherbb-cost=2",
+    "-memssa-check-limit=1000000",
+    "memdep-block-number-limit=10000",
+    "-memdep-block-scan-limit=1000000",
+    "-gvn-max-block-speculations=1000000",
+    "-gvn-max-num-deps=1000000",
+});
+*/
+for (int i = 0; i < 10; i++)
+{
+
+    LLVMInteropApi.Test(unicornTraceModule, ptr);
+    LlvmUtilities.LLVMParseCommandLineOptions(new string[] {
+    "test",
+    "-memdep-block-scan-limit=10000000",
+    });
 }
 
 Debugger.Break();
@@ -581,7 +691,7 @@ Debugger.Break();
 Console.WriteLine("Done.");
 //unicornTraceModule.Dump();
 
-//unicornTraceModule.PrintToFile(@"unicorn_alias_analysis.ll");
+unicornTraceModule.PrintToFile(@"unicorn_alias_analysis.ll");
 Debugger.Break();
 
 
