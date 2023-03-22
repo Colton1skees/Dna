@@ -615,7 +615,7 @@ LlvmUtilities.LLVMParseCommandLineOptions(new string[] { "-memdep-block-scan-lim
     "-gvn-max-num-deps=1000000",
 });
 */
-var memBuffer = LlvmUtilities.CreateMemoryBuffer(@"C:\Users\colton\source\repos\Dna\Dna.Example\bin\x64\Debug\net7.0\unicorn_alias_analysis_3_no_segment.txt");
+var memBuffer = LlvmUtilities.CreateMemoryBuffer(@"C:\Users\colton\source\repos\Dna\Dna.Example\bin\x64\Debug\net7.0\unicorn_alias_analysis3.ll");
 ctx.TryParseIR(memBuffer, out LLVMModuleRef unicornTraceModule, out string unicornLoadMsg);
 
 /*
@@ -676,7 +676,7 @@ LlvmUtilities.LLVMParseCommandLineOptions(new string[] { "-memdep-block-scan-lim
     "-gvn-max-num-deps=1000000",
 });
 */
-for (int i = 0; i < 10; i++)
+for (int i = 0; i < 1000; i++)
 {
 
     LLVMInteropApi.Test(unicornTraceModule, ptr);

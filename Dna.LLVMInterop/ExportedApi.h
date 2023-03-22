@@ -83,7 +83,7 @@ extern "C" __declspec(dllexport) void OptimizeModule(llvm::Module * module, Dna:
 	FPM.add(llvm::createTypeBasedAAWrapperPass());
 	FPM.add(llvm::createScopedNoAliasAAWrapperPass());
 	FPM.add(Dna::Passes::createSegmentsAAWrapperPass());
-	//FPM.add(new Dna::Passes::SegmentsExternalAAWrapperPass());
+	FPM.add(new Dna::Passes::SegmentsExternalAAWrapperPass());
 	FPM.add(llvm::createSROAPass());
 	FPM.add(llvm::createEarlyCSEPass());
 
@@ -114,13 +114,16 @@ extern "C" __declspec(dllexport) void OptimizeModule(llvm::Module * module, Dna:
 	FPM.add(llvm::createCFGSimplificationPass());    // added
 	FPM.add(llvm::createDeadStoreEliminationPass()); // added
 
-	//FPM.add(Dna::Passes::getConstantConcretizationPassPass(readBinaryContents)); // added
+	FPM.add(Dna::Passes::getConstantConcretizationPassPass(readBinaryContents)); // added
 	FPM.add(llvm::createDeadStoreEliminationPass()); // added
 	PMB.populateFunctionPassManager(FPM);
 	PMB.populateModulePassManager(module_manager);
 
 
 	auto f = (module->getFunction("SampleFunc"));
+
+	const char* args[2] = { "test", "-memdep-block-scan-limit=10000000" };
+	llvm::cl::ParseCommandLineOptions(2, args);
 
 	FPM.doInitialization();
 	FPM.run(*f);
