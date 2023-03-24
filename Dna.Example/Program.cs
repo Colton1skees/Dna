@@ -162,7 +162,7 @@ if (writeDotGraph)
 
 List<Iced.Intel.Instruction> icedInstructions = new();
 
-bool emulate = false;
+bool emulate = true;
 if (emulate)
 {
     // Load the binary into unicorn engine.
@@ -322,6 +322,16 @@ if (emulate)
         var uniDisassembly = dna.BinaryDisassembler.GetInstructionFromBytes(unicornRip, uniBytes);
         Console.WriteLine($"Symbolic inst: {symbolicDisassembly}");
         Console.WriteLine($"Uni inst: {uniDisassembly}");
+
+        if(address == 0x14000B38C)
+        {
+            Debugger.Break();
+        }
+
+        if(address == 0x140015C47)
+        {
+            Debugger.Break();
+        }
 
         var disassembled = dna.BinaryDisassembler.GetInstructionAt(symbolicRip);
         icedInstructions.Add(disassembled);
@@ -618,6 +628,8 @@ LlvmUtilities.LLVMParseCommandLineOptions(new string[] { "-memdep-block-scan-lim
 var memBuffer = LlvmUtilities.CreateMemoryBuffer(@"C:\Users\colton\source\repos\Dna\Dna.Example\bin\x64\Debug\net7.0\unicorn_alias_analysis3.ll");
 ctx.TryParseIR(memBuffer, out LLVMModuleRef unicornTraceModule, out string unicornLoadMsg);
 
+
+unicornTraceModule = llvmLifter.Module;
 /*
 LlvmUtilities.LLVMParseCommandLineOptions(new string[] { "-memdep-block-scan-limit=10000000",
     "-earlycse-mssa-optimization-cap=1000000",
@@ -676,7 +688,7 @@ LlvmUtilities.LLVMParseCommandLineOptions(new string[] { "-memdep-block-scan-lim
     "-gvn-max-num-deps=1000000",
 });
 */
-for (int i = 0; i < 1000; i++)
+for (int i = 0; i < 10; i++)
 {
 
     LLVMInteropApi.Test(unicornTraceModule, ptr);
@@ -691,7 +703,7 @@ Debugger.Break();
 Console.WriteLine("Done.");
 //unicornTraceModule.Dump();
 
-unicornTraceModule.PrintToFile(@"unicorn_alias_analysis.ll");
+unicornTraceModule.PrintToFile(@"optimized_vm_entry.ll");
 Debugger.Break();
 
 

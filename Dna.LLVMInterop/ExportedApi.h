@@ -116,6 +116,7 @@ extern "C" __declspec(dllexport) void OptimizeModule(llvm::Module * module, Dna:
 
 	FPM.add(Dna::Passes::getConstantConcretizationPassPass(readBinaryContents)); // added
 	FPM.add(llvm::createDeadStoreEliminationPass()); // added
+	FPM.add(llvm::createLoopUnrollPass(3));
 	PMB.populateFunctionPassManager(FPM);
 	PMB.populateModulePassManager(module_manager);
 
@@ -124,6 +125,9 @@ extern "C" __declspec(dllexport) void OptimizeModule(llvm::Module * module, Dna:
 
 	const char* args[2] = { "test", "-memdep-block-scan-limit=10000000" };
 	llvm::cl::ParseCommandLineOptions(2, args);
+
+	const char* args2[2] = { "testt", "-unroll-count=10000" };
+	llvm::cl::ParseCommandLineOptions(2, args2);
 
 	FPM.doInitialization();
 	FPM.run(*f);

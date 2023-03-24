@@ -160,8 +160,12 @@
     <ClInclude Include="Arch\X86\X86Registers.h" />
     <ClInclude Include="ExportedApi.h" />
     <ClInclude Include="Passes\ClassifyingAliasAnalysisPass.h" />
+    <ClInclude Include="Passes\compilercore_assert.h" />
     <ClInclude Include="Passes\ConstantConcretizationPass.h" />
     <ClInclude Include="Passes\ControlledNodeSplittingPass.h" />
+    <ClInclude Include="Passes\generator_jit_ast_compute.h" />
+    <ClInclude Include="Passes\generator_jit_sl_function.h" />
+    <ClInclude Include="Passes\mdl_assert.h" />
     <ClInclude Include="Passes\PassUtilities.h" />
     <ClInclude Include="Symex\ICpuEmulatorState.h" />
     <ClInclude Include="Symex\LLVMSymbolicExecutor.h" />
@@ -169,8 +173,10 @@
   <ItemGroup>
     <ClCompile Include="dllmain.cpp" />
     <ClCompile Include="Passes\ClassifyingAliasAnalysisPass.cpp" />
+    <ClCompile Include="Passes\compilercore_assert.cpp" />
     <ClCompile Include="Passes\ConstantConcretizationPass.cpp" />
     <ClCompile Include="Passes\ControlledNodeSplittingPass.cpp" />
+    <ClCompile Include="Passes\generator_jit_ast_compute.cpp" />
     <ClCompile Include="Symex\LLVMSymbolicExecutor.cpp" />
   </ItemGroup>
   <ItemGroup>

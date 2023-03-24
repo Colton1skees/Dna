@@ -25,6 +25,18 @@
     <ClInclude Include="Passes\PassUtilities.h">
       <Filter>Passes</Filter>
     </ClInclude>
+    <ClInclude Include="Passes\compilercore_assert.h">
+      <Filter>Passes</Filter>
+    </ClInclude>
+    <ClInclude Include="Passes\generator_jit_ast_compute.h">
+      <Filter>Passes</Filter>
+    </ClInclude>
+    <ClInclude Include="Passes\generator_jit_sl_function.h">
+      <Filter>Passes</Filter>
+    </ClInclude>
+    <ClInclude Include="Passes\mdl_assert.h">
+      <Filter>Passes</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="dllmain.cpp" />
@@ -38,6 +50,12 @@
       <Filter>Passes</Filter>
     </ClCompile>
     <ClCompile Include="Passes\ConstantConcretizationPass.cpp">
+      <Filter>Passes</Filter>
+    </ClCompile>
+    <ClCompile Include="Passes\compilercore_assert.cpp">
+      <Filter>Passes</Filter>
+    </ClCompile>
+    <ClCompile Include="Passes\generator_jit_ast_compute.cpp">
       <Filter>Passes</Filter>
     </ClCompile>
   </ItemGroup>
