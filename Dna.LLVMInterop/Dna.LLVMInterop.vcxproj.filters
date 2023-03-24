@@ -16,9 +16,6 @@
     <ClInclude Include="Arch\X86\X86Registers.h">
       <Filter>Arch\X86</Filter>
     </ClInclude>
-    <ClInclude Include="ExportedApi.h">
-      <Filter>API</Filter>
-    </ClInclude>
     <ClInclude Include="Passes\ConstantConcretizationPass.h">
       <Filter>Passes</Filter>
     </ClInclude>
@@ -51,6 +48,33 @@
     </ClInclude>
     <ClInclude Include="Utilities\magic_enum_switch.hpp">
       <Filter>Utilities</Filter>
+    </ClInclude>
+    <ClInclude Include="API\ExportedAPI.h">
+      <Filter>API</Filter>
+    </ClInclude>
+    <ClInclude Include="API\RegionAPI\BaseRegionAPI.h">
+      <Filter>API\RegionAPI</Filter>
+    </ClInclude>
+    <ClInclude Include="API\RegionAPI\ComplexRegionAPI.h">
+      <Filter>API\RegionAPI</Filter>
+    </ClInclude>
+    <ClInclude Include="API\RegionAPI\IfThenElseRegionAPI.h">
+      <Filter>API\RegionAPI</Filter>
+    </ClInclude>
+    <ClInclude Include="API\RegionAPI\IfThenRegionAPI.h">
+      <Filter>API\RegionAPI</Filter>
+    </ClInclude>
+    <ClInclude Include="API\RegionAPI\ReturnRegionAPI.h">
+      <Filter>API\RegionAPI</Filter>
+    </ClInclude>
+    <ClInclude Include="API\OptimizationAPI\OptimizationAPI.h">
+      <Filter>API\OptimizationAPI</Filter>
+    </ClInclude>
+    <ClInclude Include="API\ExportDef.h">
+      <Filter>API</Filter>
+    </ClInclude>
+    <ClInclude Include="API\RegionAPI\RegionAPI.h">
+      <Filter>API\RegionAPI</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>
@@ -92,6 +116,12 @@
     </Filter>
     <Filter Include="Utilities">
       <UniqueIdentifier>{dc5b4ba6-84b8-49f6-b289-87600b5945b1}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="API\RegionAPI">
+      <UniqueIdentifier>{06c71f36-bfee-4518-822e-152c6ef0275b}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="API\OptimizationAPI">
+      <UniqueIdentifier>{a9052d1b-7687-4796-96e4-3b6df6841c81}</UniqueIdentifier>
     </Filter>
   </ItemGroup>
   <ItemGroup>

@@ -47,6 +47,8 @@
 
 #include "Utilities/magic_enum.hpp"
 
+#include <API/RegionAPI/RegionAPI.h>
+
 using namespace llvm::sl;
 
 void DumpRegion(llvm::sl::Region* region)
@@ -90,7 +92,7 @@ void DumpStructuredFunction(const llvm::sl::StructuredFunction& sfunc)
 	DumpRegion(rootRegion);
 }
 
-extern "C" __declspec(dllexport) void OptimizeModule(llvm::Module * module, Dna::Passes::tReadBinaryContents readBinaryContents)
+extern "C" __declspec(dllexport) llvm::sl::Region* OptimizeModule(llvm::Module * module, Dna::Passes::tReadBinaryContents readBinaryContents)
 {
 	printf("received llvm module.");
 
@@ -200,4 +202,23 @@ extern "C" __declspec(dllexport) void OptimizeModule(llvm::Module * module, Dna:
 
 	printf("got structured function.");
 	DumpStructuredFunction(*structuredFunction);
+
+	auto root = structuredFunction->getBody();
+
+	auto kind = root->get_kind();
+
+	auto str = magic_enum::enum_name(kind);
+
+	printf("foo \n");
+	std::printf(
+		"%.*s",
+		static_cast<int>(str.length()),
+		str.data());
+
+
+	auto childCt = root->getChildSize();
+
+	printf("The value of a : %zu", childCt);
+
+	return root;
 }

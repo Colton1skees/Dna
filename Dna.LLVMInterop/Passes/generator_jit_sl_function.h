@@ -122,7 +122,10 @@ protected:
     }
 
     /// Destructor.
-    virtual ~Region() {}
+    virtual ~Region() 
+    {
+        printf("destroyed.");
+    }
 
 public:
     /// Get the kind of the region.

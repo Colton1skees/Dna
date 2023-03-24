@@ -157,8 +157,16 @@
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
+    <ClInclude Include="API\ExportDef.h" />
+    <ClInclude Include="API\ExportedAPI.h" />
+    <ClInclude Include="API\OptimizationAPI\OptimizationAPI.h" />
+    <ClInclude Include="API\RegionAPI\BaseRegionAPI.h" />
+    <ClInclude Include="API\RegionAPI\ComplexRegionAPI.h" />
+    <ClInclude Include="API\RegionAPI\IfThenElseRegionAPI.h" />
+    <ClInclude Include="API\RegionAPI\IfThenRegionAPI.h" />
+    <ClInclude Include="API\RegionAPI\RegionAPI.h" />
+    <ClInclude Include="API\RegionAPI\ReturnRegionAPI.h" />
     <ClInclude Include="Arch\X86\X86Registers.h" />
-    <ClInclude Include="ExportedApi.h" />
     <ClInclude Include="Passes\ClassifyingAliasAnalysisPass.h" />
     <ClInclude Include="Passes\compilercore_assert.h" />
     <ClInclude Include="Passes\ConstantConcretizationPass.h" />

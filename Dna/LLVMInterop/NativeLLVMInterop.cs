@@ -13,7 +13,7 @@ namespace Dna.LLVMInterop
         [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
         public delegate ulong dgReadBinaryContents(ulong rva, uint size);
 
-        [DllImport("Dna.LLVMInterop", CallingConvention = CallingConvention.Cdecl, EntryPoint = "OptimizeModule")]
-        public unsafe static extern void VerifyModule(LLVMOpaqueModule* M, IntPtr readBinaryContents);
+        [DllImport("Dna.LLVMInterop", CallingConvention = CallingConvention.Cdecl)]
+        public unsafe static extern IntPtr OptimizeModule(LLVMOpaqueModule* M, IntPtr readBinaryContents);
     }
 }

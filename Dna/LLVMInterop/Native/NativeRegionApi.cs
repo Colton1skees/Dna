@@ -72,36 +72,36 @@ namespace Dna.LLVMInterop.Native
         public unsafe static extern RegionKind RegionGetKind(nint region);
 
         [DllImport("Dna.LLVMInterop", CallingConvention = CallingConvention.Cdecl, EntryPoint = "RegionGetOwnerRegion")]
-        public unsafe static extern bool GetOwnerRegion(nint region, out nint ownerRegion);
+        public unsafe static extern nint RegionGetOwnerRegion(nint region);
 
-        [DllImport("Dna.LLVMInterop", CallingConvention = CallingConvention.Cdecl, EntryPoint = "RegionGetKind")]
+        [DllImport("Dna.LLVMInterop", CallingConvention = CallingConvention.Cdecl, EntryPoint = "RegionGetEntryRegionBlock")]
         public unsafe static extern nint RegionGetEntryRegionBlock(nint region);
 
-        [DllImport("Dna.LLVMInterop", CallingConvention = CallingConvention.Cdecl, EntryPoint = "RegionGetKind")]
+        [DllImport("Dna.LLVMInterop", CallingConvention = CallingConvention.Cdecl, EntryPoint = "RegionGetId")]
         public unsafe static extern ulong RegionGetId(nint region);
 
-        [DllImport("Dna.LLVMInterop", CallingConvention = CallingConvention.Cdecl, EntryPoint = "RegionGetKind")]
+        [DllImport("Dna.LLVMInterop", CallingConvention = CallingConvention.Cdecl, EntryPoint = "RegionGetPredCount")]
         public unsafe static extern ulong RegionGetPredCount(nint region);
 
-        [DllImport("Dna.LLVMInterop", CallingConvention = CallingConvention.Cdecl, EntryPoint = "RegionGetKind")]
-        public unsafe static extern nint RegionGetPred(nint region);
+        [DllImport("Dna.LLVMInterop", CallingConvention = CallingConvention.Cdecl, EntryPoint = "RegionGetPred")]
+        public unsafe static extern nint RegionGetPred(nint region, ulong index);
 
-        [DllImport("Dna.LLVMInterop", CallingConvention = CallingConvention.Cdecl, EntryPoint = "RegionGetKind")]
+        [DllImport("Dna.LLVMInterop", CallingConvention = CallingConvention.Cdecl, EntryPoint = "RegionGetSuccCount")]
         public unsafe static extern ulong RegionGetSuccCount(nint region);
 
-        [DllImport("Dna.LLVMInterop", CallingConvention = CallingConvention.Cdecl, EntryPoint = "RegionGetKind")]
-        public unsafe static extern nint RegionGetSucc(nint region);
+        [DllImport("Dna.LLVMInterop", CallingConvention = CallingConvention.Cdecl, EntryPoint = "RegionGetSucc")]
+        public unsafe static extern nint RegionGetSucc(nint region, ulong index);
 
-        [DllImport("Dna.LLVMInterop", CallingConvention = CallingConvention.Cdecl, EntryPoint = "RegionGetKind")]
+        [DllImport("Dna.LLVMInterop", CallingConvention = CallingConvention.Cdecl, EntryPoint = "RegionGetLLVMBasicBlock")]
         public unsafe static extern nint RegionGetLLVMBasicBlock(nint region);
 
-        [DllImport("Dna.LLVMInterop", CallingConvention = CallingConvention.Cdecl, EntryPoint = "RegionGetKind")]
+        [DllImport("Dna.LLVMInterop", CallingConvention = CallingConvention.Cdecl, EntryPoint = "RegionGetHeadLLVMBasicBlock")]
         public unsafe static extern nint RegionGetHeadLLVMBasicBlock(nint region);
 
-        [DllImport("Dna.LLVMInterop", CallingConvention = CallingConvention.Cdecl, EntryPoint = "RegionGetKind")]
+        [DllImport("Dna.LLVMInterop", CallingConvention = CallingConvention.Cdecl, EntryPoint = "RegionGetChildCount")]
         public unsafe static extern ulong RegionGetChildCount(nint region);
 
-        [DllImport("Dna.LLVMInterop", CallingConvention = CallingConvention.Cdecl, EntryPoint = "RegionGetKind")]
-        public unsafe static extern nint RegionGetChild(nint region);
+        [DllImport("Dna.LLVMInterop", CallingConvention = CallingConvention.Cdecl, EntryPoint = "RegionGetChild")]
+        public unsafe static extern nint RegionGetChild(nint region, ulong id);
     }
 }

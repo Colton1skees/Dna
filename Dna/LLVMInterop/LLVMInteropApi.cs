@@ -1,4 +1,6 @@
-﻿using LLVMSharp.Interop;
+﻿using Dna.LLVMInterop.Native;
+using Dna.LLVMInterop.Wrapper;
+using LLVMSharp.Interop;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -11,9 +13,11 @@ namespace Dna.LLVMInterop
 {
     public static class LLVMInteropApi
     {
-        public unsafe static void Test(LLVMModuleRef module, IntPtr readBinaryContents)
+        public unsafe static Region Test(LLVMModuleRef module, IntPtr readBinaryContents)
         {
-            NativeLLVMInterop.VerifyModule(module, readBinaryContents);
+            nint ptr = NativeLLVMInterop.OptimizeModule(module, readBinaryContents);
+
+            return Region.CreateRegion(ptr);
         }
     }
 }

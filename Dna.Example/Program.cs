@@ -691,7 +691,19 @@ LlvmUtilities.LLVMParseCommandLineOptions(new string[] { "-memdep-block-scan-lim
 for (int i = 0; i < 1; i++)
 {
 
-    LLVMInteropApi.Test(unicornTraceModule, ptr);
+    var result = LLVMInteropApi.Test(unicornTraceModule, ptr);
+    Console.WriteLine("");
+    Console.WriteLine(result.Kind);
+
+    var idk2 = result.ChildCount;
+    var idk3 = result.EntryRegion;
+    var idk4 = result.Id;
+    var idk5 = result.HeadBasicBlock;
+    var idk6 = result.EntryRegion;
+    var idk7 = result.Owner;
+    var idk1 = result.BasicBlock;
+    var idk8 = result.PredecessorCount;
+    var idk9 = result.SuccessorCount;
     LlvmUtilities.LLVMParseCommandLineOptions(new string[] {
     "test",
     "-memdep-block-scan-limit=10000000",
