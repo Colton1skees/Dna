@@ -786,7 +786,6 @@ public:
     /// Constructor.
     ///
     /// \param func         the LLVM function to wrap
-    /// \param type_mapper  the type mapper of the backend
     /// \param domTree      the dominator tree for \c func
     /// \param loop_info    the loop info for \func
     StructuredFunction(

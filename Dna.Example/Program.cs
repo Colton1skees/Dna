@@ -162,7 +162,7 @@ if (writeDotGraph)
 
 List<Iced.Intel.Instruction> icedInstructions = new();
 
-bool emulate = true;
+bool emulate = false;
 if (emulate)
 {
     // Load the binary into unicorn engine.
@@ -688,7 +688,7 @@ LlvmUtilities.LLVMParseCommandLineOptions(new string[] { "-memdep-block-scan-lim
     "-gvn-max-num-deps=1000000",
 });
 */
-for (int i = 0; i < 10; i++)
+for (int i = 0; i < 1; i++)
 {
 
     LLVMInteropApi.Test(unicornTraceModule, ptr);

@@ -37,6 +37,21 @@
     <ClInclude Include="Passes\mdl_assert.h">
       <Filter>Passes</Filter>
     </ClInclude>
+    <ClInclude Include="Utilities\magic_enum.hpp">
+      <Filter>Utilities</Filter>
+    </ClInclude>
+    <ClInclude Include="Utilities\magic_enum_containers.hpp">
+      <Filter>Utilities</Filter>
+    </ClInclude>
+    <ClInclude Include="Utilities\magic_enum_format.hpp">
+      <Filter>Utilities</Filter>
+    </ClInclude>
+    <ClInclude Include="Utilities\magic_enum_fuse.hpp">
+      <Filter>Utilities</Filter>
+    </ClInclude>
+    <ClInclude Include="Utilities\magic_enum_switch.hpp">
+      <Filter>Utilities</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="dllmain.cpp" />
@@ -74,6 +89,9 @@
     </Filter>
     <Filter Include="Arch\X86">
       <UniqueIdentifier>{09c71ae9-f396-44b3-ad96-cc53ada21c2d}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Utilities">
+      <UniqueIdentifier>{dc5b4ba6-84b8-49f6-b289-87600b5945b1}</UniqueIdentifier>
     </Filter>
   </ItemGroup>
   <ItemGroup>

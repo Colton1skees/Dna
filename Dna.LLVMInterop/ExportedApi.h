@@ -41,6 +41,54 @@
 
 #include "Passes/ClassifyingAliasAnalysisPass.h"
 #include "Passes/ConstantConcretizationPass.h"
+#include "Passes/ControlledNodeSplittingPass.h"
+#include "Passes/generator_jit_sl_function.h"
+#include "Passes/generator_jit_ast_compute.h"
+
+#include "Utilities/magic_enum.hpp"
+
+using namespace llvm::sl;
+
+void DumpRegion(llvm::sl::Region* region)
+{
+
+	switch (region->get_kind())
+	{
+	case Region::SK_SEQUENCE:
+		auto sequence = static_cast<RegionSequence*>(region);
+
+		for (auto i = 0; i < sequence->getChildSize(); i++)
+		{
+			auto child = sequence->getChild(i);
+
+			auto str = magic_enum::enum_name(child->get_kind());
+
+			std::printf(
+				"%.*s",
+				static_cast<int>(str.length()),
+				str.data());
+
+			printf("\n");
+		}
+		break;
+	}
+}
+
+void DumpStructuredFunction(const llvm::sl::StructuredFunction& sfunc)
+{
+	auto rootRegion = sfunc.getBody();
+
+	auto str = magic_enum::enum_name(rootRegion->get_kind());
+
+	std::printf(
+		"%.*s",
+		static_cast<int>(str.length()),
+		str.data());
+
+	printf("\n");
+
+	DumpRegion(rootRegion);
+}
 
 extern "C" __declspec(dllexport) void OptimizeModule(llvm::Module * module, Dna::Passes::tReadBinaryContents readBinaryContents)
 {
@@ -117,9 +165,20 @@ extern "C" __declspec(dllexport) void OptimizeModule(llvm::Module * module, Dna:
 	FPM.add(Dna::Passes::getConstantConcretizationPassPass(readBinaryContents)); // added
 	FPM.add(llvm::createDeadStoreEliminationPass()); // added
 	FPM.add(llvm::createLoopUnrollPass(3));
+
+
+	// Note: We should avoid pointer PHIs here.
+	FPM.add(llvm::createCFGSimplificationPass());
+	FPM.add(llvm::sl::createControlledNodeSplittingPass());
+	FPM.add(llvm::createCFGSimplificationPass());
+	FPM.add(llvm::sl::createUnswitchPass());
+
+
 	PMB.populateFunctionPassManager(FPM);
 	PMB.populateModulePassManager(module_manager);
 
+	auto structuringPass = (llvm::sl::StructuredControlFlowPass*)llvm::sl::createASTComputePass();
+	module_manager.add(structuringPass);
 
 	auto f = (module->getFunction("SampleFunc"));
 
@@ -135,4 +194,10 @@ extern "C" __declspec(dllexport) void OptimizeModule(llvm::Module * module, Dna:
 
 	module_manager.run(*f->getParent());
 	printf("done");
+
+
+	auto structuredFunction = structuringPass->getStructuredFunction(f);
+
+	printf("got structured function.");
+	DumpStructuredFunction(*structuredFunction);
 }

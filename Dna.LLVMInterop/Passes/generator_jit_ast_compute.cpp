@@ -211,7 +211,6 @@ public:
     /// Constructor.
     ///
     /// \param func         the LLVM function we build a region graph for
-    /// \param type_mapper  the MDL type mapper
     /// \param domTree      LLVM dominance tree for \c func
     /// \param loop_info    LLVM loop info for \c func
     RegionBuilder(
@@ -1500,9 +1499,8 @@ Region *IfContext::createIfRegion(
 // ----------------------------------------------------------------------------
 
 // Constructor.
-StructuredControlFlowPass::StructuredControlFlowPass(mi::mdl::Type_mapper &type_mapper)
+StructuredControlFlowPass::StructuredControlFlowPass()
 : ModulePass(ID)
-, m_type_mapper(type_mapper)
 {
 }
 
@@ -1541,9 +1539,9 @@ bool StructuredControlFlowPass::runOnModule(Module &M)
 char StructuredControlFlowPass::ID = 0;
 
 //------------------------------------------------------------------------------
-Pass *createASTComputePass(mi::mdl::Type_mapper &type_mapper)
+Pass *createASTComputePass()
 {
-    return new StructuredControlFlowPass(type_mapper);
+    return new StructuredControlFlowPass();
 }
 
 unsigned RegionBuilder::dumpRegion(FILE *file, Region const *region)

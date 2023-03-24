@@ -54,9 +54,7 @@ public:
 public:
     /// Constructor.
     ///
-    /// \param type_mapper  the MDL type mapper.
-    explicit StructuredControlFlowPass(
-        mi::mdl::Type_mapper &type_mapper);
+    explicit StructuredControlFlowPass();
 
     /// Destructor.
     ~StructuredControlFlowPass() override;
@@ -86,17 +84,13 @@ public:
 private:
 
 private:
-    /// The MDL type mapper.
-    mi::mdl::Type_mapper &m_type_mapper;
-
     /// Map from LLVM functions to structured functions.
     std::map<llvm::Function *, StructuredFunction *> m_structured_function_map;
 };
 
 /// Creates a new AST compute pass.
 ///
-/// \param type_mapper  the MDL type mapper.
-Pass *createASTComputePass(mi::mdl::Type_mapper &type_mapper);
+Pass *createASTComputePass();
 
 
 /// This pass ensures that loops only have one exit node as preparation

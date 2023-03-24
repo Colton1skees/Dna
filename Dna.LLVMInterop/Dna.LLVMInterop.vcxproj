@@ -169,6 +169,11 @@
     <ClInclude Include="Passes\PassUtilities.h" />
     <ClInclude Include="Symex\ICpuEmulatorState.h" />
     <ClInclude Include="Symex\LLVMSymbolicExecutor.h" />
+    <ClInclude Include="Utilities\magic_enum.hpp" />
+    <ClInclude Include="Utilities\magic_enum_containers.hpp" />
+    <ClInclude Include="Utilities\magic_enum_format.hpp" />
+    <ClInclude Include="Utilities\magic_enum_fuse.hpp" />
+    <ClInclude Include="Utilities\magic_enum_switch.hpp" />
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="dllmain.cpp" />
