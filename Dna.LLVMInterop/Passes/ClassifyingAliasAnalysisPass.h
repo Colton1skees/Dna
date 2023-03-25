@@ -9,6 +9,9 @@
 #include <Arch/X86/X86Registers.h>
 
 namespace Dna::Passes {
+	// Typedef for a function pointer which returns whether two functions alias.
+	typedef llvm::AliasResult(__cdecl* tGetAliasResult)(llvm::Value* ptrA, llvm::Value* ptrB);
+
 	// Classification of the type of a pointer.
 	enum PointerType 
 	{

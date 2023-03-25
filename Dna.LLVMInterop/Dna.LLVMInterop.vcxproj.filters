@@ -76,6 +76,9 @@
     <ClInclude Include="API\RegionAPI\RegionAPI.h">
       <Filter>API\RegionAPI</Filter>
     </ClInclude>
+    <ClInclude Include="Pipeline\Pipeline.h">
+      <Filter>Pipeline</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="dllmain.cpp" />
@@ -122,6 +125,9 @@
     </Filter>
     <Filter Include="API\OptimizationAPI">
       <UniqueIdentifier>{a9052d1b-7687-4796-96e4-3b6df6841c81}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Pipeline">
+      <UniqueIdentifier>{1e02910f-66d7-4740-8d98-568ef22a7b5b}</UniqueIdentifier>
     </Filter>
   </ItemGroup>
   <ItemGroup>

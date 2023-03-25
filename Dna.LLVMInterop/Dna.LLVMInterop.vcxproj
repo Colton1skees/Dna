@@ -175,6 +175,7 @@
     <ClInclude Include="Passes\generator_jit_sl_function.h" />
     <ClInclude Include="Passes\mdl_assert.h" />
     <ClInclude Include="Passes\PassUtilities.h" />
+    <ClInclude Include="Pipeline\Pipeline.h" />
     <ClInclude Include="Symex\ICpuEmulatorState.h" />
     <ClInclude Include="Symex\LLVMSymbolicExecutor.h" />
     <ClInclude Include="Utilities\magic_enum.hpp" />
