@@ -20,7 +20,7 @@ namespace Dna.Lifting
 
         private readonly ICpuArchitecture architecture;
 
-        private readonly LLVMBuilderRef builder;
+        public readonly LLVMBuilderRef builder;
 
         private InstToLLVMLifter lifter;
 
@@ -38,7 +38,7 @@ namespace Dna.Lifting
 
         private LLVMValueRef memoryPtr;
 
-        private LLVMValueRef localMemVariable;
+        public LLVMValueRef localMemVariable;
 
         // Current control flow graph to lift.
         private ControlFlowGraph<AbstractInst> irCfg;

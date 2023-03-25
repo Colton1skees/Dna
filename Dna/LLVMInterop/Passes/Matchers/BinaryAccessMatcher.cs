@@ -10,6 +10,23 @@ namespace Dna.LLVMInterop.Passes.Matchers
 {
     public static class BinaryAccessMatcher
     {
+        public static ulong GetBinarySectionOffset(LLVMValueRef value)
+        {
+            if(IsConstantWithinBinarySection(value))
+            {
+                var constant = value.ConstIntZExt;
+                return constant;
+            }
+
+            if(IsAddToBinarySection(value))
+            {
+                var constant = value.GetOperand(1).ConstIntZExt;
+                return constant;
+            }
+
+            throw new InvalidOperationException($"Cannot identify constant binary section access for: {value}");
+        }
+
         public static bool IsBinarySectionAccess(LLVMValueRef value)
         {
             // Precisely match:

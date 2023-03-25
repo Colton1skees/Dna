@@ -51,6 +51,12 @@ binary.WriteBytes(0x000000014001552B, new byte[]
     0x90, 0x90, 0x90, 0x90, 0x90
 });
 
+var assembler = new Iced.Intel.Assembler(64);
+assembler.jmp(0x14004B2EE);
+
+var encoded = InstructionRelocator.EncodeInstructions(assembler.Instructions.ToList(), 0x140015C47, out ulong endRIP);
+binary.WriteBytes(0x140015C47, encoded);
+
 // Instantiate dna.
 var dna = new Dna.Dna(binary);
 
@@ -137,8 +143,22 @@ OptimizationApi.OptimizeModule(llvmLifter.Module, llvmLifter.llvmFunction, false
 // Run the O3 pipeline with ptr alias analysis AND aggressive loop unrolling enabled.
 OptimizationApi.OptimizeModule(llvmLifter.Module, llvmLifter.llvmFunction, true, true, ptrAlias, false, 0, false);
 
+
+
 // Run the O3 pipeline one last time with custom alias analysis.
 OptimizationApi.OptimizeModule(llvmLifter.Module, llvmLifter.llvmFunction, false, true, ptrAlias, false, 0, false);
+
+llvmLifter.Module.PrintToFile(llPath);
+var myPass = new ConstantConcretizationPass(llvmLifter.llvmFunction, llvmLifter.builder, binary);
+myPass.Execute();
+
+// Run the O3 pipeline one last time with custom alias analysis.
+// PointerClassifier.Seen.Clear();
+//PointerClassifier.print = true;
+for (int i = 0; i < 5; i++)
+{
+    OptimizationApi.OptimizeModule(llvmLifter.Module, llvmLifter.llvmFunction, false, true, ptrAlias, false, 0, false);
+}
 
 llvmLifter.Module.PrintToFile(llPath);
 

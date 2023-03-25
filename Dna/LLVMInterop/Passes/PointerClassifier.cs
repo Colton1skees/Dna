@@ -15,6 +15,8 @@ namespace Dna.LLVMInterop.Passes
 {
     public static class PointerClassifier
     {
+        public static bool print = false;
+
         public static HashSet<LLVMValueRef> Seen = new HashSet<LLVMValueRef>();
 
         public static PointerType GetPointerType (LLVMValueRef gep)
@@ -53,13 +55,21 @@ namespace Dna.LLVMInterop.Passes
                 return PointerType.Segment;
             }
 
-            /*
-            if(!Seen.Contains(gep))
+            
+            if(!Seen.Contains(gep) && print)
             {
                 Seen.Add(gep);
-                Debugger.Break();
+
+                var slice = InstructionSlicer.SliceInst(gep);
+                foreach (var item in slice.Reverse())
+                {
+                    var text = item.ToString();
+                    text = new string(text.SkipWhile(x => x == ' ').ToArray());
+                    Console.WriteLine("    " + text);
+                }
+                //Debugger.Break();
             }
-            */
+            
 
             return PointerType.Unk;
         }

@@ -27,6 +27,33 @@ namespace Dna.Extensions
             }
         }
 
+        public static IEnumerable<LLVMBasicBlockRef> GetBlocks(this LLVMValueRef value)
+        {
+            // Get the first global within the module.
+            var next = value.FirstBasicBlock;
+            while (true)
+            {
+                // Exit if there are no more elements to yield.
+                if (next == null)
+                    yield break;
+
+                // Yield the next global.
+                yield return next;
+
+                if (next == value.LastBasicBlock)
+                    yield break;
+
+                // Setup the next global for iteration.
+                next = next.Next;
+
+            }
+        }
+
+        public static IEnumerable<LLVMValueRef> GetInstructions(this LLVMValueRef function)
+        {
+            return function.GetBlocks().SelectMany(x => x.GetInstructions());
+        }
+
         public static IEnumerable<LLVMValueRef> GetInstructions(this LLVMBasicBlockRef block)
         {
             // Get the first global within the module.
