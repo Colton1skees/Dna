@@ -22,7 +22,7 @@ namespace Dna::Passes {
 	{
 		// If our managed implementation of alias analysis returns a valid result, then we use it.
 		// Otherwise, UINT8_MAX was returned, meaning that we must use the value obtained via LLVM's default alias analysis.
-		auto result = pGetAliasResult(locA.Ptr, locB.Ptr);
+		auto result = pGetAliasResult((llvm::Value*)locA.Ptr, (llvm::Value*)locB.Ptr);
 		if (result == llvm::AliasResult::NoAlias
 			|| result == llvm::AliasResult::MayAlias
 			|| result == llvm::AliasResult::PartialAlias

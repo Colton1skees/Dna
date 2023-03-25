@@ -117,12 +117,16 @@ var readBytes = (ulong address, uint size) =>
 };
 
 
-var ptrReadBinaryContents = Marshal.GetFunctionPointerForDelegate(new dgReadBinaryContents(readBytes));
+var dgReadBytes = new dgReadBinaryContents(readBytes);
+var ptrReadBinaryContents = Marshal.GetFunctionPointerForDelegate(dgReadBytes);
 
 var ptrAlias = ClassifyingAliasAnalysisPass.PtrGetAliasResult;
 
+var llPath = @"optimized_vm_entry.ll";
+
+
 // Run the standard O3 pipeline.
-for (int i = 0; i < 20; i++)
+for (int i = 0; i < 5; i++)
 {
     OptimizationApi.OptimizeModule(llvmLifter.Module, llvmLifter.llvmFunction, false, false, 0, false, 0, false);
 }
@@ -133,7 +137,9 @@ OptimizationApi.OptimizeModule(llvmLifter.Module, llvmLifter.llvmFunction, false
 // Run the O3 pipeline with ptr alias analysis AND aggressive loop unrolling enabled.
 OptimizationApi.OptimizeModule(llvmLifter.Module, llvmLifter.llvmFunction, true, true, ptrAlias, false, 0, false);
 
-var llPath = @"optimized_vm_entry.ll";
+// Run the O3 pipeline one last time with custom alias analysis.
+OptimizationApi.OptimizeModule(llvmLifter.Module, llvmLifter.llvmFunction, false, true, ptrAlias, false, 0, false);
+
 llvmLifter.Module.PrintToFile(llPath);
 
 bool compile = true;

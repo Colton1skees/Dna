@@ -88,6 +88,7 @@ namespace Dna::Pipeline
 		PMB.LoopVectorize = false;
 
 		// Add the alias analysis passes.
+		FPM.add(llvm::createReassociatePass());
 		FPM.add(llvm::createCFLSteensAAWrapperPass());
 		FPM.add(llvm::createTypeBasedAAWrapperPass());
 		FPM.add(llvm::createScopedNoAliasAAWrapperPass());
@@ -153,6 +154,7 @@ namespace Dna::Pipeline
 		FPM.add(llvm::createSCCPPass());
 		FPM.add(llvm::createSROAPass());
 		FPM.add(llvm::createAggressiveDCEPass());
+		FPM.add(llvm::createReassociatePass());
 
 		// Note: We should avoid pointer PHIs here.
 		if (runStructuring)
@@ -172,8 +174,32 @@ namespace Dna::Pipeline
 			module_manager.add(structuringPass);
 		}
 
-		const char* args[2] = { "test", "-memdep-block-scan-limit=10000000" };
+		const char* args[2] = { "test", "-earlycse-mssa-optimization-cap=1000000" };
 		llvm::cl::ParseCommandLineOptions(2, args);
+
+		const char* args4[2] = { "test4", "-dse-memoryssa-defs-per-block-limit=1000000" };
+		llvm::cl::ParseCommandLineOptions(2, args4);
+
+		const char* args5[2] = { "test5", "-dse-memoryssa-partial-store-limit=1000000" };
+		llvm::cl::ParseCommandLineOptions(2, args5);
+
+		const char* args6[2] = { "test6", "-dse-memoryssa-path-check-limit=1000000" };
+		llvm::cl::ParseCommandLineOptions(2, args6);
+
+		const char* args7[2] = { "test7", "-dse-memoryssa-scanlimit=1000000" };
+		llvm::cl::ParseCommandLineOptions(2, args7);
+
+		const char* args8[2] = { "test8", "-dse-memoryssa-walklimit=1000000" };
+		llvm::cl::ParseCommandLineOptions(2, args8);
+
+		const char* args9[2] = { "test9", "-dse-memoryssa-otherbb-cost=2" };
+		llvm::cl::ParseCommandLineOptions(2, args9);
+
+		//const char* args10[2] = { "test10", "memdep-block-number-limit=10000" };
+		//llvm::cl::ParseCommandLineOptions(2, args10);
+
+		const char* args11[2] = { "test11", "-memdep-block-scan-limit=1000000" };
+		llvm::cl::ParseCommandLineOptions(2, args11);
 
 		FPM.doInitialization();
 		FPM.run(*f);

@@ -48,5 +48,13 @@ namespace Dna.Extensions
 
             }
         }
+
+        public static IEnumerable<LLVMValueRef> GetOperands(this LLVMValueRef value)
+        {
+            for(uint i = 0; i < value.OperandCount; i++)
+            {
+                yield return value.GetOperand(i);
+            }
+        }
     }
 }

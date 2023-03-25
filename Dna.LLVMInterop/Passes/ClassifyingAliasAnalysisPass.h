@@ -10,7 +10,7 @@
 
 namespace Dna::Passes {
 	// Typedef for a function pointer which returns whether two functions alias.
-	typedef llvm::AliasResult(__cdecl* tGetAliasResult)(const llvm::Value* ptrA, const llvm::Value* ptrB);
+	typedef llvm::AliasResult::Kind(__cdecl* tGetAliasResult)(llvm::Value* ptrA, llvm::Value* ptrB);
 
 	// Alias analysis pass that attempts to classify pointers based off of their access
 	// patterns. For example, if you encounter [rsp - 0x10] and [.TEXT + 0x50],

@@ -24,21 +24,36 @@ namespace Dna.LLVMInterop.Passes
         PartialAlias,
         /// The two locations precisely alias each other.
         MustAlias,
+
+        /// <summary>
+        /// If Dna cannot determine the pointer type, then we return this out of range value.
+        /// Since this is not a valid option(e.g. llvm only has the above four alias types),
+        /// the pass which consumes this API knows to default to LLVM's built in AA.
+        /// </summary>
+        UnknownAlias,
     };
+
+    public enum PointerType
+    {
+        Unk,
+        BinarySection,
+        LocalStack,
+        Segment,
+    }
 
     [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
     public unsafe delegate AliasResult dgGetAliasResult(LLVMOpaqueValue* ptrA, LLVMOpaqueValue* ptrB);
 
-    public static unsafe class ClassifyingAliasAnalysisPass
+    public static class ClassifyingAliasAnalysisPass
     {
-        private static dgGetAliasResult getAliasResult;
+        private static readonly dgGetAliasResult getAliasResult;
 
         /// <summary>
         /// Unmanaged pointer to the `GetAliasKind` method, which is invoked by native code.
         /// </summary>
         public static nint PtrGetAliasResult { get;}
 
-        static ClassifyingAliasAnalysisPass()
+        static unsafe ClassifyingAliasAnalysisPass()
         {
             getAliasResult = new dgGetAliasResult(GetAliasResult);
             PtrGetAliasResult = Marshal.GetFunctionPointerForDelegate(getAliasResult);
@@ -52,7 +67,35 @@ namespace Dna.LLVMInterop.Passes
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         private static unsafe AliasResult GetAliasResultInternal(LLVMValueRef ptrA, LLVMValueRef ptrB)
         {
+            /*
+            var ptrAText = new string(ptrA.ToString().SkipWhile(x => x == ' ').ToArray());
+            Console.WriteLine(ptrAText);
+            var typeA = PointerClassifier.GetPointerType(ptrA);
+            var ptrBText = new string(ptrB.ToString().SkipWhile(x => x == ' ').ToArray());
+            Console.WriteLine(ptrBText);
+            var typeB = PointerClassifier.GetPointerType(ptrB);
             return (AliasResult)byte.MaxValue;
+            */
+
+            // Classify the type of pointer A.
+            var typeA = PointerClassifier.GetPointerType(ptrA);
+
+            // Classify the type of pointer B.
+            var typeB = PointerClassifier.GetPointerType(ptrB);
+
+            // If either pointer type is unknown, then we tell LLVM
+            // to fall back to it's basic alias analysis.
+            if (typeA == PointerType.Unk || typeB == PointerType.Unk)
+                return AliasResult.UnknownAlias;
+
+            // If the two pointer types are different(e.g. [rsp - 0x10] and [gs]),
+            // then we tell LLVM that these cannot possibly alias.
+            if (typeA != typeB)
+                return AliasResult.NoAlias;
+
+            // If the two pointer types are the same, then we fall back to LLVM's
+            // built in alias analysis.
+            return AliasResult.UnknownAlias;
         }
     }
 }
