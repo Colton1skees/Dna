@@ -8,12 +8,19 @@ using System.Threading.Tasks;
 
 namespace Dna.LLVMInterop
 {
-    public static class NativeLLVMInterop
+    public static class NativeOptimizationApi
     {
         [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
         public delegate ulong dgReadBinaryContents(ulong rva, uint size);
 
         [DllImport("Dna.LLVMInterop", CallingConvention = CallingConvention.Cdecl)]
-        public unsafe static extern IntPtr OptimizeModule(LLVMOpaqueModule* M, IntPtr readBinaryContents);
+        public unsafe static extern IntPtr OptimizeLLVMModule(LLVMOpaqueModule* module,
+            LLVMOpaqueValue* function,
+            bool aggressiveUnroll,
+            bool runClassifyingAliasAnalysis,
+            nint ptrGetAliasResult,
+            bool runConstantConcretization,
+            nint ptrReadBinaryContents,
+            bool runStructuring);
     }
 }

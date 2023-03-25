@@ -55,10 +55,12 @@ namespace Dna::Pipeline
 {
 	void OptimizeModule(llvm::Module* module,
 		llvm::Function* f,
+		bool aggressiveUnroll,
 		bool runClassifyingAliasAnalysis,
-
+		Dna::Passes::tGetAliasResult getAliasResult,
 		bool runConstantConcretization, 
-		Dna::Passes::tReadBinaryContents readBinaryContents)
+		Dna::Passes::tReadBinaryContents readBinaryContents,
+		bool runStructuring)
 	{
 		// Initialize passes.
 		llvm::PassRegistry& Registry = *llvm::PassRegistry::getPassRegistry();
@@ -89,8 +91,15 @@ namespace Dna::Pipeline
 		FPM.add(llvm::createCFLSteensAAWrapperPass());
 		FPM.add(llvm::createTypeBasedAAWrapperPass());
 		FPM.add(llvm::createScopedNoAliasAAWrapperPass());
-		FPM.add(Dna::Passes::createSegmentsAAWrapperPass());
-		FPM.add(new Dna::Passes::SegmentsExternalAAWrapperPass());
+		if (runClassifyingAliasAnalysis)
+		{
+			// TODO: Properly pass the alias analysis func ptr.
+			Dna::Passes::ClassifyingAAResult::gGetAliasResult = getAliasResult;
+
+			FPM.add(Dna::Passes::createSegmentsAAWrapperPass());
+
+			FPM.add(new Dna::Passes::SegmentsExternalAAWrapperPass());
+		}
 		FPM.add(llvm::createSROAPass());
 		FPM.add(llvm::createEarlyCSEPass());
 
@@ -121,13 +130,23 @@ namespace Dna::Pipeline
 		FPM.add(llvm::createCFGSimplificationPass());    // added
 		FPM.add(llvm::createDeadStoreEliminationPass()); // added
 
-		FPM.add(Dna::Passes::getConstantConcretizationPassPass(readBinaryContents)); // added
+		if(runConstantConcretization)
+			FPM.add(Dna::Passes::getConstantConcretizationPassPass(readBinaryContents)); // added
 		FPM.add(llvm::createDeadStoreEliminationPass()); // added
 
-		FPM.add(llvm::createLoopUnrollPass(3, false, false, 9999999999, -1, 1));
+		if (aggressiveUnroll)
+		{
+			const char* args2[2] = { "testtwo", "-unroll-count=1500" };
+			llvm::cl::ParseCommandLineOptions(2, args2);
+			const char* args3[2] = { "testhree", "-unroll-threshold=100000000" };
+			llvm::cl::ParseCommandLineOptions(2, args3);
+			FPM.add(llvm::createLoopUnrollPass(3, false, false, 9999999999, -1, 1));
+		}
 
 
-		FPM.add(new Dna::Passes::SegmentsExternalAAWrapperPass());
+		FPM.add(llvm::createIndVarSimplifyPass());
+		FPM.add(llvm::createConstraintEliminationPass());
+
 		FPM.add(llvm::createSROAPass());
 		FPM.add(llvm::createEarlyCSEPass());
 		FPM.add(llvm::createDeadStoreEliminationPass()); // added
@@ -136,30 +155,25 @@ namespace Dna::Pipeline
 		FPM.add(llvm::createAggressiveDCEPass());
 
 		// Note: We should avoid pointer PHIs here.
-		FPM.add(llvm::createCFGSimplificationPass());
-		FPM.add(llvm::sl::createControlledNodeSplittingPass());
-		FPM.add(llvm::createCFGSimplificationPass());
-		FPM.add(llvm::sl::createUnswitchPass());
+		if (runStructuring)
+		{
+			FPM.add(llvm::createCFGSimplificationPass());
+			FPM.add(llvm::sl::createControlledNodeSplittingPass());
+			FPM.add(llvm::createCFGSimplificationPass());
+			FPM.add(llvm::sl::createUnswitchPass());
+		}
 
 		PMB.populateFunctionPassManager(FPM);
 		PMB.populateModulePassManager(module_manager);
 
-		auto structuringPass = (llvm::sl::StructuredControlFlowPass*)llvm::sl::createASTComputePass();
-		module_manager.add(structuringPass);
-
-		auto f = (module->getFunction("SampleFunc"));
+		if (runStructuring)
+		{
+			auto structuringPass = (llvm::sl::StructuredControlFlowPass*)llvm::sl::createASTComputePass();
+			module_manager.add(structuringPass);
+		}
 
 		const char* args[2] = { "test", "-memdep-block-scan-limit=10000000" };
 		llvm::cl::ParseCommandLineOptions(2, args);
-
-		const char* args2[2] = { "testtwo", "-unroll-count=1500" };
-		llvm::cl::ParseCommandLineOptions(2, args2);
-
-		const char* args3[2] = { "testhree", "-unroll-threshold=100000000" };
-		llvm::cl::ParseCommandLineOptions(2, args3);
-
-		//const char* args2[2] = { "testt", "-unroll-count=10000" };
-		//llvm::cl::ParseCommandLineOptions(2, args2);
 
 		FPM.doInitialization();
 		FPM.run(*f);

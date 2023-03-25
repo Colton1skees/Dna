@@ -6,7 +6,6 @@ using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
 using System.Text;
 using System.Threading.Tasks;
-using static Dna.LLVMInterop.NativeLLVMInterop;
 
 namespace Dna.LLVMInterop.Passes
 {
@@ -32,18 +31,26 @@ namespace Dna.LLVMInterop.Passes
 
     public static unsafe class ClassifyingAliasAnalysisPass
     {
+        private static dgGetAliasResult getAliasResult;
+
         /// <summary>
         /// Unmanaged pointer to the `GetAliasKind` method, which is invoked by native code.
         /// </summary>
-        public static nint PtrGetAliasResult { get;} = Marshal.GetFunctionPointerForDelegate(new dgGetAliasResult(GetAliasResult));
+        public static nint PtrGetAliasResult { get;}
+
+        static ClassifyingAliasAnalysisPass()
+        {
+            getAliasResult = new dgGetAliasResult(GetAliasResult);
+            PtrGetAliasResult = Marshal.GetFunctionPointerForDelegate(getAliasResult);
+        }
 
         public static unsafe AliasResult GetAliasResult(LLVMOpaqueValue* opaquePtrA, LLVMOpaqueValue* opaquePtrB)
         {
-            return GetAliasResult(opaquePtrA, opaquePtrB);
+            return GetAliasResultInternal(opaquePtrA, opaquePtrB);
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        private static unsafe AliasResult GetAliasResult(LLVMValueRef ptrA, LLVMValueRef ptrB)
+        private static unsafe AliasResult GetAliasResultInternal(LLVMValueRef ptrA, LLVMValueRef ptrB)
         {
             return (AliasResult)byte.MaxValue;
         }
