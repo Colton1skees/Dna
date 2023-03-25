@@ -713,6 +713,9 @@ for (int i = 0; i < 1; i++)
  //   var idk13 = result.Predecessors;
     */
     Debugger.Break();
+
+    RegionPrinter.PrintRegion(result);
+
     LlvmUtilities.LLVMParseCommandLineOptions(new string[] {
     "test",
     "-memdep-block-scan-limit=10000000",
