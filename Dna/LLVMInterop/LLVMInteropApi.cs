@@ -1,5 +1,4 @@
-﻿using Dna.LLVMInterop.Native;
-using Dna.LLVMInterop.Wrapper;
+﻿using Dna.LLVMInterop.API.RegionAnalysis.Wrapper;
 using LLVMSharp.Interop;
 using System;
 using System.Collections.Generic;

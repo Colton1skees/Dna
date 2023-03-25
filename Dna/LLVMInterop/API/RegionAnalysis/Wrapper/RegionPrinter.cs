@@ -8,7 +8,7 @@ using System.Runtime.CompilerServices;
 using System.Text;
 using System.Threading.Tasks;
 
-namespace Dna.LLVMInterop.Wrapper
+namespace Dna.LLVMInterop.API.RegionAnalysis.Wrapper
 {
     public static class RegionPrinter
     {
@@ -28,10 +28,10 @@ namespace Dna.LLVMInterop.Wrapper
 
         private static void FormatRegion(Region region, ref StringBuilder builder)
         {
-            switch(region)
+            switch (region)
             {
                 case SequenceRegion seqReg:
-                    foreach(var child in region.Children)
+                    foreach (var child in region.Children)
                     {
                         FormatRegion(child, ref builder);
                     }
@@ -88,7 +88,7 @@ namespace Dna.LLVMInterop.Wrapper
             }
         }
 
-       private static void PrintBlock(LLVMBasicBlockRef block, ref StringBuilder builder)
+        private static void PrintBlock(LLVMBasicBlockRef block, ref StringBuilder builder)
         {
             foreach (var inst in block.GetInstructions())
             {

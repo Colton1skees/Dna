@@ -4,11 +4,11 @@ using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 
-namespace Dna.LLVMInterop.Wrapper
+namespace Dna.LLVMInterop.API.RegionAnalysis.Wrapper
 {
-    public class SwitchRegion : ComplexRegion
+    public class BlockRegion : Region
     {
-        public SwitchRegion(nint handle) : base(handle)
+        public BlockRegion(nint handle) : base(handle)
         {
         }
     }

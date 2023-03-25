@@ -167,15 +167,23 @@ extern "C" __declspec(dllexport) llvm::sl::Region * OptimizeModule(llvm::Module 
 	FPM.add(Dna::Passes::getConstantConcretizationPassPass(readBinaryContents)); // added
 	FPM.add(llvm::createDeadStoreEliminationPass()); // added
 
+	FPM.add(llvm::createSCEVAAWrapperPass());
+	FPM.add(llvm::createLoopUnrollPass(3, false, false, 9999999999, -1, 1));
+
+
+	FPM.add(new Dna::Passes::SegmentsExternalAAWrapperPass());
+	FPM.add(llvm::createSROAPass());
+	FPM.add(llvm::createEarlyCSEPass());
+	FPM.add(llvm::createDeadStoreEliminationPass()); // added
+	FPM.add(llvm::createSCCPPass());
+	FPM.add(llvm::createSROAPass());
+	FPM.add(llvm::createAggressiveDCEPass());
 
 	// Note: We should avoid pointer PHIs here.
 	FPM.add(llvm::createCFGSimplificationPass());
 	FPM.add(llvm::sl::createControlledNodeSplittingPass());
 	FPM.add(llvm::createCFGSimplificationPass());
 	FPM.add(llvm::sl::createUnswitchPass());
-
-	FPM.add(llvm::createSCEVAAWrapperPass());
-	FPM.add(llvm::createLoopUnrollPass(3, false, false, 9999999999, -1, 1));
 
 	PMB.populateFunctionPassManager(FPM);
 	PMB.populateModulePassManager(module_manager);
@@ -187,6 +195,12 @@ extern "C" __declspec(dllexport) llvm::sl::Region * OptimizeModule(llvm::Module 
 
 	const char* args[2] = { "test", "-memdep-block-scan-limit=10000000" };
 	llvm::cl::ParseCommandLineOptions(2, args);
+
+	const char* args2[2] = { "testtwo", "-unroll-count=1500" };
+	llvm::cl::ParseCommandLineOptions(2, args2);
+
+	const char* args3[2] = { "testhree", "-unroll-threshold=100000000" };
+	llvm::cl::ParseCommandLineOptions(2, args3);
 
 	//const char* args2[2] = { "testt", "-unroll-count=10000" };
 	//llvm::cl::ParseCommandLineOptions(2, args2);

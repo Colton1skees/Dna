@@ -183,7 +183,6 @@ namespace Dna.Lifting
 
                 else
                 {
-
                     var llvmBlock = llvmFunction.AppendBasicBlock(block.Name);
                     liftedBlockMapping.Add(block, llvmBlock);
                 }

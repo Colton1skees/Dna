@@ -33,7 +33,7 @@ using Dna.Decompiler.Rellic;
 using Dna.LLVMInterop;
 using System.Runtime.InteropServices;
 using static Dna.LLVMInterop.NativeLLVMInterop;
-using Dna.LLVMInterop.Wrapper;
+using Dna.LLVMInterop.API.RegionAnalysis.Wrapper;
 // Load the 64 bit PE file.
 // Note: This file is automatically copied to the build directory.
 var path = @"C:\Users\colton\source\repos\ObfuscationTester\x64\Release\ObfuscationTester.themida.exe";
@@ -693,7 +693,7 @@ LlvmUtilities.LLVMParseCommandLineOptions(new string[] { "-memdep-block-scan-lim
 for (int i = 0; i < 1; i++)
 {
 
-    var result = (SequenceRegion)LLVMInteropApi.Test(unicornTraceModule, ptr);
+    var result = LLVMInteropApi.Test(unicornTraceModule, ptr);
     Console.WriteLine("");
    // Console.WriteLine(result.Kind);
 

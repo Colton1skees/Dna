@@ -7,7 +7,7 @@ using System.Runtime.InteropServices;
 using System.Text;
 using System.Threading.Tasks;
 
-namespace Dna.LLVMInterop.Native
+namespace Dna.LLVMInterop.API.RegionAnalysis.Native
 {
     /// <summary>
     /// The kind of a region.

@@ -1,4 +1,4 @@
-﻿using Dna.LLVMInterop.Native;
+﻿using Dna.LLVMInterop.API.RegionAnalysis.Native;
 using LLVMSharp.Interop;
 using System;
 using System.Collections.Generic;
@@ -6,7 +6,7 @@ using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 
-namespace Dna.LLVMInterop.Wrapper
+namespace Dna.LLVMInterop.API.RegionAnalysis.Wrapper
 {
     public unsafe abstract class Region : IEquatable<Region>
     {
@@ -109,10 +109,10 @@ namespace Dna.LLVMInterop.Wrapper
                 RegionKind.Return => new ReturnRegion(ptr),
                 RegionKind.Switch => new SwitchRegion(ptr),
                 _ => throw new InvalidOperationException($"Region kind {kind} is not supported."),
-            }; 
+            };
         }
 
-        public override bool Equals(object? obj) => (obj is Region other) && Equals(other);
+        public override bool Equals(object? obj) => obj is Region other && Equals(other);
 
         public bool Equals(Region other) => this == other;
 
@@ -122,6 +122,6 @@ namespace Dna.LLVMInterop.Wrapper
 
         public static bool operator !=(Region left, Region right) => !(left == right);
 
-        public static implicit operator Region(nint value) => CreateRegion(value); 
+        public static implicit operator Region(nint value) => CreateRegion(value);
     }
 }
