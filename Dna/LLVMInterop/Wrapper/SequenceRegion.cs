@@ -6,7 +6,7 @@ using System.Threading.Tasks;
 
 namespace Dna.LLVMInterop.Wrapper
 {
-    internal class SequenceRegion : ComplexRegion
+    public class SequenceRegion : ComplexRegion
     {
         public SequenceRegion(nint handle) : base(handle)
         {

@@ -33,6 +33,7 @@ using Dna.Decompiler.Rellic;
 using Dna.LLVMInterop;
 using System.Runtime.InteropServices;
 using static Dna.LLVMInterop.NativeLLVMInterop;
+using Dna.LLVMInterop.Wrapper;
 // Load the 64 bit PE file.
 // Note: This file is automatically copied to the build directory.
 var path = @"C:\Users\colton\source\repos\ObfuscationTester\x64\Release\ObfuscationTester.themida.exe";
@@ -688,22 +689,30 @@ LlvmUtilities.LLVMParseCommandLineOptions(new string[] { "-memdep-block-scan-lim
     "-gvn-max-num-deps=1000000",
 });
 */
+
 for (int i = 0; i < 1; i++)
 {
 
-    var result = LLVMInteropApi.Test(unicornTraceModule, ptr);
+    var result = (SequenceRegion)LLVMInteropApi.Test(unicornTraceModule, ptr);
     Console.WriteLine("");
-    Console.WriteLine(result.Kind);
+   // Console.WriteLine(result.Kind);
 
+    /*
+    var idk1 = result.BasicBlock;
     var idk2 = result.ChildCount;
     var idk3 = result.EntryRegion;
-    var idk4 = result.Id;
-    var idk5 = result.HeadBasicBlock;
-    var idk6 = result.EntryRegion;
-    var idk7 = result.Owner;
-    var idk1 = result.BasicBlock;
-    var idk8 = result.PredecessorCount;
-    var idk9 = result.SuccessorCount;
+    var idk4 = result.HeadBasicBlock;
+    var idk5 = result.Head;
+    var idk6 = result.Id;
+    var idk7 = result.Kind;
+    var idk8 = result.Owner;
+    var idk9 = result.PredecessorCount;
+    //var idk10 = result.Predecessors;
+    var idk11 = result.SuccessorCount;
+   // var idk12 = result.Successors;
+ //   var idk13 = result.Predecessors;
+    */
+    Debugger.Break();
     LlvmUtilities.LLVMParseCommandLineOptions(new string[] {
     "test",
     "-memdep-block-scan-limit=10000000",

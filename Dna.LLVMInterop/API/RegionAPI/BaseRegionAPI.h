@@ -56,9 +56,9 @@ namespace Dna::API {
 		return region->get_head_bb();
 	}
 
-	DNA_EXPORT size_t RegionGetChildCount(Region* region)
+	DNA_EXPORT unsigned long long RegionGetChildCount(Region* region)
 	{
-		region->getChildSize();
+		return region->getChildSize();
 	}
 
 	DNA_EXPORT Region* RegionGetChild(Region* region, size_t index)

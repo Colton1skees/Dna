@@ -92,7 +92,7 @@ void DumpStructuredFunction(const llvm::sl::StructuredFunction& sfunc)
 	DumpRegion(rootRegion);
 }
 
-extern "C" __declspec(dllexport) llvm::sl::Region* OptimizeModule(llvm::Module * module, Dna::Passes::tReadBinaryContents readBinaryContents)
+extern "C" __declspec(dllexport) llvm::sl::Region * OptimizeModule(llvm::Module * module, Dna::Passes::tReadBinaryContents readBinaryContents)
 {
 	printf("received llvm module.");
 

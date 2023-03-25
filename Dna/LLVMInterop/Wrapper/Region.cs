@@ -35,11 +35,13 @@ namespace Dna.LLVMInterop.Wrapper
 
         public IEnumerable<Region> Successors => GetSuccessors();
 
+        public ulong ChildCount => NativeRegionApi.RegionGetChildCount(handle);
+
+        public IEnumerable<Region> Children => GetChildren();
+
         public LLVMBasicBlockRef BasicBlock => new LLVMBasicBlockRef(NativeRegionApi.RegionGetLLVMBasicBlock(handle));
 
         public LLVMBasicBlockRef HeadBasicBlock => new LLVMBasicBlockRef(NativeRegionApi.RegionGetHeadLLVMBasicBlock(handle));
-
-        public ulong ChildCount => NativeRegionApi.RegionGetChildCount(handle);
 
         public Region(nint handle)
         {
