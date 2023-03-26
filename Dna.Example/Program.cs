@@ -70,9 +70,12 @@ var cfg = dna.RecursiveDescent.ReconstructCfg(funcAddr);
 // Instantiate the cpu architecture.
 var architecture = new X86CpuArchitecture(ArchitectureId.ARCH_X86_64);
 
-//var cfgExplorer = new CfgExplorer(dna, architecture);
-//cfgExplorer.DevirtualizeRoutine(funcAddr);
-
+bool explore = false;
+if (explore)
+{
+    var cfgExplorer = new CfgExplorer(dna, architecture);
+    cfgExplorer.DevirtualizeRoutine(funcAddr);
+}
 
 // Instantiate a class for lifting control flow graphs to our intermediate language.
 var cfgLifter = new CfgLifter(architecture);
@@ -161,7 +164,7 @@ var ptrReadBinaryContents = Marshal.GetFunctionPointerForDelegate(dgReadBytes);
 
 var ptrAlias = ClassifyingAliasAnalysisPass.PtrGetAliasResult;
 
-var llPath = @"optimized_vm_entry.ll";
+var llPath = @"optimized_vm_entry2.ll";
 
 
 
@@ -182,7 +185,7 @@ OptimizationApi.OptimizeModule(llvmLifter.Module, llvmLifter.llvmFunction, true,
 // Run the O3 pipeline one last time with custom alias analysis.
 OptimizationApi.OptimizeModule(llvmLifter.Module, llvmLifter.llvmFunction, false, true, ptrAlias, false, 0, false);
 
-llvmLifter.Module.PrintToFile(llPath);
+//llvmLifter.Module.PrintToFile(llPath);
 var myPass = new ConstantConcretizationPass(llvmLifter.llvmFunction, llvmLifter.builder, binary);
 myPass.Execute();
 
@@ -193,7 +196,15 @@ for (int i = 0; i < 7; i++)
 {
     Console.WriteLine(i);
     OptimizationApi.OptimizeModule(llvmLifter.Module, llvmLifter.llvmFunction, false, true, ptrAlias, false, 0, false);
+
+    var pass2 = new ConstantConcretizationPass(llvmLifter.llvmFunction, llvmLifter.builder, binary);
+    pass2.Execute();
+
+    llvmLifter.Module.PrintToFile("foo.ll");
+    OptimizationApi.OptimizeModule(llvmLifter.Module, llvmLifter.llvmFunction, false, true, ptrAlias, false, 0, false, true);
+    Console.WriteLine("foo foo foo");
 }
+
 
 llvmLifter.Module.PrintToFile(llPath);
 

@@ -58,10 +58,26 @@ namespace Dna::Pipeline
 		bool aggressiveUnroll,
 		bool runClassifyingAliasAnalysis,
 		Dna::Passes::tGetAliasResult getAliasResult,
-		bool runConstantConcretization, 
+		bool runConstantConcretization,
 		Dna::Passes::tReadBinaryContents readBinaryContents,
-		bool runStructuring)
+		bool runStructuring,
+		bool justGVN = false)
 	{
+
+		const char* argv[12] = { "mesa", "-simplifycfg-sink-common=false",
+				"-memdep-block-number-limit=10000000",
+				"-dse-memoryssa-defs-per-block-limit=10000000",
+				"-gvn-max-num-deps=100000000",
+				"-dse-memoryssa-scanlimit=10000000",
+				"-dse-memoryssa-partial-store-limit=10000000",
+				"-gvn-max-block-speculations=10000000",
+				"-memdep-block-scan-limit=10000000",
+				"-unroll-count=1500",
+				"-unroll-threshold=100000000",
+				"-enable-store-refinement=1"
+		};
+		llvm::cl::ParseCommandLineOptions(12, argv);
+
 		// Initialize passes.
 		llvm::PassRegistry& Registry = *llvm::PassRegistry::getPassRegistry();
 		llvm::initializeCore(Registry);
@@ -73,6 +89,8 @@ namespace Dna::Pipeline
 		llvm::initializeInstrumentation(Registry);
 		llvm::initializeTargetLibraryInfoWrapperPassPass(Registry);
 		llvm::initializeGlobalsAAWrapperPassPass(Registry);
+		llvm::initializeGVNLegacyPassPass(Registry);
+		llvm::initializeDependenceAnalysisWrapperPassPass(Registry);
 		initializeTarget(Registry);
 
 		// Create pass managers.
@@ -88,9 +106,9 @@ namespace Dna::Pipeline
 		PMB.SLPVectorize = false;
 		PMB.LoopVectorize = false;
 
-		
 
-		const char* args[2] = { "test", "-earlycse-mssa-optimization-cap=1000000" };
+		/*
+		const char* args[2] = { "-dse-memoryssa-defs-per-block-limit=1000000", "-earlycse-mssa-optimization-cap=1000000" };
 		llvm::cl::ParseCommandLineOptions(2, args);
 
 		const char* args4[2] = { "test4", "-dse-memoryssa-defs-per-block-limit=1000000" };
@@ -117,16 +135,83 @@ namespace Dna::Pipeline
 		const char* args14[2] = { "test14", "-gvn-max-block-speculations=10000000" };
 		llvm::cl::ParseCommandLineOptions(2, args14);
 
-		//const char* args15[2] = { "test15", "-gvn-max-num-visited-insts=1000000" };
-		//llvm::cl::ParseCommandLineOptions(2, args15);
-
+		const char* args15[2] = { "test15", "-gvn-max-num-visited-insts=1000000" };
+		llvm::cl::ParseCommandLineOptions(2, args15);
+		*/
 		//const char* args10[2] = { "test10", "memdep-block-number-limit=10000" };
 		//llvm::cl::ParseCommandLineOptions(2, args10);
-		
 
 
+		/*
+		const char* args99999[11] = {
+			"foo"
+			"-memdep-block-number-limit=10000",
+			"-dse-memoryssa-defs-per-block-limit=1000000",
+			"-gvn-max-num-deps=100000000",
+			"-dse-memoryssa-scanlimit=1000000",
+			"-dse-memoryssa-otherbb-cost=2",
+			"-dse-memoryssa-partial-store-limit=1000000",
+			"-gvn-max-block-speculations=1000000",
+			"-memdep-block-scan-limit=1000000",
+			"-unroll-count=1500",
+			"-unroll-threshold=100000000"
+		};
+		llvm::cl::ParseCommandLineOptions(11, args99999);
+		*/
+
+		const char* argv67[12] = { "mesa", "-simplifycfg-sink-common=false",
+				"-memdep-block-number-limit=10000000",
+				"-dse-memoryssa-defs-per-block-limit=10000000",
+				"-gvn-max-num-deps=100000000",
+				"-dse-memoryssa-scanlimit=10000000",
+				"-dse-memoryssa-partial-store-limit=10000000",
+				"-gvn-max-block-speculations=10000000",
+				"-memdep-block-scan-limit=10000000",
+				"-unroll-count=1500",
+				"-unroll-threshold=100000000",
+				"-enable-store-refinement=1"
+		};
+		llvm::cl::ParseCommandLineOptions(12, argv67);
+
+
+		if (justGVN)
+		{
+			printf("just gvn. \n");
+			FPM.add(llvm::createCFLSteensAAWrapperPass());
+			//FPM.add(llvm::createGlobalsAAWrapperPass());
+			FPM.add(llvm::createSCEVAAWrapperPass());
+			//FPM.add(llvm::createTypeBasedAAWrapperPass());
+			//FPM.add(llvm::createScopedNoAliasAAWrapperPass());
+			FPM.add(llvm::createBasicAAWrapperPass());
+			//FPM.add(llvm::createLCSSAPass());
+
+			// TODO: Properly pass the alias analysis func ptr.
+			Dna::Passes::ClassifyingAAResult::gGetAliasResult = getAliasResult;
+
+			FPM.add(Dna::Passes::createSegmentsAAWrapperPass());
+
+			FPM.add(new Dna::Passes::SegmentsExternalAAWrapperPass());
+
+			FPM.add(llvm::createGVNPass(false));
+
+			PMB.populateFunctionPassManager(FPM);
+			PMB.populateModulePassManager(module_manager);
+
+			FPM.doInitialization();
+
+			FPM.run(*f);
+
+			FPM.doFinalization();
+
+			module_manager.run(*f->getParent());
+
+			return;
+		}
 		// Add the alias analysis passes.
+		// Note: CSE i
+		FPM.add(llvm::createEarlyCSEPass(true));
 		FPM.add(llvm::createReassociatePass());
+		FPM.add(llvm::createEarlyCSEPass(true));
 		FPM.add(llvm::createCFLSteensAAWrapperPass());
 		//FPM.add(llvm::createGlobalsAAWrapperPass());
 		FPM.add(llvm::createSCEVAAWrapperPass());
@@ -149,7 +234,7 @@ namespace Dna::Pipeline
 		FPM.add(llvm::createCorrelatedValuePropagationPass());
 		FPM.add(llvm::createCFGSimplificationPass());
 
-		
+
 		// Add various optimization passes.
 		FPM.add(llvm::createInstructionCombiningPass());
 		FPM.add(llvm::createJumpThreadingPass());
@@ -168,7 +253,9 @@ namespace Dna::Pipeline
 
 		FPM.add(llvm::createGVNHoistPass());
 		FPM.add(llvm::createNewGVNPass());
-		//FPM.add(llvm::createGVNPass(false));
+		FPM.add(llvm::createGVNPass(false));
+		// Note: This legacy GVN pass is necessary for DSE to work properly.
+
 
 		FPM.add(llvm::createAggressiveDCEPass());
 		FPM.add(llvm::createCFGSimplificationPass());
@@ -178,27 +265,29 @@ namespace Dna::Pipeline
 		FPM.add(llvm::createInstructionCombiningPass()); // added
 		FPM.add(llvm::createCFGSimplificationPass());    // added
 		FPM.add(llvm::createDeadStoreEliminationPass()); // added
-		
-		if(runConstantConcretization)
+
+		if (runConstantConcretization)
 			FPM.add(Dna::Passes::getConstantConcretizationPassPass(readBinaryContents)); // added
 		FPM.add(llvm::createDeadStoreEliminationPass()); // added
 
 
 		if (aggressiveUnroll)
 		{
-			
-			const char* args2[2] = { "testtwo", "-unroll-count=1500" };
-			llvm::cl::ParseCommandLineOptions(2, args2);
-			const char* args3[2] = { "testhree", "-unroll-threshold=100000000" };
-			llvm::cl::ParseCommandLineOptions(2, args3);
-			const char* args4[2] = { "testfiyr", "-memdep-block-scan-limit=1000000" };
-			llvm::cl::ParseCommandLineOptions(2, args4);
+			/*
+				const char* args2[2] = { "testtwo", "-unroll-count=1500" };
+				llvm::cl::ParseCommandLineOptions(2, args2);
+				const char* args3[2] = { "testhree", "-unroll-threshold=100000000" };
+				llvm::cl::ParseCommandLineOptions(2, args3);
+				const char* args4[2] = { "testfiyr", "-memdep-block-scan-limit=1000000" };
+				llvm::cl::ParseCommandLineOptions(2, args4);
+				FPM.add(llvm::createLoopUnrollPass(3, false, false, 9999999999, -1, 1));
+				*/
+
 			FPM.add(llvm::createLoopUnrollPass(3, false, false, 9999999999, -1, 1));
-			
 		}
 
-		const char* args17[2] = { "testfiyr", "-memdep-block-scan-limit=1000000" };
-		llvm::cl::ParseCommandLineOptions(2, args17);
+		//const char* args17[2] = { "testfiyr", "-memdep-block-scan-limit=1000000" };
+		//llvm::cl::ParseCommandLineOptions(2, args17);
 
 		/*
 		else
@@ -220,7 +309,7 @@ namespace Dna::Pipeline
 		FPM.add(llvm::createSCCPPass());
 		FPM.add(llvm::createSROAPass());
 		FPM.add(llvm::createAggressiveDCEPass());
-		FPM.add(llvm::createReassociatePass());
+		//FPM.add(llvm::createReassociatePass());
 
 		// Note: We should avoid pointer PHIs here.
 		if (runStructuring)
@@ -231,7 +320,25 @@ namespace Dna::Pipeline
 			FPM.add(llvm::sl::createUnswitchPass());
 		}
 
+		FPM.add(llvm::createLoopRotatePass());
+		bool cns = false;
+		if (cns)
+		{
+			FPM.add(llvm::createCFGSimplificationPass());
+			FPM.add(llvm::sl::createControlledNodeSplittingPass());
+			FPM.add(llvm::createCFGSimplificationPass());
+			FPM.add(llvm::sl::createUnswitchPass());       // get rid of all switch instructions
+			FPM.add(llvm::createLoopSimplifyCFGPass());    // ensure all exit blocks are dominated by
+			// the loop header
+			FPM.add(llvm::sl::createLoopExitEnumerationPass());  // ensure all loops have <= 1 exits
+			FPM.add(llvm::sl::createUnswitchPass());       // get rid of all switch instructions
+			// introduced by the loop exit enumeration
+		}
 
+		//FPM.add(llvm::createFixIrreduciblePass());
+		//FPM.add(llvm::createGVNPass(false));
+		FPM.add(llvm::createNewGVNPass());
+	
 		PMB.populateFunctionPassManager(FPM);
 		PMB.populateModulePassManager(module_manager);
 
@@ -243,7 +350,20 @@ namespace Dna::Pipeline
 
 
 		FPM.doInitialization();
-		FPM.run(*f);
+
+		try
+		{
+			//f->dump();
+
+			FPM.run(*f);
+		}
+
+		catch(...)
+		{
+			printf("exception\n");
+			f->dump();
+			printf("bruh.");
+		}
 		FPM.doFinalization();
 
 		module_manager.run(*f->getParent());

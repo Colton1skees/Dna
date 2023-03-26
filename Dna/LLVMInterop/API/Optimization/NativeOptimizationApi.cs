@@ -21,6 +21,7 @@ namespace Dna.LLVMInterop
             nint ptrGetAliasResult,
             bool runConstantConcretization,
             nint ptrReadBinaryContents,
-            bool runStructuring);
+            bool runStructuring,
+            bool justGVN);
     }
 }

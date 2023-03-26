@@ -16,7 +16,8 @@ namespace Dna.LLVMInterop.API.Optimization
             nint ptrGetAliasResult,
             bool runConstantConcretization,
             nint ptrReadBinaryContents,
-            bool runStructuring)
+            bool runStructuring,
+            bool justGVN = false)
         {
             NativeOptimizationApi.OptimizeLLVMModule(module,
                 function,
@@ -25,7 +26,8 @@ namespace Dna.LLVMInterop.API.Optimization
                 ptrGetAliasResult, 
                 runConstantConcretization, 
                 ptrReadBinaryContents,
-                runStructuring);
+                runStructuring,
+                justGVN);
         }
     }
 }

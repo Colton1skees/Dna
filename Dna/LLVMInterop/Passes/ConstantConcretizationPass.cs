@@ -1,10 +1,13 @@
 ﻿using Dna.Binary;
 using Dna.Extensions;
+using Dna.Lifting;
 using Dna.LLVMInterop.Passes.Matchers;
 using LLVMSharp;
 using LLVMSharp.Interop;
 using System;
 using System.Collections.Generic;
+using System.Diagnostics;
+using System.Drawing;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
@@ -21,6 +24,8 @@ namespace Dna.LLVMInterop.Passes
 
         private readonly Dictionary<ulong, uint> accessedBytes = new();
 
+        private readonly HashSet<string> existingConcretizes = new();
+
         public ConstantConcretizationPass(LLVMValueRef function, LLVMBuilderRef builder, IBinary binary)
         {
             this.function = function;
@@ -33,16 +38,41 @@ namespace Dna.LLVMInterop.Passes
             // Get all GEP instructions.
             var instructions = function.GetInstructions();
 
+            var existingStores = instructions.Where(x => x.InstructionOpcode == LLVMOpcode.LLVMStore);
+            foreach(var existingStore in existingStores)
+            {
+                var gep = existingStore.GetOperand(1);
+                if (gep.InstructionOpcode != LLVMOpcode.LLVMGetElementPtr)
+                    continue;
+
+                var gepIndex = gep.GetOperand(1);
+                if (!BinaryAccessMatcher.IsBinarySectionAccess(gepIndex))
+                    continue;
+                
+                var offset = BinaryAccessMatcher.GetBinarySectionOffset(gepIndex);
+                var size = existingStore.GetOperand(0).TypeOf.IntWidth;
+                //existingConcretizes.Add($"{offset}_{size}");
+
+                var storeVal = existingStore.GetOperand(0);
+                if (storeVal.Kind != LLVMValueKind.LLVMConstantIntValueKind)
+                    continue;
+
+                var valConst = storeVal.ConstIntZExt;
+                existingConcretizes.Add($"{offset}_{size}_{valConst}");
+            }
+
             // Traverse each instruction and track a set of all bytes being accessed.
             foreach(var instruction in instructions)
             {
                 if(instruction.InstructionOpcode == LLVMOpcode.LLVMLoad)
                     TrackSecionAccesses(instruction.GetOperand(0), instruction.TypeOf.IntWidth);
-                else if(instruction.InstructionOpcode == LLVMOpcode.LLVMStore)
-                    TrackSecionAccesses(instruction.GetOperand(1), instruction.GetOperand(0).TypeOf.IntWidth);
+                //else if(instruction.InstructionOpcode == LLVMOpcode.LLVMStore)
+                  //  TrackSecionAccesses(instruction.GetOperand(1), instruction.GetOperand(0).TypeOf.IntWidth);
             }
 
             ConcretizeBinarySectionAccesses();
+
+            Optimize();
         }
 
         private void TrackSecionAccesses(LLVMValueRef value, uint bitWidth)
@@ -60,14 +90,17 @@ namespace Dna.LLVMInterop.Passes
 
             if(!accessedBytes.ContainsKey(sectionOffset))
             {
+
                 accessedBytes.Add(sectionOffset, bitWidth);
             }
 
             else
             {
                 var currentWidth = accessedBytes[sectionOffset];
-                if(bitWidth > currentWidth)
+                if (bitWidth > currentWidth)
+                {
                     accessedBytes[sectionOffset] = bitWidth;
+                }
             }
             //accessedBytes.TryAdd(sectionOffset, bitWidth);
 
@@ -93,7 +126,7 @@ namespace Dna.LLVMInterop.Passes
             var last = memoryPtr.NextInstruction;
             byteAddresses.Reverse();
 
-            last = function.EntryBasicBlock.GetInstructions().First(x => x.ToString().Contains("%sub = add i64 "));
+            //last = function.EntryBasicBlock.GetInstructions().First(x => x.ToString().Contains("%sub = add i64 "));
 
             var readBytes = (ulong address, uint size) =>
             {
@@ -118,14 +151,40 @@ namespace Dna.LLVMInterop.Passes
                 // Create a constant byte integer.
                 var context = function.GlobalParent.Context;
                 var valType = LLVMTypeRef.CreateInt(address.Value);
-                var constantInt = LLVMValueRef.CreateConstInt(valType, readBytes(address.Key, address.Value / 8), false);
+                var memValue = readBytes(address.Key, address.Value / 8);
+
+                var name = $"{address.Key}_{address.Value}_{memValue}";
+                if(existingConcretizes.Contains(name))
+                {
+                    continue;
+                }
+
+                var constantInt = LLVMValueRef.CreateConstInt(valType, memValue, false);
 
                 // Store the constant byte to memory.
                 var storeAddr = LLVMValueRef.CreateConstInt(context.Int64Type, address.Key, false);
                 var storePtr = builder.BuildInBoundsGEP2(context.Int8Type, memoryPtr, new LLVMValueRef[] { storeAddr });
-                storePtr = builder.BuildBitCast(storePtr, LLVMTypeRef.CreatePointer(valType, 0));
+                //storePtr = builder.BuildBitCast(storePtr, LLVMTypeRef.CreatePointer(valType, 0));
 
                 last = builder.BuildStore(constantInt, storePtr);
+            }
+        }
+
+        private void Optimize()
+        {
+            bool optimize = true;
+            if (optimize)
+            {
+                var passManager2 = function.GlobalParent.CreateFunctionPassManager();
+                passManager2.AddEarlyCSEPass();
+                passManager2.AddNewGVNPass();
+                passManager2.InitializeFunctionPassManager();
+                for (int i = 0; i < 1; i++)
+                {
+                    passManager2.RunFunctionPassManager(function);
+                }
+                passManager2.FinalizeFunctionPassManager();
+                Console.WriteLine("ran");
             }
         }
     }

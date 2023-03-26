@@ -70,12 +70,10 @@ namespace Dna.LLVMInterop.Passes
             /*
             var ptrAText = new string(ptrA.ToString().SkipWhile(x => x == ' ').ToArray());
             Console.WriteLine(ptrAText);
-            var typeA = PointerClassifier.GetPointerType(ptrA);
             var ptrBText = new string(ptrB.ToString().SkipWhile(x => x == ' ').ToArray());
             Console.WriteLine(ptrBText);
-            var typeB = PointerClassifier.GetPointerType(ptrB);
-            return (AliasResult)byte.MaxValue;
             */
+            
 
             // Classify the type of pointer A.
             var typeA = PointerClassifier.GetPointerType(ptrA);
