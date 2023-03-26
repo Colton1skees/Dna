@@ -87,7 +87,7 @@ namespace Dna.Devirtualization
 
         private void OptimizeVirtualizedFunction(LLVMLifter llvmLifter, ControlFlowGraph<Iced.Intel.Instruction> asmCfg)
         {
-            for (int i = 0; i < 5; i++)
+            for (int i = 0; i < 4; i++)
             {
                 // Run a fast, O3-like pipeline.
                 RunO3(llvmLifter);

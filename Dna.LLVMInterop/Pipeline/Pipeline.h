@@ -72,6 +72,7 @@ namespace Dna::Pipeline
 		llvm::initializeInstCombine(Registry);
 		llvm::initializeInstrumentation(Registry);
 		llvm::initializeTargetLibraryInfoWrapperPassPass(Registry);
+		llvm::initializeGlobalsAAWrapperPassPass(Registry);
 		initializeTarget(Registry);
 
 		// Create pass managers.
@@ -86,6 +87,8 @@ namespace Dna::Pipeline
 		PMB.RerollLoops = false;
 		PMB.SLPVectorize = false;
 		PMB.LoopVectorize = false;
+
+		
 
 		const char* args[2] = { "test", "-earlycse-mssa-optimization-cap=1000000" };
 		llvm::cl::ParseCommandLineOptions(2, args);
@@ -108,17 +111,28 @@ namespace Dna::Pipeline
 		const char* args9[2] = { "test9", "-dse-memoryssa-otherbb-cost=2" };
 		llvm::cl::ParseCommandLineOptions(2, args9);
 
+		const char* args13[2] = { "test13", "-gvn-max-num-deps=100000000" };
+		llvm::cl::ParseCommandLineOptions(2, args13);
+
+		const char* args14[2] = { "test14", "-gvn-max-block-speculations=10000000" };
+		llvm::cl::ParseCommandLineOptions(2, args14);
+
+		//const char* args15[2] = { "test15", "-gvn-max-num-visited-insts=1000000" };
+		//llvm::cl::ParseCommandLineOptions(2, args15);
+
 		//const char* args10[2] = { "test10", "memdep-block-number-limit=10000" };
 		//llvm::cl::ParseCommandLineOptions(2, args10);
+		
 
-		const char* args11[2] = { "test11", "-memdep-block-scan-limit=1000000" };
-		llvm::cl::ParseCommandLineOptions(2, args11);
 
 		// Add the alias analysis passes.
 		FPM.add(llvm::createReassociatePass());
 		FPM.add(llvm::createCFLSteensAAWrapperPass());
-		FPM.add(llvm::createTypeBasedAAWrapperPass());
-		FPM.add(llvm::createScopedNoAliasAAWrapperPass());
+		//FPM.add(llvm::createGlobalsAAWrapperPass());
+		FPM.add(llvm::createSCEVAAWrapperPass());
+		//FPM.add(llvm::createTypeBasedAAWrapperPass());
+		//FPM.add(llvm::createScopedNoAliasAAWrapperPass());
+		FPM.add(llvm::createBasicAAWrapperPass());
 		if (runClassifyingAliasAnalysis)
 		{
 			// TODO: Properly pass the alias analysis func ptr.
@@ -129,27 +143,34 @@ namespace Dna::Pipeline
 			FPM.add(new Dna::Passes::SegmentsExternalAAWrapperPass());
 		}
 		FPM.add(llvm::createSROAPass());
-		FPM.add(llvm::createEarlyCSEPass());
+		FPM.add(llvm::createEarlyCSEPass(true));
+		FPM.add(llvm::createSpeculativeExecutionPass());
+		FPM.add(llvm::createJumpThreadingPass(99999));
+		FPM.add(llvm::createCorrelatedValuePropagationPass());
+		FPM.add(llvm::createCFGSimplificationPass());
 
+		
 		// Add various optimization passes.
 		FPM.add(llvm::createInstructionCombiningPass());
-		FPM.add(llvm::createCFGSimplificationPass());
-		FPM.add(llvm::createEarlyCSEPass(true));
-		FPM.add(llvm::createGVNHoistPass());
-		FPM.add(llvm::createGVNSinkPass());
-		FPM.add(llvm::createCFGSimplificationPass());
 		FPM.add(llvm::createJumpThreadingPass());
 		FPM.add(llvm::createCorrelatedValuePropagationPass());
 		FPM.add(llvm::createCFGSimplificationPass());
 		FPM.add(llvm::createAggressiveInstCombinerPass());
 		FPM.add(llvm::createInstructionCombiningPass());
 		FPM.add(llvm::createReassociatePass());
-
+		FPM.add(llvm::createSROAPass());
 		FPM.add(llvm::createMergedLoadStoreMotionPass());
-		FPM.add(llvm::createGVNPass(false));
+		FPM.add(llvm::createNewGVNPass());
+		FPM.add(llvm::createSCCPPass());
 		FPM.add(llvm::createBitTrackingDCEPass());
-		FPM.add(llvm::createAggressiveDCEPass());
+		FPM.add(llvm::createInstructionCombiningPass());
 		FPM.add(llvm::createDeadStoreEliminationPass());
+
+		FPM.add(llvm::createGVNHoistPass());
+		FPM.add(llvm::createNewGVNPass());
+		//FPM.add(llvm::createGVNPass(false));
+
+		FPM.add(llvm::createAggressiveDCEPass());
 		FPM.add(llvm::createCFGSimplificationPass());
 		FPM.add(llvm::createInstructionCombiningPass());
 		FPM.add(llvm::createDeadStoreEliminationPass()); // added
@@ -157,21 +178,39 @@ namespace Dna::Pipeline
 		FPM.add(llvm::createInstructionCombiningPass()); // added
 		FPM.add(llvm::createCFGSimplificationPass());    // added
 		FPM.add(llvm::createDeadStoreEliminationPass()); // added
-
+		
 		if(runConstantConcretization)
 			FPM.add(Dna::Passes::getConstantConcretizationPassPass(readBinaryContents)); // added
 		FPM.add(llvm::createDeadStoreEliminationPass()); // added
 
+
 		if (aggressiveUnroll)
 		{
+			
 			const char* args2[2] = { "testtwo", "-unroll-count=1500" };
 			llvm::cl::ParseCommandLineOptions(2, args2);
 			const char* args3[2] = { "testhree", "-unroll-threshold=100000000" };
 			llvm::cl::ParseCommandLineOptions(2, args3);
+			const char* args4[2] = { "testfiyr", "-memdep-block-scan-limit=1000000" };
+			llvm::cl::ParseCommandLineOptions(2, args4);
 			FPM.add(llvm::createLoopUnrollPass(3, false, false, 9999999999, -1, 1));
+			
 		}
 
+		const char* args17[2] = { "testfiyr", "-memdep-block-scan-limit=1000000" };
+		llvm::cl::ParseCommandLineOptions(2, args17);
 
+		/*
+		else
+		{
+			const char* args11[2] = { "testeleven", "-memdep-block-scan-limit=1000000" };
+			bool succ = llvm::cl::ParseCommandLineOptions(2, args11);
+			if (!succ)
+			{
+				printf("oh no.");
+			}
+		}
+		*/
 		FPM.add(llvm::createIndVarSimplifyPass());
 		FPM.add(llvm::createConstraintEliminationPass());
 

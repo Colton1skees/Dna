@@ -84,7 +84,7 @@ namespace Dna.Reconstruction
 
             if(edges.Count == 0 && pGetOutgoingEdges == null)
             {
-                Debugger.Break();
+                //Debugger.Break();
             }
 
             if(edges.Count == 0 && pGetOutgoingEdges != null)

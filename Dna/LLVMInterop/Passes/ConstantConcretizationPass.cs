@@ -58,7 +58,18 @@ namespace Dna.LLVMInterop.Passes
             // Get the binary section offset.
             var sectionOffset = BinaryAccessMatcher.GetBinarySectionOffset(value.GetOperand(1));
 
-            accessedBytes.TryAdd(sectionOffset, bitWidth);
+            if(!accessedBytes.ContainsKey(sectionOffset))
+            {
+                accessedBytes.Add(sectionOffset, bitWidth);
+            }
+
+            else
+            {
+                var currentWidth = accessedBytes[sectionOffset];
+                if(bitWidth > currentWidth)
+                    accessedBytes[sectionOffset] = bitWidth;
+            }
+            //accessedBytes.TryAdd(sectionOffset, bitWidth);
 
             /*
             for (ulong i = sectionOffset; i < sectionOffset + bitWidth; i++)

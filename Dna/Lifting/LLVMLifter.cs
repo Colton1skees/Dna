@@ -16,7 +16,7 @@ namespace Dna.Lifting
 {
     public class LLVMLifter
     {
-        private readonly LLVMModuleRef module;
+        public LLVMModuleRef module;
 
         private readonly ICpuArchitecture architecture;
 

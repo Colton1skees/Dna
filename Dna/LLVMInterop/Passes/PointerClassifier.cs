@@ -67,6 +67,8 @@ namespace Dna.LLVMInterop.Passes
                     text = new string(text.SkipWhile(x => x == ' ').ToArray());
                     Console.WriteLine("    " + text);
                 }
+
+                Console.WriteLine("done");
                 //Debugger.Break();
             }
             

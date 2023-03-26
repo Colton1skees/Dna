@@ -65,14 +65,13 @@ var dna = new Dna.Dna(binary);
 
 // Parse a (virtualized) control flow graph from the binary.
 ulong funcAddr = 0x14000123C;
-//var cfg = dna.RecursiveDescent.ReconstructCfg(funcAddr);
-ControlFlowGraph<Iced.Intel.Instruction> cfg = null;
+var cfg = dna.RecursiveDescent.ReconstructCfg(funcAddr);
 
 // Instantiate the cpu architecture.
 var architecture = new X86CpuArchitecture(ArchitectureId.ARCH_X86_64);
 
-var cfgExplorer = new CfgExplorer(dna, architecture);
-cfgExplorer.DevirtualizeRoutine(funcAddr);
+//var cfgExplorer = new CfgExplorer(dna, architecture);
+//cfgExplorer.DevirtualizeRoutine(funcAddr);
 
 
 // Instantiate a class for lifting control flow graphs to our intermediate language.
@@ -84,12 +83,38 @@ var liftedCfg = cfgLifter.LiftCfg(cfg);
 for (int i = 0; i < 3; i++)
     Console.WriteLine("");
 
-// Lift the cfg to LLVM IR.
 var llvmLifter = new LLVMLifter(architecture);
-llvmLifter.Lift(liftedCfg);
+
+
+var ctx = LLVMContextRef.Create();
+var memBuffer = LlvmUtilities.CreateMemoryBuffer(@"C:\Users\colton\source\repos\Dna\Dna.Example\bin\x64\Debug\net7.0\cant_resolve.ll");
+ctx.TryParseIR(memBuffer, out LLVMModuleRef unicornTraceModule, out string unicornLoadMsg);
+
+llvmLifter.module = unicornTraceModule;
+llvmLifter.llvmFunction = llvmLifter.Module.FirstFunction;
+
+/*
+LlvmUtilities.LLVMParseCommandLineOptions(new string[] { "-memdep-block-scan-limit=10000000",
+    "-memdep-block-scan-limit=10000000",
+    "-dse-memoryssa-defs-per-block-limit=1000000",
+    "-dse-memoryssa-partial-store-limit=1000000",
+    "-dse-memoryssa-path-check-limit=1000000",
+    "-dse-memoryssa-scanlimit=1000000",
+    "-dse-memoryssa-walklimit=1000000",
+    "-dse-memoryssa-otherbb-cost=2",
+    "-memssa-check-limit=1000000",
+    "memdep-block-number-limit=10000",
+    "-memdep-block-scan-limit=1000000",
+    "-gvn-max-block-speculations=1000000",
+    "-gvn-max-num-deps=1000000",
+});
+*/
+
+// Lift the cfg to LLVM IR.
+//llvmLifter.Lift(liftedCfg);
 
 // Optimize the routine.
-bool optimize = true;
+bool optimize = false;
 if (optimize)
 {
     var passManager2 = llvmLifter.Module.CreateFunctionPassManager();
@@ -139,6 +164,7 @@ var ptrAlias = ClassifyingAliasAnalysisPass.PtrGetAliasResult;
 var llPath = @"optimized_vm_entry.ll";
 
 
+
 // Run the standard O3 pipeline.
 for (int i = 0; i < 5; i++)
 {
@@ -161,10 +187,11 @@ var myPass = new ConstantConcretizationPass(llvmLifter.llvmFunction, llvmLifter.
 myPass.Execute();
 
 // Run the O3 pipeline one last time with custom alias analysis.
-// PointerClassifier.Seen.Clear();
-//PointerClassifier.print = true;
-for (int i = 0; i < 5; i++)
+PointerClassifier.Seen.Clear();
+PointerClassifier.print = true;
+for (int i = 0; i < 7; i++)
 {
+    Console.WriteLine(i);
     OptimizationApi.OptimizeModule(llvmLifter.Module, llvmLifter.llvmFunction, false, true, ptrAlias, false, 0, false);
 }
 
