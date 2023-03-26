@@ -17,7 +17,7 @@ namespace Dna.Reconstruction
             this.dna = dna;
         }
 
-        public ControlFlowGraph<Instruction> ReconstructCfg(ulong address)
+        public ControlFlowGraph<Instruction> ReconstructCfg(ulong address, Func<BasicBlock<Instruction>, IEnumerable<ulong>> pGetOutgoingEdges = null)
         {
             throw new NotImplementedException();
         }

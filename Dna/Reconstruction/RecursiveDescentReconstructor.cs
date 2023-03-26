@@ -5,6 +5,7 @@ using Iced.Intel;
 using Rivers;
 using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
@@ -25,7 +26,7 @@ namespace Dna.Reconstruction
             this.dna = dna;
         }
 
-        public ControlFlowGraph<Instruction> ReconstructCfg(ulong address)
+        public ControlFlowGraph<Instruction> ReconstructCfg(ulong address, Func<BasicBlock<Instruction>, IEnumerable<ulong>> pGetOutgoingEdges = null)
         {
             // Initialize a control flow graph with a single node,
             // starting at the provided address.
@@ -33,9 +34,9 @@ namespace Dna.Reconstruction
             var basicBlock = DisassembleBlock(graph, address);
 
             // Recursively follow all new paths.
-            var edges = GetBlockEdges(basicBlock);
+            var edges = GetBlockEdges(basicBlock, pGetOutgoingEdges);
             foreach (var edge in edges)
-                RecursiveHandleBlock(graph, edge, basicBlock);
+                RecursiveHandleBlock(graph, edge, basicBlock, pGetOutgoingEdges);
 
             // Collapse pairs of duplicated blocks into a single block.
             //RemoveDuplicatedBlocks();
@@ -63,7 +64,7 @@ namespace Dna.Reconstruction
             }
         }
 
-        private IEnumerable<ulong> GetBlockEdges(BasicBlock<Instruction> block)
+        private IEnumerable<ulong> GetBlockEdges(BasicBlock<Instruction> block, Func<BasicBlock<Instruction>, IEnumerable<ulong>> pGetOutgoingEdges = null)
         {
             List<ulong> edges = new List<ulong>();
             var exitInstruction = block.ExitInstruction;
@@ -81,10 +82,20 @@ namespace Dna.Reconstruction
                     edges.Add(exitInstruction.NextIP);
             }
 
+            if(edges.Count == 0 && pGetOutgoingEdges == null)
+            {
+                Debugger.Break();
+            }
+
+            if(edges.Count == 0 && pGetOutgoingEdges != null)
+            {
+                return pGetOutgoingEdges(block);
+            }
+
             return edges;
         }
 
-        private Node RecursiveHandleBlock(ControlFlowGraph<Instruction> graph, ulong addrInitialBlock, Node source)
+        private Node RecursiveHandleBlock(ControlFlowGraph<Instruction> graph, ulong addrInitialBlock, Node source, Func<BasicBlock<Instruction>, IEnumerable<ulong>> pGetOutgoingEdges = null)
         {
             // If we have already traversed this block, then we add it as an edge
             // and return.
@@ -101,7 +112,7 @@ namespace Dna.Reconstruction
 
             // Extract basic block information.
             var basicBlock = DisassembleBlock(graph, addrInitialBlock);
-            var edges = GetBlockEdges(basicBlock);
+            var edges = GetBlockEdges(basicBlock, pGetOutgoingEdges);
 
             // Create a node for the block.
             var targetNode = basicBlock;
@@ -115,7 +126,7 @@ namespace Dna.Reconstruction
                 if (existingNodes.Count() == 1)
                     edgeNode = existingNodes.First();
                 else if (existingNodes.Count() == 0)
-                    edgeNode = RecursiveHandleBlock(graph,addrOfEdge, targetNode);
+                    edgeNode = RecursiveHandleBlock(graph,addrOfEdge, targetNode, pGetOutgoingEdges);
                 else
                     throw new InvalidOperationException(String.Format("Too many instances of node with name: {0}", strEdgeAddr));
 

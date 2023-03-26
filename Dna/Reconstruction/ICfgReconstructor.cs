@@ -15,6 +15,6 @@ namespace Dna.Reconstruction
         /// </summary>
         /// <param name="address"></param>
         /// <returns></returns>
-        public ControlFlowGraph<Instruction> ReconstructCfg(ulong address);
+        public ControlFlowGraph<Instruction> ReconstructCfg(ulong address, Func<BasicBlock<Instruction>, IEnumerable<ulong>> pGetOutgoingEdges = null);
     }
 }

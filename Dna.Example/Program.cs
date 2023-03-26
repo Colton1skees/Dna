@@ -37,6 +37,7 @@ using static Dna.LLVMInterop.NativeOptimizationApi;
 using Dna.LLVMInterop.API.Optimization;
 using Dna.LLVMInterop.Passes;
 using Dna.Utilities;
+using Dna.Devirtualization;
 
 // Load the 64 bit PE file.
 // Note: This file is automatically copied to the build directory.
@@ -51,21 +52,28 @@ binary.WriteBytes(0x000000014001552B, new byte[]
     0x90, 0x90, 0x90, 0x90, 0x90
 });
 
+/*
 var assembler = new Iced.Intel.Assembler(64);
 assembler.jmp(0x14004B2EE);
 
 var encoded = InstructionRelocator.EncodeInstructions(assembler.Instructions.ToList(), 0x140015C47, out ulong endRIP);
 binary.WriteBytes(0x140015C47, encoded);
+*/
 
 // Instantiate dna.
 var dna = new Dna.Dna(binary);
 
 // Parse a (virtualized) control flow graph from the binary.
 ulong funcAddr = 0x14000123C;
-var cfg = dna.RecursiveDescent.ReconstructCfg(funcAddr);
+//var cfg = dna.RecursiveDescent.ReconstructCfg(funcAddr);
+ControlFlowGraph<Iced.Intel.Instruction> cfg = null;
 
 // Instantiate the cpu architecture.
 var architecture = new X86CpuArchitecture(ArchitectureId.ARCH_X86_64);
+
+var cfgExplorer = new CfgExplorer(dna, architecture);
+cfgExplorer.DevirtualizeRoutine(funcAddr);
+
 
 // Instantiate a class for lifting control flow graphs to our intermediate language.
 var cfgLifter = new CfgLifter(architecture);
