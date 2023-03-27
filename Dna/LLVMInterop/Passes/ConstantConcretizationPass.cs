@@ -39,7 +39,7 @@ namespace Dna.LLVMInterop.Passes
             var instructions = function.GetInstructions();
 
             var existingStores = instructions.Where(x => x.InstructionOpcode == LLVMOpcode.LLVMStore);
-            foreach(var existingStore in existingStores)
+            foreach (var existingStore in existingStores)
             {
                 var gep = existingStore.GetOperand(1);
                 if (gep.InstructionOpcode != LLVMOpcode.LLVMGetElementPtr)
@@ -48,7 +48,7 @@ namespace Dna.LLVMInterop.Passes
                 var gepIndex = gep.GetOperand(1);
                 if (!BinaryAccessMatcher.IsBinarySectionAccess(gepIndex))
                     continue;
-                
+
                 var offset = BinaryAccessMatcher.GetBinarySectionOffset(gepIndex);
                 var size = existingStore.GetOperand(0).TypeOf.IntWidth;
                 //existingConcretizes.Add($"{offset}_{size}");
@@ -62,12 +62,12 @@ namespace Dna.LLVMInterop.Passes
             }
 
             // Traverse each instruction and track a set of all bytes being accessed.
-            foreach(var instruction in instructions)
+            foreach (var instruction in instructions)
             {
-                if(instruction.InstructionOpcode == LLVMOpcode.LLVMLoad)
+                if (instruction.InstructionOpcode == LLVMOpcode.LLVMLoad)
                     TrackSecionAccesses(instruction.GetOperand(0), instruction.TypeOf.IntWidth);
                 //else if(instruction.InstructionOpcode == LLVMOpcode.LLVMStore)
-                  //  TrackSecionAccesses(instruction.GetOperand(1), instruction.GetOperand(0).TypeOf.IntWidth);
+                //  TrackSecionAccesses(instruction.GetOperand(1), instruction.GetOperand(0).TypeOf.IntWidth);
             }
 
             ConcretizeBinarySectionAccesses();
@@ -82,13 +82,13 @@ namespace Dna.LLVMInterop.Passes
                 return;
 
             // If this is not a binary section access, then it's not relevant.
-            if(!BinaryAccessMatcher.IsBinarySectionAccess(value.GetOperand(1))) 
+            if (!BinaryAccessMatcher.IsBinarySectionAccess(value.GetOperand(1)))
                 return;
 
             // Get the binary section offset.
             var sectionOffset = BinaryAccessMatcher.GetBinarySectionOffset(value.GetOperand(1));
 
-            if(!accessedBytes.ContainsKey(sectionOffset))
+            if (!accessedBytes.ContainsKey(sectionOffset))
             {
 
                 accessedBytes.Add(sectionOffset, bitWidth);
@@ -116,7 +116,7 @@ namespace Dna.LLVMInterop.Passes
         {
             // Sort the byte addresses in ascending order.
             var byteAddresses = accessedBytes.OrderBy(x => x.Key);
-            
+
 
             // Get the memory ptr.
             var memoryPtr = function.FirstBasicBlock.FirstInstruction;
@@ -154,7 +154,7 @@ namespace Dna.LLVMInterop.Passes
                 var memValue = readBytes(address.Key, address.Value / 8);
 
                 var name = $"{address.Key}_{address.Value}_{memValue}";
-                if(existingConcretizes.Contains(name))
+                if (existingConcretizes.Contains(name))
                 {
                     continue;
                 }

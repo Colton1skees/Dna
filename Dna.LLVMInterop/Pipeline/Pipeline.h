@@ -177,9 +177,9 @@ namespace Dna::Pipeline
 		if (justGVN)
 		{
 			printf("just gvn. \n");
-			FPM.add(llvm::createCFLSteensAAWrapperPass());
+			//FPM.add(llvm::createCFLSteensAAWrapperPass());
 			//FPM.add(llvm::createGlobalsAAWrapperPass());
-			FPM.add(llvm::createSCEVAAWrapperPass());
+			//FPM.add(llvm::createSCEVAAWrapperPass());
 			//FPM.add(llvm::createTypeBasedAAWrapperPass());
 			//FPM.add(llvm::createScopedNoAliasAAWrapperPass());
 			FPM.add(llvm::createBasicAAWrapperPass());
@@ -193,6 +193,8 @@ namespace Dna::Pipeline
 			FPM.add(new Dna::Passes::SegmentsExternalAAWrapperPass());
 
 			FPM.add(llvm::createGVNPass(false));
+
+			//FPM.add(llvm::)
 
 			PMB.populateFunctionPassManager(FPM);
 			PMB.populateModulePassManager(module_manager);
@@ -312,7 +314,7 @@ namespace Dna::Pipeline
 		//FPM.add(llvm::createReassociatePass());
 
 		// Note: We should avoid pointer PHIs here.
-		if (runStructuring)
+		if (false)
 		{
 			FPM.add(llvm::createCFGSimplificationPass());
 			FPM.add(llvm::sl::createControlledNodeSplittingPass());
@@ -335,14 +337,18 @@ namespace Dna::Pipeline
 			// introduced by the loop exit enumeration
 		}
 
+
+		FPM.add(llvm::createFixIrreduciblePass());
+
 		//FPM.add(llvm::createFixIrreduciblePass());
 		//FPM.add(llvm::createGVNPass(false));
-		FPM.add(llvm::createNewGVNPass());
-	
+		//FPM.add(llvm::createNewGVNPass());
+		//FPM.add(llvm::createStructurizeCFGPass());
+
 		PMB.populateFunctionPassManager(FPM);
 		PMB.populateModulePassManager(module_manager);
 
-		if (runStructuring)
+		if (false)
 		{
 			auto structuringPass = (llvm::sl::StructuredControlFlowPass*)llvm::sl::createASTComputePass();
 			module_manager.add(structuringPass);
@@ -360,9 +366,9 @@ namespace Dna::Pipeline
 
 		catch(...)
 		{
-			printf("exception\n");
+			printf("excasdesption\n");
 			f->dump();
-			printf("bruh.");
+			printf("brasdasduh.");
 		}
 		FPM.doFinalization();
 

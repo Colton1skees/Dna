@@ -744,8 +744,6 @@ StructuredFunction::StructuredFunction(
 // Destructor.
 StructuredFunction::~StructuredFunction()
 {
-    printf("destructor.");
-    return;
     while (!m_region_list.empty()) {
         Region *n = m_region_list.front();
         m_region_list.pop_front();
@@ -1091,6 +1089,7 @@ StructuredFunction *RegionBuilder::buildRegions()
 
     Region *body = discoverRegion(ctx, /*processLoopBody=*/false, entry);
 
+    printf("set body.");
     m_func.setBody(body);
 
     return &m_func;
@@ -1509,7 +1508,6 @@ StructuredControlFlowPass::StructuredControlFlowPass()
 // Destructor.
 StructuredControlFlowPass::~StructuredControlFlowPass()
 {
-    return;
     for (auto it : m_structured_function_map) {
         delete it.second;
     }
