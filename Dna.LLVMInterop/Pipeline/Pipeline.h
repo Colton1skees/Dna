@@ -255,7 +255,7 @@ namespace Dna::Pipeline
 
 		FPM.add(llvm::createGVNHoistPass());
 		FPM.add(llvm::createNewGVNPass());
-		FPM.add(llvm::createGVNPass(false));
+		//FPM.add(llvm::createGVNPass(false));
 		// Note: This legacy GVN pass is necessary for DSE to work properly.
 
 
