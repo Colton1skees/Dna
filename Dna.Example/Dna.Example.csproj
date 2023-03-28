@@ -10,6 +10,9 @@
 
   <ItemGroup>
     <ProjectReference Include="..\Dna.Decompiler\Dna.Decompiler.csproj" />
+    <ProjectReference Include="..\Dna.LLVMInterop\Dna.LLVMInterop.vcxproj">
+      <Private>False</Private>
+    </ProjectReference>
     <ProjectReference Include="..\Dna.Synthesis\Dna.Synthesis.csproj" />
     <ProjectReference Include="..\Dna\Dna.csproj" />
   </ItemGroup>
@@ -27,7 +30,7 @@
   </ItemGroup>
   
   <ItemGroup>
-    <None Include="..\llvm-15.0.3-win64\bin\LLVM-C.dll" />
+    <None Include="..\..\llvm-project-15.0.7.src\llvm\build\RelWithDebInfo\bin\LLVM-C.dll" />
     <None Include="..\x64\Release\Dna.LLVMInterop.dll" Link="Dna.LLVMInterop.dll">
       <CopyToOutputDirectory>Always</CopyToOutputDirectory>
     </None>
@@ -35,5 +38,9 @@
       <CopyToOutputDirectory>Always</CopyToOutputDirectory>
     </None>
   </ItemGroup>
+  
+  <Target Name="PostBuild" AfterTargets="PostBuildEvent">
+    <Exec Command="&quot;C:\Program Files\Microsoft Visual Studio\2022\Community\VC\Tools\MSVC\14.35.32215\bin\Hostx64\x64\editbin.exe&quot; /STACK:2147483648 &quot;$(TargetPath)&quot;" />
+  </Target>
 
 </Project>

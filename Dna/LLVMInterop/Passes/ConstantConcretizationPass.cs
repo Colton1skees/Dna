@@ -35,6 +35,8 @@ namespace Dna.LLVMInterop.Passes
 
         public void Execute()
         {
+
+            //function.GlobalParent.PrintToFile("pre_concretization.ll");
             // Get all GEP instructions.
             var instructions = function.GetInstructions();
 
@@ -73,6 +75,9 @@ namespace Dna.LLVMInterop.Passes
             ConcretizeBinarySectionAccesses();
 
             Optimize();
+
+            //function.GlobalParent.PrintToFile("post_concretization.ll");
+            Console.WriteLine("Concretized.");
         }
 
         private void TrackSecionAccesses(LLVMValueRef value, uint bitWidth)
@@ -87,6 +92,11 @@ namespace Dna.LLVMInterop.Passes
 
             // Get the binary section offset.
             var sectionOffset = BinaryAccessMatcher.GetBinarySectionOffset(value.GetOperand(1));
+
+            if(sectionOffset == 0x140042101)
+            {
+            //   Debugger.Break();
+            }
 
             if (!accessedBytes.ContainsKey(sectionOffset))
             {
@@ -142,6 +152,12 @@ namespace Dna.LLVMInterop.Passes
                 return (ulong)value;
             };
 
+
+            var gsAccess = function.EntryBasicBlock.GetInstructions().First(x => x.OperandCount == 1 && x.GetOperand(0).Kind == LLVMValueKind.LLVMGlobalVariableValueKind
+            && x.GetOperand(0).Name == "gs");
+
+            last = gsAccess.NextInstruction;
+
             foreach (var address in byteAddresses)
             {
                 // Since we're iterating in reverse, position the builder before
@@ -154,6 +170,12 @@ namespace Dna.LLVMInterop.Passes
                 var memValue = readBytes(address.Key, address.Value / 8);
 
                 var name = $"{address.Key}_{address.Value}_{memValue}";
+
+                if (existingConcretizes.Contains(name) && address.Key == 0x140042101)
+                {
+                   // Debugger.Break();
+                }
+
                 if (existingConcretizes.Contains(name))
                 {
                     continue;
@@ -161,6 +183,10 @@ namespace Dna.LLVMInterop.Passes
 
                 var constantInt = LLVMValueRef.CreateConstInt(valType, memValue, false);
 
+                if(address.Key == 0x140042101)
+                {
+                   // Debugger.Break();
+                }
                 // Store the constant byte to memory.
                 var storeAddr = LLVMValueRef.CreateConstInt(context.Int64Type, address.Key, false);
                 var storePtr = builder.BuildInBoundsGEP2(context.Int8Type, memoryPtr, new LLVMValueRef[] { storeAddr });

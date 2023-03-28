@@ -90,7 +90,7 @@ var llvmLifter = new LLVMLifter(architecture);
 
 
 var ctx = LLVMContextRef.Create();
-var memBuffer = LlvmUtilities.CreateMemoryBuffer(@"C:\Users\colton\source\repos\Dna\Dna.Example\bin\x64\Debug\net7.0\cant_resolve_crash.ll");
+var memBuffer = LlvmUtilities.CreateMemoryBuffer(@"C:\Users\colton\source\repos\Dna\Dna.Example\bin\x64\Debug\net7.0\beforecustompipeline.ll");
 ctx.TryParseIR(memBuffer, out LLVMModuleRef unicornTraceModule, out string unicornLoadMsg);
 
 llvmLifter.module = unicornTraceModule;
@@ -183,6 +183,7 @@ OptimizationApi.OptimizeModule(llvmLifter.Module, llvmLifter.llvmFunction, true,
 
 
 // Run the O3 pipeline one last time with custom alias analysis.
+llvmLifter.Module.PrintToFile("foo2.ll");
 OptimizationApi.OptimizeModule(llvmLifter.Module, llvmLifter.llvmFunction, false, true, ptrAlias, false, 0, false);
 
 //llvmLifter.Module.PrintToFile(llPath);
@@ -192,7 +193,7 @@ OptimizationApi.OptimizeModule(llvmLifter.Module, llvmLifter.llvmFunction, false
 // Run the O3 pipeline one last time with custom alias analysis.
 PointerClassifier.Seen.Clear();
 PointerClassifier.print = true;
-for (int i = 0; i < 7; i++)
+for (int i = 0; i < 10; i++)
 {
     Console.WriteLine(i);
     OptimizationApi.OptimizeModule(llvmLifter.Module, llvmLifter.llvmFunction, false, true, ptrAlias, false, 0, false);
@@ -201,6 +202,7 @@ for (int i = 0; i < 7; i++)
     pass2.Execute();
 
     llvmLifter.Module.PrintToFile("foo.ll");
+    Console.WriteLine(i.ToString());
     OptimizationApi.OptimizeModule(llvmLifter.Module, llvmLifter.llvmFunction, false, true, ptrAlias, false, 0, false, true);
     Console.WriteLine("foo foo foo");
 }

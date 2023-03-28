@@ -31,11 +31,11 @@ namespace Dna::Passes {
 				if (dumpLoad)
 				{
 					printf("Dumping load chain for: ");
-					instruction.dump();
+					//instruction.dump();
 					for (auto operand : operands)
 					{
 						printf("input: ");
-						operand->dump();
+						//operand->dump();
 					}
 				}
 
@@ -113,11 +113,11 @@ namespace Dna::Passes {
 				if (dumpStore)
 				{
 					printf("Dumping store chain for: ");
-					instruction.dump();
+					//instruction.dump();
 					for (auto operand : operands)
 					{
 						printf("input: ");
-						operand->dump();
+						//operand->dump();
 					}
 				}
 
@@ -126,11 +126,11 @@ namespace Dna::Passes {
 				{
 					printf("Permamently exiting due to unsupported operation.");
 					printf("Dumping store chain for: ");
-					instruction.dump();
+					//instruction.dump();
 					for (auto operand : operands)
 					{
 						printf("input: ");
-						operand->dump();
+						//operand->dump();
 					}
 					break;
 				}

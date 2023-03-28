@@ -170,6 +170,7 @@ namespace Dna.Devirtualization
 
         private void RunCustomPipeline(LLVMLifter llvmLifter)
         {
+            llvmLifter.Module.PrintToFile("beforecustompipeline.ll");
             // Run the custom pipeline with very light settings.
             for (int i = 0; i < 3; i++)
             {
@@ -179,18 +180,22 @@ namespace Dna.Devirtualization
             var ptrAlias = ClassifyingAliasAnalysisPass.PtrGetAliasResult;
 
             // Run the O3 pipeline with custom alias analysis.
+            Console.WriteLine("o1");
             OptimizationApi.OptimizeModule(llvmLifter.Module, llvmLifter.llvmFunction, false, true, ptrAlias, false, 0, false);
 
+            Console.WriteLine("o2");
             // Run the O3 pipeline with ptr alias analysis AND aggressive loop unrolling enabled.
             OptimizationApi.OptimizeModule(llvmLifter.Module, llvmLifter.llvmFunction, true, true, ptrAlias, false, 0, false);
 
+            Console.WriteLine(  "o3");
             // Run the O3 pipeline one last time with custom alias analysis.
             OptimizationApi.OptimizeModule(llvmLifter.Module, llvmLifter.llvmFunction, false, true, ptrAlias, false, 0, false);
-
+            Console.WriteLine(  "done");
             // Run a pass to concretize known constants within binary sections.
             var myPass = new ConstantConcretizationPass(llvmLifter.llvmFunction, llvmLifter.builder, dna.Binary);
             myPass.Execute();
 
+            Console.WriteLine( "up to 5");
             // Finally run our pipeline again with custom alias analysis.
             for (int i = 0; i < 5; i++)
             {
