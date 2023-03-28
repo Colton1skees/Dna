@@ -32,6 +32,7 @@ namespace Dna.ControlFlow
             return block;
         }
 
+
         public IEnumerable<BasicBlock<T>> GetBlocks()
         {
             return Nodes.Select(x => x.GetBlock<T>());

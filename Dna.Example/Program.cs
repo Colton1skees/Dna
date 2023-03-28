@@ -38,6 +38,8 @@ using Dna.LLVMInterop.API.Optimization;
 using Dna.LLVMInterop.Passes;
 using Dna.Utilities;
 using Dna.Devirtualization;
+using Dna.Extensions;
+using Dna.Structuring.Stacker;
 
 // Load the 64 bit PE file.
 // Note: This file is automatically copied to the build directory.
@@ -70,7 +72,7 @@ var cfg = dna.RecursiveDescent.ReconstructCfg(funcAddr);
 // Instantiate the cpu architecture.
 var architecture = new X86CpuArchitecture(ArchitectureId.ARCH_X86_64);
 
-bool explore = true;
+bool explore = false;
 if (explore)
 {
     var cfgExplorer = new CfgExplorer(dna, architecture);
@@ -196,17 +198,17 @@ OptimizationApi.OptimizeModule(llvmLifter.Module, llvmLifter.llvmFunction, false
 
 PointerClassifier.Seen.Clear();
 PointerClassifier.print = true;
-for (int i = 0; i < 50; i++)
+for (int i = 0; i < 10; i++)
 {
     Console.WriteLine(i);
     OptimizationApi.OptimizeModule(llvmLifter.Module, llvmLifter.llvmFunction, false, true, ptrAlias, false, 0, false);
 
 
-    if(i % 4 == 0)
+    if (i % 4 == 0)
     {
 
         var pass2 = new ConstantConcretizationPass(llvmLifter.llvmFunction, llvmLifter.builder, binary);
-        pass2.Execute();
+        //pass2.Execute();
 
         // ClassifyingAliasAnalysisPass.print = true;
     }
@@ -219,6 +221,41 @@ for (int i = 0; i < 50; i++)
 
 
 llvmLifter.Module.PrintToFile(llPath);
+
+
+ControlFlowGraph<LLVMValueRef> llvmGraph = new ControlFlowGraph<LLVMValueRef>(0);
+foreach(var llvmBlock in llvmLifter.llvmFunction.BasicBlocks)
+{
+    // Allocate a new block.
+    var blk = llvmGraph.CreateBlock((ulong)llvmBlock.Handle);
+
+    // Copy the instructions.
+    blk.Instructions.AddRange(llvmBlock.GetInstructions());
+}
+
+foreach(var block in llvmGraph.GetBlocks())
+{
+    var exitInstruction = block.ExitInstruction;
+    var operands = exitInstruction.GetOperands().ToList();
+    foreach(var operand in operands)
+    {
+        if (operand.Kind != LLVMValueKind.LLVMBasicBlockValueKind)
+            continue;
+
+        var outgoingBlk = llvmGraph.GetBlocks().Single(x => x.Address == (ulong)operand.Handle);
+        block.AddOutgoingEdge(new BlockEdge<LLVMValueRef>(block, outgoingBlk));
+    }
+    Console.WriteLine(exitInstruction);
+}
+
+var dotGraph = GraphVisualizer.GetDotGraph(llvmGraph);
+var dot = dotGraph.Compile();
+File.WriteAllText("llvmGraph.dot", dot);
+
+var loopAnalysis = new LoopAnalysis<LLVMValueRef>(llvmGraph);
+
+var structurer = new StackingStructurer(llvmGraph, loopAnalysis);
+structurer.Structure();
 
 bool compile = true;
 if (compile)

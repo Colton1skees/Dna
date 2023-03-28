@@ -6,8 +6,7 @@ using System.Threading.Tasks;
 
 namespace Dna.ControlFlow.Analysis
 {
-    public class DominatorTree
+    public class LoopHierarchyAnalysis
     {
-
     }
 }

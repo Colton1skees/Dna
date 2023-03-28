@@ -1,5 +1,6 @@
 ﻿using Dna.ControlFlow;
 using Dna.ControlFlow.Analysis;
+using Dna.DataStructures;
 using Dna.Extensions;
 using Dna.Structuring.Stackify.StackEntries;
 using Dna.Structuring.Stackify.Structured;
@@ -33,7 +34,7 @@ namespace Dna.Structuring.Stackify
     {
         private ControlFlowGraph<AbstractInst> cfg;
 
-        private IReadOnlyDictionary<Node, HashSet<Node>> dominatorTree;
+        private IReadOnlyDictionary<Node, OrderedSet<Node>> dominatorTree;
 
         private HashSet<BasicBlock<AbstractInst>> loopHeaders = new();
 

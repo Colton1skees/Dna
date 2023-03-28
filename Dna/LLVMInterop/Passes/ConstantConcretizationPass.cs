@@ -35,6 +35,7 @@ namespace Dna.LLVMInterop.Passes
 
         public void Execute()
         {
+            return;
             var instructions = function.GetInstructions();
 
             // Traverse each instruction and track a set of all bytes being accessed.

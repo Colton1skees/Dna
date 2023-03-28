@@ -1,5 +1,6 @@
 ﻿using Dna.ControlFlow;
 using Dna.ControlFlow.Analysis;
+using Dna.DataStructures;
 using Dna.Structuring.Stackify.Structured;
 using Iced.Intel;
 using Rivers;
@@ -24,7 +25,7 @@ namespace Dna.Structuring.Stackify
 
         private Stack<CtrlEntry> ctrlStack = new Stack<CtrlEntry>();
 
-        private IReadOnlyDictionary<Node, HashSet<Node>> dominatorTree;
+        private IReadOnlyDictionary<Node, OrderedSet<Node>> dominatorTree;
 
         private HashSet<BasicBlock<AbstractInst>> loopHeaders;
 

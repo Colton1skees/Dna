@@ -1,4 +1,5 @@
-﻿using Rivers;
+﻿using Dna.DataStructures;
+using Rivers;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -16,7 +17,7 @@ namespace Dna.ControlFlow.Analysis
         /// <param name="graph"></param>
         /// <returns></returns>
         /// <exception cref="InvalidOperationException"></exception>
-        public static IReadOnlyDictionary<Node, HashSet<Node>> GetDominatorTree(Graph graph)
+        public static IReadOnlyDictionary<Node, OrderedSet<Node>> GetDominatorTree(Graph graph)
         {
             if (graph.Nodes.First().IncomingEdges.Count > 0)
                 throw new InvalidOperationException("Root nodes cannot have incoming edges.");
@@ -61,7 +62,16 @@ namespace Dna.ControlFlow.Analysis
                 }
             }
 
-            return dominatorTree;
+
+            var idk = new Dictionary<Node, OrderedSet<Node>>();
+            foreach(var pair in dominatorTree)
+            {
+                idk.Add(pair.Key, new OrderedSet<Node>(pair.Value));
+            }
+
+            return idk;
+
+           // return dominatorTree;
         }
     }
 }

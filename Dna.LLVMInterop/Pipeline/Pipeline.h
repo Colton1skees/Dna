@@ -358,8 +358,19 @@ namespace Dna::Pipeline
 			FPM.add(llvm::sl::createUnswitchPass());
 		}
 
-		FPM.add(llvm::createLoopRotatePass());
-		bool cns = false;
+		//FPM.add(llvm::createLoopRotatePass());
+
+
+		FPM.add(llvm::createGVNPass(false));
+		//FPM.add(llvm::createFixIrreduciblePass());
+
+		//FPM.add(llvm::createFixIrreduciblePass());
+		//FPM.add(llvm::createGVNPass(false));
+		//FPM.add(llvm::createNewGVNPass());
+		//FPM.add(llvm::createStructurizeCFGPass());
+
+
+		bool cns = true;
 		if (cns)
 		{
 			FPM.add(llvm::createCFGSimplificationPass());
@@ -372,20 +383,13 @@ namespace Dna::Pipeline
 			FPM.add(llvm::sl::createUnswitchPass());       // get rid of all switch instructions
 			// introduced by the loop exit enumeration
 		}
-
-
-		FPM.add(llvm::createGVNPass(false));
-		//FPM.add(llvm::createFixIrreduciblePass());
-
-		//FPM.add(llvm::createFixIrreduciblePass());
-		//FPM.add(llvm::createGVNPass(false));
-		//FPM.add(llvm::createNewGVNPass());
-		//FPM.add(llvm::createStructurizeCFGPass());
+		
+		FPM.add(llvm::createStructurizeCFGPass());
 
 		PMB.populateFunctionPassManager(FPM);
 		PMB.populateModulePassManager(module_manager);
 
-		if (false)
+		if (true)
 		{
 			auto structuringPass = (llvm::sl::StructuredControlFlowPass*)llvm::sl::createASTComputePass();
 			module_manager.add(structuringPass);

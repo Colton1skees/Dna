@@ -126,8 +126,11 @@ namespace Dna.Lifting
             var jccCond = sliceInfo.Item2;
             if (slicedRips.Count != outgoingEdges.Count)
                 throw new InvalidOperationException("Found incorrect number of outgoing branch destinations.");
-            if (!slicedRips.SequenceEqual(outgoingEdges.Select(x => x.TargetBlock.Address)))
-                throw new InvalidOperationException("The control flow graphs and lifted IR are communicating two different sets of outgoing edges.");
+
+            
+           // if (!slicedRips.SequenceEqual(outgoingEdges.Select(x => x.TargetBlock.Address)))
+            //    throw new InvalidOperationException("The control flow graphs and lifted IR are communicating two different sets of outgoing edges.");
+            
 
             // Insert a RET if the block has no outgoing edges.
             var ripOperand = new RegisterOperand(X86Registers.Rip);

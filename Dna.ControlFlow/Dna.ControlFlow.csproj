@@ -12,4 +12,8 @@
     <PackageReference Include="Rivers" Version="0.1.0" />
   </ItemGroup>
 
+  <ItemGroup>
+    <ProjectReference Include="..\Dna.DataStructures\Dna.DataStructures.csproj" />
+  </ItemGroup>
+
 </Project>
