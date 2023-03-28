@@ -78,14 +78,14 @@ namespace Dna::Pipeline
 		justGVN = false;
 		if (justGVN)
 		{
-			const char* argv[12] = { "mesa", "-simplifycfg-sink-common=false",
+			const char* argv[13] = { "mesa", "-simplifycfg-sink-common=false",
 					"-memdep-block-number-limit=10000000",
 					"-dse-memoryssa-defs-per-block-limit=10000000",
 					"-gvn-max-num-deps=100000000",
 					"-dse-memoryssa-scanlimit=10000000",
 					"-dse-memoryssa-partial-store-limit=10000000",
 					"-gvn-max-block-speculations=10000000",
-					"-memdep-block-scan-limit=280",
+					"-memdep-block-scan-limit=28000",
 					"-unroll-count=1500",
 					"-unroll-threshold=100000000",
 					"-enable-store-refinement=1"
@@ -99,14 +99,14 @@ namespace Dna::Pipeline
 			const char* argv[12] = { "mesa", "-simplifycfg-sink-common=false",
 		"-memdep-block-number-limit=10000000",
 		"-dse-memoryssa-defs-per-block-limit=10000000",
-		"-gvn-max-num-deps=1500",
-		"-dse-memoryssa-scanlimit=100000000",
-		"-dse-memoryssa-partial-store-limit=10000000",
-		"-gvn-max-block-speculations=1000",
+		"-gvn-max-num-deps=25000000",
+		"-dse-memoryssa-scanlimit=900000000",
+		"-dse-memoryssa-partial-store-limit=90000000",
+		"-gvn-max-block-speculations=90000000",
 		"-memdep-block-scan-limit=1000000000",
 		"-unroll-count=1500",
 		"-unroll-threshold=100000000",
-		"-enable-store-refinement=1"
+		"-enable-store-refinement=0"
 			};
 			llvm::cl::ParseCommandLineOptions(12, argv);
 		}
@@ -213,11 +213,11 @@ namespace Dna::Pipeline
 		if (justGVN)
 		{
 			printf("just gvn. \n");
-			//FPM.add(llvm::createCFLSteensAAWrapperPass());
-			//FPM.add(llvm::createGlobalsAAWrapperPass());
-			//FPM.add(llvm::createSCEVAAWrapperPass());
+			FPM.add(llvm::createCFLSteensAAWrapperPass());
+			FPM.add(llvm::createGlobalsAAWrapperPass());
+			FPM.add(llvm::createSCEVAAWrapperPass());
 			//FPM.add(llvm::createTypeBasedAAWrapperPass());
-			//FPM.add(llvm::createScopedNoAliasAAWrapperPass());
+			FPM.add(llvm::createScopedNoAliasAAWrapperPass());
 			FPM.add(llvm::createBasicAAWrapperPass());
 			//FPM.add(llvm::createLCSSAPass());
 
@@ -271,7 +271,7 @@ namespace Dna::Pipeline
 		FPM.add(llvm::createJumpThreadingPass(99999));
 		FPM.add(llvm::createCorrelatedValuePropagationPass());
 		FPM.add(llvm::createCFGSimplificationPass());
-
+		
 
 		// Add various optimization passes.
 		FPM.add(llvm::createInstructionCombiningPass());
@@ -282,7 +282,7 @@ namespace Dna::Pipeline
 		FPM.add(llvm::createInstructionCombiningPass());
 		FPM.add(llvm::createReassociatePass());
 		FPM.add(llvm::createSROAPass());
-		FPM.add(llvm::createMergedLoadStoreMotionPass());
+		//FPM.add(llvm::createMergedLoadStoreMotionPass());
 		FPM.add(llvm::createNewGVNPass());
 		FPM.add(llvm::createSCCPPass());
 		FPM.add(llvm::createBitTrackingDCEPass());
@@ -303,7 +303,7 @@ namespace Dna::Pipeline
 		FPM.add(llvm::createInstructionCombiningPass()); // added
 		FPM.add(llvm::createCFGSimplificationPass());    // added
 		FPM.add(llvm::createDeadStoreEliminationPass()); // added
-
+		FPM.add(llvm::createGVNPass(true));
 		if (runConstantConcretization)
 			FPM.add(Dna::Passes::getConstantConcretizationPassPass(readBinaryContents)); // added
 		FPM.add(llvm::createDeadStoreEliminationPass()); // added
@@ -374,6 +374,7 @@ namespace Dna::Pipeline
 		}
 
 
+		FPM.add(llvm::createGVNPass(false));
 		//FPM.add(llvm::createFixIrreduciblePass());
 
 		//FPM.add(llvm::createFixIrreduciblePass());

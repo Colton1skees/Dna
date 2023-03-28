@@ -22,7 +22,7 @@ namespace Dna.LLVMInterop.Passes
 
         private readonly IBinary binary;
 
-        private readonly Dictionary<ulong, uint> accessedBytes = new();
+        private readonly Dictionary<ulong, byte> accessedBytes = new();
 
         private readonly HashSet<string> existingConcretizes = new();
 
@@ -35,53 +35,34 @@ namespace Dna.LLVMInterop.Passes
 
         public void Execute()
         {
-
-            //function.GlobalParent.PrintToFile("pre_concretization.ll");
-            // Get all GEP instructions.
             var instructions = function.GetInstructions();
-
-            var existingStores = instructions.Where(x => x.InstructionOpcode == LLVMOpcode.LLVMStore);
-            foreach (var existingStore in existingStores)
-            {
-                var gep = existingStore.GetOperand(1);
-                if (gep.InstructionOpcode != LLVMOpcode.LLVMGetElementPtr)
-                    continue;
-
-                var gepIndex = gep.GetOperand(1);
-                if (!BinaryAccessMatcher.IsBinarySectionAccess(gepIndex))
-                    continue;
-
-                var offset = BinaryAccessMatcher.GetBinarySectionOffset(gepIndex);
-                var size = existingStore.GetOperand(0).TypeOf.IntWidth;
-                //existingConcretizes.Add($"{offset}_{size}");
-
-                var storeVal = existingStore.GetOperand(0);
-                if (storeVal.Kind != LLVMValueKind.LLVMConstantIntValueKind)
-                    continue;
-
-                var valConst = storeVal.ConstIntZExt;
-                existingConcretizes.Add($"{offset}_{size}_{valConst}");
-            }
 
             // Traverse each instruction and track a set of all bytes being accessed.
             foreach (var instruction in instructions)
             {
                 if (instruction.InstructionOpcode == LLVMOpcode.LLVMLoad)
                     TrackSecionAccesses(instruction.GetOperand(0), instruction.TypeOf.IntWidth);
-                //else if(instruction.InstructionOpcode == LLVMOpcode.LLVMStore)
-                //  TrackSecionAccesses(instruction.GetOperand(1), instruction.GetOperand(0).TypeOf.IntWidth);
             }
 
             ConcretizeBinarySectionAccesses();
-
-            Optimize();
-
-            //function.GlobalParent.PrintToFile("post_concretization.ll");
-            Console.WriteLine("Concretized.");
         }
 
         private void TrackSecionAccesses(LLVMValueRef value, uint bitWidth)
         {
+            var readBytes = (ulong address, uint size) =>
+            {
+                var bytes = binary.ReadBytes(address, (int)size);
+                var value = size switch
+                {
+                    1 => bytes[0],
+                    2 => BitConverter.ToUInt16(bytes),
+                    4 => BitConverter.ToUInt32(bytes),
+                    8 => BitConverter.ToUInt64(bytes),
+                    _ => throw new InvalidOperationException()
+                };
+                return (ulong)value;
+            };
+
             // If this is not a getelementptr, then it's a global variable, where no processing is needed.
             if (value.InstructionOpcode != LLVMOpcode.LLVMGetElementPtr)
                 return;
@@ -93,11 +74,23 @@ namespace Dna.LLVMInterop.Passes
             // Get the binary section offset.
             var sectionOffset = BinaryAccessMatcher.GetBinarySectionOffset(value.GetOperand(1));
 
-            if(sectionOffset == 0x140042101)
+            if (sectionOffset == 0x140043761)
             {
-            //   Debugger.Break();
+               // Debugger.Break();
             }
 
+            var byteWidth = bitWidth / 8;
+            for(ulong i = 0; i < byteWidth + 1; i++)
+            {
+                var offset = i + sectionOffset;
+                if (accessedBytes.ContainsKey(offset))
+                    continue;
+
+                var data = (byte)readBytes(offset, 1);
+                accessedBytes.Add(offset, data);
+            }
+
+            /*
             if (!accessedBytes.ContainsKey(sectionOffset))
             {
 
@@ -112,6 +105,7 @@ namespace Dna.LLVMInterop.Passes
                     accessedBytes[sectionOffset] = bitWidth;
                 }
             }
+            */
             //accessedBytes.TryAdd(sectionOffset, bitWidth);
 
             /*
@@ -158,7 +152,7 @@ namespace Dna.LLVMInterop.Passes
 
             last = gsAccess.NextInstruction;
 
-            foreach (var address in byteAddresses)
+            foreach (var address in accessedBytes)
             {
                 // Since we're iterating in reverse, position the builder before
                 // the previously added instruction.
@@ -166,26 +160,14 @@ namespace Dna.LLVMInterop.Passes
 
                 // Create a constant byte integer.
                 var context = function.GlobalParent.Context;
-                var valType = LLVMTypeRef.CreateInt(address.Value);
-                var memValue = readBytes(address.Key, address.Value / 8);
+                var valType = LLVMTypeRef.CreateInt(8);
 
-                var name = $"{address.Key}_{address.Value}_{memValue}";
+   
+                var constantInt = LLVMValueRef.CreateConstInt(valType, address.Value, false);
 
-                if (existingConcretizes.Contains(name) && address.Key == 0x140042101)
+                if (address.Key >= 0x140043761 && address.Key <= 0x140043761 + 8)
                 {
-                   // Debugger.Break();
-                }
-
-                if (existingConcretizes.Contains(name))
-                {
-                    continue;
-                }
-
-                var constantInt = LLVMValueRef.CreateConstInt(valType, memValue, false);
-
-                if(address.Key == 0x140042101)
-                {
-                   // Debugger.Break();
+                 //   Debugger.Break();
                 }
                 // Store the constant byte to memory.
                 var storeAddr = LLVMValueRef.CreateConstInt(context.Int64Type, address.Key, false);
@@ -193,24 +175,6 @@ namespace Dna.LLVMInterop.Passes
                 //storePtr = builder.BuildBitCast(storePtr, LLVMTypeRef.CreatePointer(valType, 0));
 
                 last = builder.BuildStore(constantInt, storePtr);
-            }
-        }
-
-        private void Optimize()
-        {
-            bool optimize = true;
-            if (optimize)
-            {
-                var passManager2 = function.GlobalParent.CreateFunctionPassManager();
-                passManager2.AddEarlyCSEPass();
-                passManager2.AddNewGVNPass();
-                passManager2.InitializeFunctionPassManager();
-                for (int i = 0; i < 1; i++)
-                {
-                    passManager2.RunFunctionPassManager(function);
-                }
-                passManager2.FinalizeFunctionPassManager();
-                Console.WriteLine("ran");
             }
         }
     }

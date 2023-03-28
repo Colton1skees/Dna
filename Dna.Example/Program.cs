@@ -70,7 +70,7 @@ var cfg = dna.RecursiveDescent.ReconstructCfg(funcAddr);
 // Instantiate the cpu architecture.
 var architecture = new X86CpuArchitecture(ArchitectureId.ARCH_X86_64);
 
-bool explore = false;
+bool explore = true;
 if (explore)
 {
     var cfgExplorer = new CfgExplorer(dna, architecture);
@@ -89,8 +89,10 @@ for (int i = 0; i < 3; i++)
 var llvmLifter = new LLVMLifter(architecture);
 
 
+// beforecustompipeline.ll
 var ctx = LLVMContextRef.Create();
-var memBuffer = LlvmUtilities.CreateMemoryBuffer(@"C:\Users\colton\source\repos\Dna\Dna.Example\bin\x64\Debug\net7.0\beforecustompipeline.ll");
+// -passes=sccp,sroa,dce,dse,adce,licm,gvn,newgvn -memdep-block-scan-limit=1000000000 -gvn-max-num-deps=25000000
+var memBuffer = LlvmUtilities.CreateMemoryBuffer(@"C:\Users\colton\source\repos\Dna\Dna.Example\bin\x64\Debug\net7.0\cant_resolve.ll");
 ctx.TryParseIR(memBuffer, out LLVMModuleRef unicornTraceModule, out string unicornLoadMsg);
 
 llvmLifter.module = unicornTraceModule;
@@ -191,20 +193,22 @@ OptimizationApi.OptimizeModule(llvmLifter.Module, llvmLifter.llvmFunction, false
 //myPass.Execute();
 
 // Run the O3 pipeline one last time with custom alias analysis.
+
 PointerClassifier.Seen.Clear();
 PointerClassifier.print = true;
-for (int i = 0; i < 15; i++)
+for (int i = 0; i < 50; i++)
 {
     Console.WriteLine(i);
     OptimizationApi.OptimizeModule(llvmLifter.Module, llvmLifter.llvmFunction, false, true, ptrAlias, false, 0, false);
 
-    var pass2 = new ConstantConcretizationPass(llvmLifter.llvmFunction, llvmLifter.builder, binary);
-    pass2.Execute();
 
-
-    if(i == 8)
+    if(i % 4 == 0)
     {
-       // ClassifyingAliasAnalysisPass.print = true;
+
+        var pass2 = new ConstantConcretizationPass(llvmLifter.llvmFunction, llvmLifter.builder, binary);
+        pass2.Execute();
+
+        // ClassifyingAliasAnalysisPass.print = true;
     }
 
     llvmLifter.Module.PrintToFile("foo.ll");

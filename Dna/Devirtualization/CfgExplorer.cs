@@ -148,7 +148,7 @@ namespace Dna.Devirtualization
             passManager2.AddBasicAliasAnalysisPass();
             passManager2.AddTypeBasedAliasAnalysisPass();
             passManager2.AddScopedNoAliasAAPass();
-            passManager2.AddLowerExpectIntrinsicPass();
+          //  passManager2.AddLowerExpectIntrinsicPass();
             passManager2.AddCFGSimplificationPass();
             passManager2.AddPromoteMemoryToRegisterPass();
             passManager2.AddEarlyCSEPass();
