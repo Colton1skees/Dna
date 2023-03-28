@@ -75,7 +75,7 @@ namespace Dna::Pipeline
 		llvm::cl::ParseCommandLineOptions(7, argv);
 		*/
 
-
+		justGVN = false;
 		if (justGVN)
 		{
 			const char* argv[12] = { "mesa", "-simplifycfg-sink-common=false",
@@ -267,19 +267,19 @@ namespace Dna::Pipeline
 		}
 		FPM.add(llvm::createSROAPass());
 		FPM.add(llvm::createEarlyCSEPass(true));
-		//FPM.add(llvm::createSpeculativeExecutionPass());
-		//FPM.add(llvm::createJumpThreadingPass(99999));
-		//FPM.add(llvm::createCorrelatedValuePropagationPass());
+		FPM.add(llvm::createSpeculativeExecutionPass());
+		FPM.add(llvm::createJumpThreadingPass(99999));
+		FPM.add(llvm::createCorrelatedValuePropagationPass());
 		FPM.add(llvm::createCFGSimplificationPass());
 
 
 		// Add various optimization passes.
-		//FPM.add(llvm::createInstructionCombiningPass());
-		//FPM.add(llvm::createJumpThreadingPass());
-		//FPM.add(llvm::createCorrelatedValuePropagationPass());
+		FPM.add(llvm::createInstructionCombiningPass());
+		FPM.add(llvm::createJumpThreadingPass());
+		FPM.add(llvm::createCorrelatedValuePropagationPass());
 		FPM.add(llvm::createCFGSimplificationPass());
-		//FPM.add(llvm::createAggressiveInstCombinerPass());
-		//FPM.add(llvm::createInstructionCombiningPass());
+		FPM.add(llvm::createAggressiveInstCombinerPass());
+		FPM.add(llvm::createInstructionCombiningPass());
 		FPM.add(llvm::createReassociatePass());
 		FPM.add(llvm::createSROAPass());
 		FPM.add(llvm::createMergedLoadStoreMotionPass());
@@ -297,10 +297,10 @@ namespace Dna::Pipeline
 
 		FPM.add(llvm::createAggressiveDCEPass());
 		FPM.add(llvm::createCFGSimplificationPass());
-		//FPM.add(llvm::createInstructionCombiningPass());
+		FPM.add(llvm::createInstructionCombiningPass());
 		FPM.add(llvm::createDeadStoreEliminationPass()); // added
 		FPM.add(llvm::createCFGSimplificationPass());    // added
-	//	FPM.add(llvm::createInstructionCombiningPass()); // added
+		FPM.add(llvm::createInstructionCombiningPass()); // added
 		FPM.add(llvm::createCFGSimplificationPass());    // added
 		FPM.add(llvm::createDeadStoreEliminationPass()); // added
 

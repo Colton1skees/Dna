@@ -1,6 +1,7 @@
 ﻿using LLVMSharp.Interop;
 using System;
 using System.Collections.Generic;
+using System.Drawing;
 using System.Linq;
 using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
@@ -53,6 +54,8 @@ namespace Dna.LLVMInterop.Passes
         /// </summary>
         public static nint PtrGetAliasResult { get;}
 
+        public static bool print = false;
+
         static unsafe ClassifyingAliasAnalysisPass()
         {
             getAliasResult = new dgGetAliasResult(GetAliasResult);
@@ -84,7 +87,33 @@ namespace Dna.LLVMInterop.Passes
             // If either pointer type is unknown, then we tell LLVM
             // to fall back to it's basic alias analysis.
             if (typeA == PointerType.Unk || typeB == PointerType.Unk)
+            {
+                if (print)
+                {
+                    var chainA = InstructionSlicer.SliceInst(ptrA);
+                    Console.WriteLine("");
+                    Console.WriteLine("Chain A: ");
+                    foreach (var item in chainA.Reverse())
+                    {
+                        var text = item.ToString();
+                        text = new string(text.SkipWhile(x => x == ' ').ToArray());
+                        Console.WriteLine("    " + text);
+                    }
+
+                    Console.WriteLine("");
+                    Console.WriteLine("Chain B: ");
+                    var chainB = InstructionSlicer.SliceInst(ptrB);
+                    foreach (var item in chainB.Reverse())
+                    {
+                        var text = item.ToString();
+                        text = new string(text.SkipWhile(x => x == ' ').ToArray());
+                        Console.WriteLine("    " + text);
+                    }
+                }
+
+
                 return AliasResult.UnknownAlias;
+            }
 
             // If the two pointer types are different(e.g. [rsp - 0x10] and [gs]),
             // then we tell LLVM that these cannot possibly alias.

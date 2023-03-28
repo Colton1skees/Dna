@@ -193,13 +193,19 @@ OptimizationApi.OptimizeModule(llvmLifter.Module, llvmLifter.llvmFunction, false
 // Run the O3 pipeline one last time with custom alias analysis.
 PointerClassifier.Seen.Clear();
 PointerClassifier.print = true;
-for (int i = 0; i < 10; i++)
+for (int i = 0; i < 15; i++)
 {
     Console.WriteLine(i);
     OptimizationApi.OptimizeModule(llvmLifter.Module, llvmLifter.llvmFunction, false, true, ptrAlias, false, 0, false);
 
     var pass2 = new ConstantConcretizationPass(llvmLifter.llvmFunction, llvmLifter.builder, binary);
     pass2.Execute();
+
+
+    if(i == 8)
+    {
+       // ClassifyingAliasAnalysisPass.print = true;
+    }
 
     llvmLifter.Module.PrintToFile("foo.ll");
     Console.WriteLine(i.ToString());

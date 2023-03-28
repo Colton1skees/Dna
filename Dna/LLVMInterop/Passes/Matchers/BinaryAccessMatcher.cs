@@ -24,6 +24,12 @@ namespace Dna.LLVMInterop.Passes.Matchers
                 return constant;
             }
 
+            else if(IsLoopBinaryAccess(value))
+            {
+                var constant = value.GetOperand(0).ConstIntZExt;
+                return constant;
+            }
+
             throw new InvalidOperationException($"Cannot identify constant binary section access for: {value}");
         }
 
@@ -40,8 +46,46 @@ namespace Dna.LLVMInterop.Passes.Matchers
             //  %foo = getelementptr inbounds i8, ptr %0, i64 %index
             if (IsAddToBinarySection(value))
                 return true;
+
+            // Precisely match this slice:
+            //  %foo = add i64 %phiIndex, 8
+            //  %phiIndex = phi i64 [ 5369023239, %entry ], [ %foo, %"140015B1D" ]
+            //  %gep_index = getelementptr inbounds i8, ptr %0, i64 %phiIndex
+            if (IsLoopBinaryAccess(value))
+                return true;
             return false;
         }
+
+
+        private static bool IsLoopBinaryAccess(LLVMValueRef value)
+        {
+            // Precisely match:
+            //  %phiIndex = phi i64 [ 5369023239, %entry ], [ %foo, %"140015B1D" ]
+            if (value.InstructionOpcode != LLVMOpcode.LLVMPHI)
+                return false;
+
+            // For now we only match PHIs with two operands.
+            if (value.OperandCount != 2)
+                return false;
+
+            // Assume that the first phi value must be a constant.
+            var phiVal = value.GetOperand(0);
+            if (!IsConstantWithinBinarySection(value.GetOperand(0)))
+                return false;
+
+            // Return false if the second PHI value is not an add.
+            var otherPhiValue = value.GetOperand(1);
+            if(otherPhiValue.InstructionOpcode != LLVMOpcode.LLVMAdd)
+                return false;
+
+            // Return true if this is semantically equivalent to:
+            //  %foo = add i64 %phiIndex, 8
+            if (otherPhiValue.GetOperand(0) == value && IsConstantInt(otherPhiValue.GetOperand(1)))
+                return true;
+
+            return false;
+        }
+
 
         private static bool IsAddToBinarySection(LLVMValueRef value)
         {
