@@ -79,6 +79,18 @@
     <ClInclude Include="Pipeline\Pipeline.h">
       <Filter>Pipeline</Filter>
     </ClInclude>
+    <ClInclude Include="Passes\ControlFlowStructuringPass.h">
+      <Filter>Passes</Filter>
+    </ClInclude>
+    <ClInclude Include="API\LLVM\IR\LegacyPassManager.h">
+      <Filter>API\LLVM\IR</Filter>
+    </ClInclude>
+    <ClInclude Include="API\LLVM\Transforms\IPO\PassManagerBuilder.h">
+      <Filter>API\LLVM\Transforms\IPO</Filter>
+    </ClInclude>
+    <ClInclude Include="API\LLVM\Transforms\Scalar.h">
+      <Filter>API\LLVM\Transforms</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="dllmain.cpp" />
@@ -128,6 +140,18 @@
     </Filter>
     <Filter Include="Pipeline">
       <UniqueIdentifier>{1e02910f-66d7-4740-8d98-568ef22a7b5b}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="API\LLVM">
+      <UniqueIdentifier>{d253739e-87c9-42d0-b9f6-43fe9e55b152}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="API\LLVM\IR">
+      <UniqueIdentifier>{59a0d3ce-0239-4da0-9fe8-326184cdeecd}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="API\LLVM\Transforms">
+      <UniqueIdentifier>{49bf51e1-b758-418f-b337-3393d816465d}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="API\LLVM\Transforms\IPO">
+      <UniqueIdentifier>{a65f73ae-1f62-49c1-8aee-c365258964a8}</UniqueIdentifier>
     </Filter>
   </ItemGroup>
   <ItemGroup>

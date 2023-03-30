@@ -44,6 +44,7 @@
 #include "Passes/ControlledNodeSplittingPass.h"
 #include "Passes/generator_jit_sl_function.h"
 #include "Passes/generator_jit_ast_compute.h"
+#include "Passes/ControlFlowStructuringPass.h"
 
 #include "Utilities/magic_enum.hpp"
 
@@ -384,6 +385,8 @@ namespace Dna::Pipeline
 			// introduced by the loop exit enumeration
 
 			FPM.add(llvm::sl::createControlledNodeSplittingPass());
+
+			FPM.add(new Dna::Passes::ControlFlowStructuringPass());
 		}
 		
 

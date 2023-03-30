@@ -159,6 +159,9 @@
   <ItemGroup>
     <ClInclude Include="API\ExportDef.h" />
     <ClInclude Include="API\ExportedAPI.h" />
+    <ClInclude Include="API\LLVM\IR\LegacyPassManager.h" />
+    <ClInclude Include="API\LLVM\Transforms\IPO\PassManagerBuilder.h" />
+    <ClInclude Include="API\LLVM\Transforms\Scalar.h" />
     <ClInclude Include="API\OptimizationAPI\OptimizationAPI.h" />
     <ClInclude Include="API\RegionAPI\BaseRegionAPI.h" />
     <ClInclude Include="API\RegionAPI\ComplexRegionAPI.h" />
@@ -170,6 +173,7 @@
     <ClInclude Include="Passes\ClassifyingAliasAnalysisPass.h" />
     <ClInclude Include="Passes\compilercore_assert.h" />
     <ClInclude Include="Passes\ConstantConcretizationPass.h" />
+    <ClInclude Include="Passes\ControlFlowStructuringPass.h" />
     <ClInclude Include="Passes\ControlledNodeSplittingPass.h" />
     <ClInclude Include="Passes\generator_jit_ast_compute.h" />
     <ClInclude Include="Passes\generator_jit_sl_function.h" />
