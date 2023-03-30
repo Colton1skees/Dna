@@ -4,35 +4,39 @@
 #include <llvm/IR/LegacyPassManager.h> 
 #include <API/ExportDef.h>
 
-using namespace llvm::legacy;
-
 namespace Dna::API {
-	DNA_EXPORT PassManager* PassManager_Constructor()
+	DNA_EXPORT llvm::legacy::PassManager* PassManager_Constructor()
 	{
-		return new PassManager();
+		return new llvm::legacy::PassManager();
 	}
 
-	DNA_EXPORT void PassManagerBase_Add(PassManagerBase* passManager, llvm::Pass* pass)
+	DNA_EXPORT void PassManagerBase_Add(llvm::legacy::PassManagerBase* passManager, llvm::Pass* pass)
 	{
 		passManager->add(pass);
 	}
 
-	DNA_EXPORT void PassManager_Run(PassManager* passManager, llvm::Module* mod)
+	DNA_EXPORT bool PassManager_Run(llvm::legacy::PassManager* passManager, llvm::Module* mod)
 	{
 		passManager->run(*mod);
 	}
 
-	DNA_EXPORT FunctionPassManager* FunctionPassManager_Constructor(llvm::Module* mod)
+	DNA_EXPORT llvm::legacy::FunctionPassManager* FunctionPassManager_Constructor(llvm::Module* mod)
 	{
-		return new FunctionPassManager(mod);
+		return new llvm::legacy::FunctionPassManager(mod);
 	}
 
-	DNA_EXPORT void FunctionPassManager_DoInitialization(FunctionPassManager* passManager)
+	DNA_EXPORT bool FunctionPassManager_Run(llvm::legacy::FunctionPassManager* passManager, llvm::Function* func)
+	{
+		passManager->run(*func);
+	}
+
+
+	DNA_EXPORT bool FunctionPassManager_DoInitialization(llvm::legacy::FunctionPassManager* passManager)
 	{
 		passManager->doInitialization();
 	}
 
-	DNA_EXPORT void FunctionPassManager_DoFinalization(FunctionPassManager* passManager)
+	DNA_EXPORT bool FunctionPassManager_DoFinalization(llvm::legacy::FunctionPassManager* passManager)
 	{
 		passManager->doFinalization();
 	}

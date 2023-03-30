@@ -6,7 +6,7 @@ using System.Threading.Tasks;
 
 namespace Dna.LLVMInterop.API.LLVMBindings.IR
 {
-    internal class Type
+    public struct LLVMOpaqueFunctionPassManager
     {
     }
 }

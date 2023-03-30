@@ -40,6 +40,9 @@ using Dna.Utilities;
 using Dna.Devirtualization;
 using Dna.Extensions;
 using Dna.Structuring.Stacker;
+using Dna.LLVMInterop.API.LLVMBindings.Transforms;
+using Dna.LLVMInterop.API.LLVMBindings.IR;
+using Dna.LLVMInterop.API.LLVMBindings.Transforms.IPO;
 
 // Load the 64 bit PE file.
 // Note: This file is automatically copied to the build directory.
@@ -266,6 +269,20 @@ foreach(var block in llvmGraph.GetBlocks())
     }
         Console.WriteLine(exitInstruction);
 }
+
+var fpm = new FunctionPassManager();
+var pmb = new PassManagerBuilder();
+var moduleManager = new PassManager();
+
+fpm.Add(ScalarPasses.CreateCorrelatedValuePropagationPass());
+fpm.Add(ScalarPasses.CreateDeadCodeEliminationPass());
+fpm.Add(ScalarPasses.CreateDeadStoreEliminationPass());
+fpm.Add(ScalarPasses.CreateConstantHoistingPass());
+
+pmb.PopulateFunctionPassManager(fpm);
+pmb.PopulateModulePassManager(moduleManager);
+
+fpm.Run
 
 var dotGraph = GraphVisualizer.GetDotGraph(llvmGraph);
 var dot = dotGraph.Compile();

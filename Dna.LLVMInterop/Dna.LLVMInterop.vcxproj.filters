@@ -91,6 +91,9 @@
     <ClInclude Include="API\LLVM\Transforms\Scalar.h">
       <Filter>API\LLVM\Transforms</Filter>
     </ClInclude>
+    <ClInclude Include="API\LLVM\Pass.h">
+      <Filter>API\LLVM</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="dllmain.cpp" />
