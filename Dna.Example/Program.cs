@@ -43,9 +43,10 @@ using Dna.Structuring.Stacker;
 
 // Load the 64 bit PE file.
 // Note: This file is automatically copied to the build directory.
-var path = @"C:\Users\colton\source\repos\ObfuscationTester\x64\Release\ObfuscationTester.themida.exe";
+var path = @"SampleExecutable.bin";
 var binary = new WindowsBinary(64, File.ReadAllBytes(path), 0x140000000);
 
+/*
 // Replace themida spinlock with nop.
 binary.WriteBytes(0x000000014001552B, new byte[]
 {
@@ -53,7 +54,7 @@ binary.WriteBytes(0x000000014001552B, new byte[]
     0x90, 0x90,
     0x90, 0x90, 0x90, 0x90, 0x90
 });
-
+*/
 /*
 var assembler = new Iced.Intel.Assembler(64);
 assembler.jmp(0x14004B2EE);
@@ -66,7 +67,7 @@ binary.WriteBytes(0x140015C47, encoded);
 var dna = new Dna.Dna(binary);
 
 // Parse a (virtualized) control flow graph from the binary.
-ulong funcAddr = 0x14000123C;
+ulong funcAddr = 0x1400012E4;
 var cfg = dna.RecursiveDescent.ReconstructCfg(funcAddr);
 
 // Instantiate the cpu architecture.
@@ -94,11 +95,12 @@ var llvmLifter = new LLVMLifter(architecture);
 // beforecustompipeline.ll
 var ctx = LLVMContextRef.Create();
 // -passes=sccp,sroa,dce,dse,adce,licm,gvn,newgvn -memdep-block-scan-limit=1000000000 -gvn-max-num-deps=25000000
-var memBuffer = LlvmUtilities.CreateMemoryBuffer(@"C:\Users\colton\source\repos\Dna\Dna.Example\bin\x64\Debug\net7.0\cant_resolve.ll");
-ctx.TryParseIR(memBuffer, out LLVMModuleRef unicornTraceModule, out string unicornLoadMsg);
+//var memBuffer = LlvmUtilities.CreateMemoryBuffer(@"C:\Users\colton\source\repos\Dna\Dna.Example\bin\x64\Debug\net7.0\cant_resolve.ll");
+//ctx.TryParseIR(memBuffer, out LLVMModuleRef unicornTraceModule, out string unicornLoadMsg);
 
-llvmLifter.module = unicornTraceModule;
-llvmLifter.llvmFunction = llvmLifter.Module.FirstFunction;
+llvmLifter.Lift(liftedCfg);
+//llvmLifter.module = unicornTraceModule;
+//llvmLifter.llvmFunction = llvmLifter.Module.FirstFunction;
 
 /*
 LlvmUtilities.LLVMParseCommandLineOptions(new string[] { "-memdep-block-scan-limit=10000000",
@@ -215,7 +217,7 @@ for (int i = 0; i < 10; i++)
 
     llvmLifter.Module.PrintToFile("foo.ll");
     Console.WriteLine(i.ToString());
-    OptimizationApi.OptimizeModule(llvmLifter.Module, llvmLifter.llvmFunction, false, true, ptrAlias, false, 0, false, true);
+    OptimizationApi.OptimizeModule(llvmLifter.Module, llvmLifter.llvmFunction, false, true, ptrAlias, false, 0, false, false);
     Console.WriteLine("foo foo foo");
 }
 
@@ -236,25 +238,43 @@ foreach(var llvmBlock in llvmLifter.llvmFunction.BasicBlocks)
 foreach(var block in llvmGraph.GetBlocks())
 {
     var exitInstruction = block.ExitInstruction;
+   // if (exitInstruction.ToString().Contains("cond120131"))
+      //  Debugger.Break();
     var operands = exitInstruction.GetOperands().ToList();
     foreach(var operand in operands)
     {
+        Console.WriteLine(operand.ToString());
         if (operand.Kind != LLVMValueKind.LLVMBasicBlockValueKind)
             continue;
 
         var outgoingBlk = llvmGraph.GetBlocks().Single(x => x.Address == (ulong)operand.Handle);
         block.AddOutgoingEdge(new BlockEdge<LLVMValueRef>(block, outgoingBlk));
     }
-    Console.WriteLine(exitInstruction);
+
+
+    if (exitInstruction.ToString().Contains("cond120131"))
+    {
+        var op0 = block.ExitInstruction.GetOperand(1);
+        var op1 = block.ExitInstruction.GetOperand(2);
+        Console.WriteLine(exitInstruction);
+        Console.WriteLine(op0);
+        Console.WriteLine(op1);
+        var edge1 = block.GetOutgoingEdges().Single(x => x.TargetBlock.Name == block.ExitInstruction.GetOperand(1).Handle.ToString("X"));
+        var edge2 = block.GetOutgoingEdges().Single(x => x.TargetBlock.Name == block.ExitInstruction.GetOperand(2).Handle.ToString("X"));
+        Console.WriteLine("why.");
+      //  Debugger.Break();
+    }
+        Console.WriteLine(exitInstruction);
 }
 
 var dotGraph = GraphVisualizer.GetDotGraph(llvmGraph);
 var dot = dotGraph.Compile();
 File.WriteAllText("llvmGraph.dot", dot);
 
-var loopAnalysis = new LoopAnalysis<LLVMValueRef>(llvmGraph);
+var domTree = new ImmutableDomTree<LLVMValueRef>(llvmGraph);
+var loopAnalysis = new LoopAnalysis<LLVMValueRef>(llvmGraph, domTree);
 
-var structurer = new StackingStructurer(llvmGraph, loopAnalysis);
+var structurer = new StackingStructurer(llvmGraph, domTree);
 structurer.Structure();
 
 bool compile = true;

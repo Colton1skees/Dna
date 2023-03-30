@@ -30,7 +30,11 @@ namespace Dna.ControlFlow.Analysis
 
         // A mapping of <loop header, loop exit>.
         // Note: This assumes only SESE regions exit.
-        public readonly Dictionary<Node, Node> loopExitNodes = new();
+        public readonly Dictionary<Node, Node> loopExitToHeaderMapping = new();
+
+        public readonly Dictionary<Node, Node> loopHeaderToExitMapping = new();
+
+        public readonly HashSet<Node> loopExits = new();
 
         public LoopAnalysis(ControlFlowGraph<T> cfg) : this(cfg, new ImmutableDomTree<T>(cfg))
         {
@@ -49,7 +53,9 @@ namespace Dna.ControlFlow.Analysis
 
             foreach(var header in loopHeaders)
             {
-                loopExitNodes.Add(header, GetLoopExitNode(header));
+                var exit = GetLoopExitNode(header);
+                loopHeaderToExitMapping.Add(header, exit);
+                loopExitToHeaderMapping.TryAdd(exit, header);
             }
         }
 

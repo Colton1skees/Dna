@@ -382,9 +382,13 @@ namespace Dna::Pipeline
 			FPM.add(llvm::sl::createLoopExitEnumerationPass());  // ensure all loops have <= 1 exits
 			FPM.add(llvm::sl::createUnswitchPass());       // get rid of all switch instructions
 			// introduced by the loop exit enumeration
+
+			FPM.add(llvm::sl::createControlledNodeSplittingPass());
 		}
 		
-		FPM.add(llvm::createStructurizeCFGPass());
+
+		//FPM.add(llvm::createFixIrreduciblePass());
+		//FPM.add(llvm::createStructurizeCFGPass());
 
 		PMB.populateFunctionPassManager(FPM);
 		PMB.populateModulePassManager(module_manager);
