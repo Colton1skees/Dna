@@ -164,6 +164,7 @@
     <ClInclude Include="API\LLVM\Transforms\IPO\PassManagerBuilder.h" />
     <ClInclude Include="API\LLVM\Transforms\Scalar.h" />
     <ClInclude Include="API\OptimizationAPI\OptimizationAPI.h" />
+    <ClInclude Include="API\Passes\Passes.h" />
     <ClInclude Include="API\RegionAPI\BaseRegionAPI.h" />
     <ClInclude Include="API\RegionAPI\ComplexRegionAPI.h" />
     <ClInclude Include="API\RegionAPI\IfThenElseRegionAPI.h" />

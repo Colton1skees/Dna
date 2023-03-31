@@ -43,6 +43,7 @@ using Dna.Structuring.Stacker;
 using Dna.LLVMInterop.API.LLVMBindings.Transforms;
 using Dna.LLVMInterop.API.LLVMBindings.IR;
 using Dna.LLVMInterop.API.LLVMBindings.Transforms.IPO;
+using static Dna.LLVMInterop.NativePassApi;
 
 // Load the 64 bit PE file.
 // Note: This file is automatically copied to the build directory.
@@ -227,6 +228,35 @@ for (int i = 0; i < 10; i++)
 
 llvmLifter.Module.PrintToFile(llPath);
 
+var fpm = new FunctionPassManager();
+var pmb = new PassManagerBuilder();
+var moduleManager = new PassManager();
+
+// Create a reducible and sensible control flow graph.
+fpm.Add(ScalarPasses.CreateCFGSimplificationPass());
+fpm.Add(PassApi.CreateControlledNodeSplittingPass());
+fpm.Add(ScalarPasses.CreateCFGSimplificationPass());
+fpm.Add(PassApi.CreateUnSwitchPass());
+fpm.Add(ScalarPasses.CreateLoopSimplifyCFGPass());
+fpm.Add(PassApi.CreateLoopExitEnumerationPass());
+fpm.Add(PassApi.CreateUnSwitchPass());
+fpm.Add(PassApi.CreateControlledNodeSplittingPass());
+
+// Structure the CFG.
+var cfPass = new ControlFlowStructuringPass();
+var nativeCfPass = PassApi.CreateControlFlowStructuringPass(cfPass.PtrStructureFunction);
+fpm.Add(nativeCfPass);
+pmb.PopulateFunctionPassManager(fpm);
+pmb.PopulateModulePassManager(moduleManager);
+
+fpm.DoInitialization();
+
+fpm.Run(llvmLifter.llvmFunction);
+
+fpm.DoFinalization();
+
+moduleManager.Run(llvmLifter.llvmFunction.GlobalParent);
+
 
 ControlFlowGraph<LLVMValueRef> llvmGraph = new ControlFlowGraph<LLVMValueRef>(0);
 foreach(var llvmBlock in llvmLifter.llvmFunction.BasicBlocks)
@@ -270,20 +300,7 @@ foreach(var block in llvmGraph.GetBlocks())
         Console.WriteLine(exitInstruction);
 }
 
-var fpm = new FunctionPassManager();
-var pmb = new PassManagerBuilder();
-var moduleManager = new PassManager();
-
-fpm.Add(ScalarPasses.CreateCorrelatedValuePropagationPass());
-fpm.Add(ScalarPasses.CreateDeadCodeEliminationPass());
-fpm.Add(ScalarPasses.CreateDeadStoreEliminationPass());
-fpm.Add(ScalarPasses.CreateConstantHoistingPass());
-
-pmb.PopulateFunctionPassManager(fpm);
-pmb.PopulateModulePassManager(moduleManager);
-
-fpm.Run
-
+llvmLifter.llvmFunction.GlobalParent.PrintToFile("whyisthiscrashing.ll");
 var dotGraph = GraphVisualizer.GetDotGraph(llvmGraph);
 var dot = dotGraph.Compile();
 File.WriteAllText("llvmGraph.dot", dot);

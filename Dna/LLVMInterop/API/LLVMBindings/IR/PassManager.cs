@@ -20,9 +20,9 @@ namespace Dna.LLVMInterop.API.LLVMBindings.IR
 
         }
 
-        public unsafe void Run(LLVMModuleRef module)
+        public unsafe bool Run(LLVMModuleRef module)
         {
-            NativePassManagerApi.RunOnModule(this, module);
+            return NativePassManagerApi.RunOnModule(this, module);
         }
 
         public unsafe static implicit operator LLVMOpaquePassManager*(PassManager pass)

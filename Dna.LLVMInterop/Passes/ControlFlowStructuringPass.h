@@ -67,15 +67,23 @@
 #include "llvm/Transforms/InstCombine/InstCombine.h"
 #include "llvm/Transforms/Utils/Local.h"
 namespace Dna::Passes {
-	typedef void(__cdecl* tStructureFunction)(llvm::Function* func, llvm::LoopInfo* loopInfo);
+	typedef bool(__cdecl* tStructureFunction)(llvm::Function* func, llvm::LoopInfo* loopInfo);
 
 	struct ControlFlowStructuringPass : public llvm::FunctionPass
 	{
 		static char ID;
 
-		static tStructureFunction structureFunction;
+		tStructureFunction structureFunction;
 
-		ControlFlowStructuringPass() : FunctionPass(ID) {}
+		ControlFlowStructuringPass(tStructureFunction structureFunction) : FunctionPass(ID)
+		{
+			this->structureFunction = structureFunction;
+		}
+
+		ControlFlowStructuringPass() : FunctionPass(ID) 
+		{
+
+		}
 
 		void getAnalysisUsage(llvm::AnalysisUsage& AU) const
 		{
@@ -87,11 +95,10 @@ namespace Dna::Passes {
 		{
 			llvm::LoopInfo& LI = getAnalysis<llvm::LoopInfoWrapperPass>().getLoopInfo();
 			printf("structuring.");
-			return false;
+			return structureFunction(&F, &LI);
 		}
 	};
 
 	char ControlFlowStructuringPass::ID = 0;
-	tStructureFunction ControlFlowStructuringPass::structureFunction = nullptr;
 	static llvm::RegisterPass<ControlFlowStructuringPass> X("cfstructuring", "Convert an unstructured flow graph into a structured AST.");
 }

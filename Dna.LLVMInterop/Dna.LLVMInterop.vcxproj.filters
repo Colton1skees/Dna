@@ -94,6 +94,9 @@
     <ClInclude Include="API\LLVM\Pass.h">
       <Filter>API\LLVM</Filter>
     </ClInclude>
+    <ClInclude Include="API\Passes\Passes.h">
+      <Filter>API\Passes</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="dllmain.cpp" />
@@ -155,6 +158,9 @@
     </Filter>
     <Filter Include="API\LLVM\Transforms\IPO">
       <UniqueIdentifier>{a65f73ae-1f62-49c1-8aee-c365258964a8}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="API\Passes">
+      <UniqueIdentifier>{01dcc872-a1d0-4cef-b140-71e89f555cfd}</UniqueIdentifier>
     </Filter>
   </ItemGroup>
   <ItemGroup>

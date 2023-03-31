@@ -4,14 +4,28 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
+using static Dna.LLVMInterop.NativePassApi;
 
 namespace Dna.LLVMInterop.Passes
 {
-    public static class ControlFlowStructuringPass
+    public class ControlFlowStructuringPass
     {
-        public static void StructureFunction(LLVMValueRef function, IntPtr loopInfo)
-        {
+        public dgStructureFunction PtrStructureFunction { get; }
 
+        public unsafe ControlFlowStructuringPass()
+        {
+            PtrStructureFunction = new dgStructureFunction(StructureFunction);
+        }
+
+        public unsafe bool StructureFunction(LLVMOpaqueValue* function, nint loopInfo)
+        {
+            return StructureFunctionInternal(function, loopInfo);
+        }
+
+        private bool StructureFunctionInternal(LLVMValueRef function, nint loopInfo)
+        {
+            Console.WriteLine($"Structuring function: {function.Name}");
+            return false;
         }
     }
 }

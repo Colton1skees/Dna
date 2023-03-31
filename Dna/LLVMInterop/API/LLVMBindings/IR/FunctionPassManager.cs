@@ -20,14 +20,19 @@ namespace Dna.LLVMInterop.API.LLVMBindings.IR
 
         }
 
-        public unsafe void Run(LLVMValueRef function)
+        public unsafe bool Run(LLVMValueRef function)
         {
-            NativePassManagerApi.RunOnFunction(this, function);
+            return NativePassManagerApi.RunOnFunction(this, function);
         }
 
-        public unsafe void DoInitialization()
+        public unsafe bool DoInitialization()
         {
-            NativePassM
+            return NativePassManagerApi.FunctionPassManagerDoInitialization(this);
+        }
+
+        public unsafe bool DoFinalization()
+        {
+            return NativePassManagerApi.FunctionPassManagerDoFinalization(this);
         }
 
         public unsafe static implicit operator LLVMOpaqueFunctionPassManager*(FunctionPassManager pass)

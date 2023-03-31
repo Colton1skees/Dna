@@ -27,9 +27,9 @@ namespace Dna.LLVMInterop.API.LLVMBindings
         public unsafe static extern bool RunOnFunction(LLVMOpaqueFunctionPassManager* passManager, LLVMOpaqueValue* func);
 
         [DllImport("Dna.LLVMInterop", CallingConvention = CallingConvention.Cdecl, EntryPoint = "FunctionPassManager_DoInitialization")]
-        public unsafe static extern bool FunctionPassManagerDoInitialization();
+        public unsafe static extern bool FunctionPassManagerDoInitialization(LLVMOpaqueFunctionPassManager* passManager);
 
         [DllImport("Dna.LLVMInterop", CallingConvention = CallingConvention.Cdecl, EntryPoint = "FunctionPassManager_DoFinalization")]
-        public unsafe static extern bool FunctionPassManagerDoFinalization();
+        public unsafe static extern bool FunctionPassManagerDoFinalization(LLVMOpaqueFunctionPassManager* passManager);
     }
 }

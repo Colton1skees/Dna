@@ -319,9 +319,9 @@ DNA_EXPORT FunctionPass* CreateDFAJumpThreadingPass()
 //
 // CFGSimplification - Merge basic blocks, eliminate unreachable blocks,// simplify terminator instructions, convert switches to lookup tables, etc.
 //
-DNA_EXPORT FunctionPass* CreateCFGSimplificationPass(SimplifyCFGOptions Options)
+DNA_EXPORT FunctionPass* CreateCFGSimplificationPass()
 {
-    return createCFGSimplificationPass(Options);
+    return createCFGSimplificationPass();
 }
 
 //===----------------------------------------------------------------------===//
