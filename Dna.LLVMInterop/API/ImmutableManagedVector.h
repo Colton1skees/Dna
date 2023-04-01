@@ -22,6 +22,14 @@ namespace Dna::API {
 		}
 
 		template <class T>
+		static ImmutableManagedVector* NonCopyingFrom(const std::vector<T*>* input)
+		{
+			auto managedVector = new ImmutableManagedVector();
+			managedVector->items = (std::vector<void*>*)input;
+			return managedVector;
+		}
+
+		template <class T>
 		static ImmutableManagedVector* From(const llvm::ArrayRef<T*>* input)
 		{
 			auto managedVector = new ImmutableManagedVector();

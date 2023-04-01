@@ -160,6 +160,7 @@
     <ClInclude Include="API\ExportDef.h" />
     <ClInclude Include="API\ExportedAPI.h" />
     <ClInclude Include="API\LLVM\Analysis\LoopInfo.h" />
+    <ClInclude Include="API\LLVM\Analysis\MemorySSA.h" />
     <ClInclude Include="API\LLVM\IR\LegacyPassManager.h" />
     <ClInclude Include="API\LLVM\Pass.h" />
     <ClInclude Include="API\LLVM\Transforms\IPO\PassManagerBuilder.h" />

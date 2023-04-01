@@ -396,7 +396,7 @@ namespace Dna::Pipeline
 		if (count == 13)
 		{
 			printf("count.");
-			FPM.add(new Dna::Passes::ControlFlowStructuringPass());
+			// FPM.add(new Dna::Passes::ControlFlowStructuringPass());
 		}
 
 		//FPM.add(llvm::createFixIrreduciblePass());

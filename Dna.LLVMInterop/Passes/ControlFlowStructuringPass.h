@@ -94,10 +94,8 @@ namespace Dna::Passes {
 		virtual bool runOnFunction(llvm::Function& F)
 		{
 			llvm::LoopInfo& LI = getAnalysis<llvm::LoopInfoWrapperPass>().getLoopInfo();
-
-			return false;
-			//printf("structuring.");
-			//return structureFunction(&F, &LI);
+			printf("structuring.");
+			return structureFunction(&F, &LI);
 		}
 	};
 

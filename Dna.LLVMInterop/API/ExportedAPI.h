@@ -51,4 +51,5 @@
 #include <API/OptimizationAPI/OptimizationAPI.h>
 #include <API/Passes/Passes.h>
 #include <API/LLVM/Analysis/LoopInfo.h>
+#include <API/LLVM/Analysis/MemorySSA.h>
 using namespace llvm::sl;

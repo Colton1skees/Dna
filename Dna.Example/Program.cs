@@ -179,28 +179,6 @@ var ptrAlias = ClassifyingAliasAnalysisPass.PtrGetAliasResult;
 
 var llPath = @"optimized_vm_entry2.ll";
 
-// 0x140009000 && intValue <= 0x14006C460
-ulong count = (0x14006C460 - 16) - 0x140009000;
-StringBuilder sb = new StringBuilder();
-sb.AppendLine("%start = getelementptr inbounds i8, ptr %0, i64 5368745984");
-sb.Append("store i" + (count * 8));
-
-
-List<byte> binBytes = new List<byte>();
-for(ulong i = 0; i < count;  i++)
-{
-    binBytes.Add(binary.ReadBytes(i + 0x140009000, 1)[0]);
-  //  sb.Append(binary.ReadBytes(i + 0x140009000, 1)[0]);
-}
-
-var bigInt = new BigInteger(binBytes.ToArray());
-
-sb.Append(" ");
-sb.Append(bigInt.ToString());
-sb.Append(", ptr %start, align 1");
-
-File.WriteAllText("storeBytes.ll", sb.ToString());
-
 // Run the standard O3 pipeline.
 for (int i = 0; i < 5; i++)
 {
@@ -253,7 +231,7 @@ for (int i = 0; i < 10; i++)
 
 llvmLifter.Module.PrintToFile(llPath);
 
-/*
+
 var fpm = new FunctionPassManager();
 var pmb = new PassManagerBuilder();
 var moduleManager = new PassManager();
@@ -282,10 +260,10 @@ fpm.Run(llvmLifter.llvmFunction);
 fpm.DoFinalization();
 
 moduleManager.Run(llvmLifter.llvmFunction.GlobalParent);
-*/
+
 
 ControlFlowGraph<LLVMValueRef> llvmGraph = new ControlFlowGraph<LLVMValueRef>(0);
-foreach(var llvmBlock in llvmLifter.llvmFunction.BasicBlocks)
+foreach (var llvmBlock in llvmLifter.llvmFunction.BasicBlocks)
 {
     // Allocate a new block.
     var blk = llvmGraph.CreateBlock((ulong)llvmBlock.Handle);
@@ -294,13 +272,13 @@ foreach(var llvmBlock in llvmLifter.llvmFunction.BasicBlocks)
     blk.Instructions.AddRange(llvmBlock.GetInstructions());
 }
 
-foreach(var block in llvmGraph.GetBlocks())
+foreach (var block in llvmGraph.GetBlocks())
 {
     var exitInstruction = block.ExitInstruction;
-   // if (exitInstruction.ToString().Contains("cond120131"))
-      //  Debugger.Break();
+    // if (exitInstruction.ToString().Contains("cond120131"))
+    //  Debugger.Break();
     var operands = exitInstruction.GetOperands().ToList();
-    foreach(var operand in operands)
+    foreach (var operand in operands)
     {
         Console.WriteLine(operand.ToString());
         if (operand.Kind != LLVMValueKind.LLVMBasicBlockValueKind)
@@ -321,9 +299,9 @@ foreach(var block in llvmGraph.GetBlocks())
         var edge1 = block.GetOutgoingEdges().Single(x => x.TargetBlock.Name == block.ExitInstruction.GetOperand(1).Handle.ToString("X"));
         var edge2 = block.GetOutgoingEdges().Single(x => x.TargetBlock.Name == block.ExitInstruction.GetOperand(2).Handle.ToString("X"));
         Console.WriteLine("why.");
-      //  Debugger.Break();
+        //  Debugger.Break();
     }
-        Console.WriteLine(exitInstruction);
+    Console.WriteLine(exitInstruction);
 }
 
 llvmLifter.llvmFunction.GlobalParent.PrintToFile("whyisthiscrashing.ll");

@@ -103,6 +103,9 @@
     <ClInclude Include="API\ImmutableManagedVector.h">
       <Filter>API</Filter>
     </ClInclude>
+    <ClInclude Include="API\LLVM\Analysis\MemorySSA.h">
+      <Filter>API\LLVM\Analysis</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="dllmain.cpp" />
