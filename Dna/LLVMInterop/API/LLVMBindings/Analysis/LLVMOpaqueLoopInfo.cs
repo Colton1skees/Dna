@@ -8,5 +8,6 @@ namespace Dna.LLVMInterop.API.LLVMBindings.Analysis
 {
     public struct LLVMOpaqueLoopInfo
     {
+
     }
 }
