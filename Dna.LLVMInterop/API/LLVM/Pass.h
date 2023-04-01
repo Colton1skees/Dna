@@ -1,6 +1,7 @@
 #pragma once
 
 #include <llvm/Pass.h>
+#include <llvm/Analysis/LoopPass.h>
 #include <API/ExportDef.h>
 
 using namespace llvm;

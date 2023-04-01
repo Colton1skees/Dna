@@ -39,6 +39,7 @@ namespace Dna.LLVMInterop.API.LLVMBindings
             return kind switch
             {
                 PassKind.Function => new FunctionPass((nint)pass),
+                PassKind.Loop => new LoopPass((nint)pass),
                 PassKind.Module => new ModulePass((nint)pass),
                 _ => throw new InvalidOperationException($"{kind} passes are not supported.")
             };

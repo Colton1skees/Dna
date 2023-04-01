@@ -159,10 +159,12 @@
   <ItemGroup>
     <ClInclude Include="API\ExportDef.h" />
     <ClInclude Include="API\ExportedAPI.h" />
+    <ClInclude Include="API\LLVM\Analysis\LoopInfo.h" />
     <ClInclude Include="API\LLVM\IR\LegacyPassManager.h" />
     <ClInclude Include="API\LLVM\Pass.h" />
     <ClInclude Include="API\LLVM\Transforms\IPO\PassManagerBuilder.h" />
     <ClInclude Include="API\LLVM\Transforms\Scalar.h" />
+    <ClInclude Include="API\ImmutableManagedVector.h" />
     <ClInclude Include="API\OptimizationAPI\OptimizationAPI.h" />
     <ClInclude Include="API\Passes\Passes.h" />
     <ClInclude Include="API\RegionAPI\BaseRegionAPI.h" />

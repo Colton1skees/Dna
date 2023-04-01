@@ -44,13 +44,15 @@ using Dna.LLVMInterop.API.LLVMBindings.Transforms;
 using Dna.LLVMInterop.API.LLVMBindings.IR;
 using Dna.LLVMInterop.API.LLVMBindings.Transforms.IPO;
 using static Dna.LLVMInterop.NativePassApi;
+using System.Text;
+using System.Numerics;
+
 
 // Load the 64 bit PE file.
 // Note: This file is automatically copied to the build directory.
-var path = @"SampleExecutable.bin";
+var path = @"C:\Users\colton\source\repos\ObfuscationTester\x64\Release\ObfuscationTester.themida.exe";
 var binary = new WindowsBinary(64, File.ReadAllBytes(path), 0x140000000);
 
-/*
 // Replace themida spinlock with nop.
 binary.WriteBytes(0x000000014001552B, new byte[]
 {
@@ -58,7 +60,7 @@ binary.WriteBytes(0x000000014001552B, new byte[]
     0x90, 0x90,
     0x90, 0x90, 0x90, 0x90, 0x90
 });
-*/
+
 /*
 var assembler = new Iced.Intel.Assembler(64);
 assembler.jmp(0x14004B2EE);
@@ -67,11 +69,12 @@ var encoded = InstructionRelocator.EncodeInstructions(assembler.Instructions.ToL
 binary.WriteBytes(0x140015C47, encoded);
 */
 
+
 // Instantiate dna.
 var dna = new Dna.Dna(binary);
 
 // Parse a (virtualized) control flow graph from the binary.
-ulong funcAddr = 0x1400012E4;
+ulong funcAddr = 0x14000123C;
 var cfg = dna.RecursiveDescent.ReconstructCfg(funcAddr);
 
 // Instantiate the cpu architecture.
@@ -176,7 +179,27 @@ var ptrAlias = ClassifyingAliasAnalysisPass.PtrGetAliasResult;
 
 var llPath = @"optimized_vm_entry2.ll";
 
+// 0x140009000 && intValue <= 0x14006C460
+ulong count = (0x14006C460 - 16) - 0x140009000;
+StringBuilder sb = new StringBuilder();
+sb.AppendLine("%start = getelementptr inbounds i8, ptr %0, i64 5368745984");
+sb.Append("store i" + (count * 8));
 
+
+List<byte> binBytes = new List<byte>();
+for(ulong i = 0; i < count;  i++)
+{
+    binBytes.Add(binary.ReadBytes(i + 0x140009000, 1)[0]);
+  //  sb.Append(binary.ReadBytes(i + 0x140009000, 1)[0]);
+}
+
+var bigInt = new BigInteger(binBytes.ToArray());
+
+sb.Append(" ");
+sb.Append(bigInt.ToString());
+sb.Append(", ptr %start, align 1");
+
+File.WriteAllText("storeBytes.ll", sb.ToString());
 
 // Run the standard O3 pipeline.
 for (int i = 0; i < 5; i++)
@@ -207,6 +230,8 @@ PointerClassifier.print = true;
 for (int i = 0; i < 10; i++)
 {
     Console.WriteLine(i);
+
+    llvmLifter.Module.PrintToFile("foo2.ll");
     OptimizationApi.OptimizeModule(llvmLifter.Module, llvmLifter.llvmFunction, false, true, ptrAlias, false, 0, false);
 
 
@@ -228,6 +253,7 @@ for (int i = 0; i < 10; i++)
 
 llvmLifter.Module.PrintToFile(llPath);
 
+/*
 var fpm = new FunctionPassManager();
 var pmb = new PassManagerBuilder();
 var moduleManager = new PassManager();
@@ -256,7 +282,7 @@ fpm.Run(llvmLifter.llvmFunction);
 fpm.DoFinalization();
 
 moduleManager.Run(llvmLifter.llvmFunction.GlobalParent);
-
+*/
 
 ControlFlowGraph<LLVMValueRef> llvmGraph = new ControlFlowGraph<LLVMValueRef>(0);
 foreach(var llvmBlock in llvmLifter.llvmFunction.BasicBlocks)

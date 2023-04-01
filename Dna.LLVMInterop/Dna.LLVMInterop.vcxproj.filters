@@ -97,6 +97,12 @@
     <ClInclude Include="API\Passes\Passes.h">
       <Filter>API\Passes</Filter>
     </ClInclude>
+    <ClInclude Include="API\LLVM\Analysis\LoopInfo.h">
+      <Filter>API\LLVM\Analysis</Filter>
+    </ClInclude>
+    <ClInclude Include="API\ImmutableManagedVector.h">
+      <Filter>API</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="dllmain.cpp" />
@@ -161,6 +167,9 @@
     </Filter>
     <Filter Include="API\Passes">
       <UniqueIdentifier>{01dcc872-a1d0-4cef-b140-71e89f555cfd}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="API\LLVM\Analysis">
+      <UniqueIdentifier>{be453136-4f83-4577-a1a3-b208d939ba19}</UniqueIdentifier>
     </Filter>
   </ItemGroup>
   <ItemGroup>
