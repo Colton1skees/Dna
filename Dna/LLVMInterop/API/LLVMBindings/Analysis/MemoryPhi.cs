@@ -13,6 +13,8 @@ namespace Dna.LLVMInterop.API.LLVMBindings.Analysis
 
         public IReadOnlyList<LLVMUseRef> IncomingValues => GetIncomingValues();
 
+        public IReadOnlyList<MemoryAccess> IncomingMemoryAccesses => GetIncomingMemoryAccesses();
+
         public unsafe uint IncomingValueCount => NativeMemoryPhiApi.GetNumIncomingValues(this);
 
         public MemoryPhi(nint handle) : base(handle)
@@ -44,6 +46,18 @@ namespace Dna.LLVMInterop.API.LLVMBindings.Analysis
 
             // Return the read only list.
             return managedVec.Items;
+        }
+
+        private unsafe IReadOnlyList<MemoryAccess> GetIncomingMemoryAccesses()
+        {
+            var output = new List<MemoryAccess>();
+            var count = NativeMemoryPhiApi.GetNumIncomingValues(this);
+            for(uint i = 0; i < count; i++)
+            {
+                output.Add(NativeMemoryPhiApi.GetIncomingValue(this, i));
+            }
+
+            return output.AsReadOnly();
         }
 
         public unsafe MemoryAccess GetIncomingValue(uint index)

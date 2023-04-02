@@ -184,12 +184,18 @@ namespace Dna.Devirtualization
             OptimizationApi.OptimizeModule(llvmLifter.Module, llvmLifter.llvmFunction, false, true, ptrAlias, false, 0, false);
 
             Console.WriteLine("o2");
+
+            var cfPass = new ControlFlowStructuringPass();
+            var pStructureFunction = Marshal.GetFunctionPointerForDelegate(cfPass.PtrStructureFunction);
+
+
+
             // Run the O3 pipeline with ptr alias analysis AND aggressive loop unrolling enabled.
-            OptimizationApi.OptimizeModule(llvmLifter.Module, llvmLifter.llvmFunction, true, true, ptrAlias, false, 0, false);
+            OptimizationApi.OptimizeModule(llvmLifter.Module, llvmLifter.llvmFunction, true, true, ptrAlias, false, 0, false, false, pStructureFunction);
 
             Console.WriteLine(  "o3");
             // Run the O3 pipeline one last time with custom alias analysis.
-            OptimizationApi.OptimizeModule(llvmLifter.Module, llvmLifter.llvmFunction, false, true, ptrAlias, false, 0, false);
+            OptimizationApi.OptimizeModule(llvmLifter.Module, llvmLifter.llvmFunction, false, true, ptrAlias, false, 0, false, false);
             Console.WriteLine(  "done");
             // Run a pass to concretize known constants within binary sections.
             var myPass = new ConstantConcretizationPass(llvmLifter.llvmFunction, llvmLifter.builder, dna.Binary);

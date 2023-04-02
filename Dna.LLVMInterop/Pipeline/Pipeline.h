@@ -314,7 +314,7 @@ namespace Dna::Pipeline
 		if (runConstantConcretization)
 			FPM.add(Dna::Passes::getConstantConcretizationPassPass(readBinaryContents)); // added
 		FPM.add(llvm::createDeadStoreEliminationPass()); // added
-
+		FPM.add(llvm::createGVNPass(true));
 
 		if (true)
 		{
@@ -328,7 +328,7 @@ namespace Dna::Pipeline
 				FPM.add(llvm::createLoopUnrollPass(3, false, false, 9999999999, -1, 1));
 				*/
 
-			FPM.add(llvm::createLoopUnrollPass(3, false, false, 5000, -1, 1));
+			FPM.add(llvm::createLoopUnrollPass(3, false, false, 2000, -1, 1));
 		}
 
 		//const char* args17[2] = { "testfiyr", "-memdep-block-scan-limit=1000000" };
@@ -396,7 +396,8 @@ namespace Dna::Pipeline
 		}
 
 		printf("running.");
-		if (count == 13 || count == 14 || count == 15 || count == 16 || count == 17)
+		//if (count == 13 || count == 14 || count == 15 || count == 16 || count == 17)
+		if(structureFunction != nullptr)
 		{
 			printf("countcf.");
 			FPM.add(new Dna::Passes::ControlFlowStructuringPass(structureFunction));

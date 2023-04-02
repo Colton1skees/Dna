@@ -5,11 +5,11 @@ using Dna.DataStructures;
 using Dna.Extensions;
 using Dna.LLVMInterop.API.LLVMBindings.Analysis;
 using Dna.LLVMInterop.Passes.Matchers;
-using LLVMSharp;
 using LLVMSharp.Interop;
 using System;
 using System.Collections.Generic;
 using System.Diagnostics;
+using System.Drawing;
 using System.Linq;
 using System.Net;
 using System.Runtime.InteropServices;
@@ -74,57 +74,28 @@ namespace Dna.LLVMInterop.Passes
 
             var replacementMapping = new Dictionary<LLVMValueRef, LLVMValueRef>();
 
-            foreach(var load in function.GetInstructions().Where(x => x.InstructionOpcode == LLVMOpcode.LLVMLoad))
+            foreach (var load in function.GetInstructions().Where(x => x.InstructionOpcode == LLVMOpcode.LLVMLoad))
             {
                 // Get the memory access.
                 var instAccess = mssa.GetMemoryAccess(load);
 
-                if(load.ToString().Contains("%load114146 = load i64, ptr %84, a"))
+                if (load.ToString().Contains("%load114146 = load i64, ptr %84, a"))
                 {
-                   // Debugger.Break();
+                    // Debugger.Break();
                 }
 
-                else if(load.ToString().Contains("%load97958 = load i64, ptr %82, ali"))
+                else if (load.ToString().Contains("%load209615 = load i64, ptr %251"))
                 {
-                   //Debugger.Break();
+                //    Debugger.Break();
                 }
 
                 // Skip if it's not optimized.
                 if (!instAccess.IsOptimized)
                     continue;
 
-                // Skip if a definition already exists for this access.
-                var definition = instAccess.DefiningAccess;
-                if (!mssa.IsLiveOnEntryDef(definition))
-                    continue;
-               
-                // Get the GEP.
-                var gep = load.GetOperand(0);
-                if (gep.InstructionOpcode != LLVMOpcode.LLVMGetElementPtr)
-                    continue;
-
-                // Skip if this is not a binary section access.
-                var gepIndex = gep.GetOperand(1);
-                if (!BinaryAccessMatcher.IsConstantWithinBinarySection(gepIndex))
-                    continue;
-
-                var constant = BinaryAccessMatcher.GetBinarySectionOffset(gepIndex);
-                var intWidth = load.TypeOf.IntWidth;
-                var intType = LLVMTypeRef.CreateInt(intWidth);
-
-                var size = intWidth / 8;
-                var bytes = binary.ReadBytes(constant, (int)size);
-                var value = size switch
-                {
-                    1 => bytes[0],
-                    2 => BitConverter.ToUInt16(bytes),
-                    4 => BitConverter.ToUInt32(bytes),
-                    8 => BitConverter.ToUInt64(bytes),
-                    _ => throw new InvalidOperationException()
-                };
-
-                var constInt = LLVMValueRef.CreateConstInt(intType, value);
-                replacementMapping.Add(load, constInt);
+                var replacement = TryResolveLoad(load, mssa, binary);
+                if(replacement != null)
+                    replacementMapping.Add(load, replacement.Value);
             }
 
             if (!replacementMapping.Any())
@@ -136,6 +107,135 @@ namespace Dna.LLVMInterop.Passes
             }
 
             return true;
+        }
+
+        /// <summary>
+        /// Try to resolve constant loads within the binary section.
+        /// </summary>
+        /// <param name="loadInst"></param>
+        /// <returns></returns>
+        private LLVMValueRef? TryResolveLoad(LLVMValueRef loadInst, MemorySSA mssa, IBinary binary)
+        {
+            // Get the GEP.
+            var gep = loadInst.GetOperand(0);
+            if (gep.InstructionOpcode != LLVMOpcode.LLVMGetElementPtr)
+                return null;
+
+            // Skip if this is not a binary section access.
+            var gepIndex = gep.GetOperand(1);
+            if (!BinaryAccessMatcher.IsConstantWithinBinarySection(gepIndex))
+                return null;
+
+            // Iteratively walk backwards while building a set of all clobbering accesses.
+            OrderedSet<MemoryUseOrDef> clobberingAccesses = new();
+            var initial = mssa.GetMemoryAccess(loadInst);
+            MemoryAccess current = initial;
+            while (true)
+            {
+                // If the load has a definition outside of this block(aka a memory phi),
+                // we terminate and stop processing the load completely.
+                if(current is MemoryPhi memoryPhi)
+                {
+                    return null;
+                }
+
+                // If we've reached the entry definition, then we've processed all potentially
+                // clobbering stores.
+                var useOrDef = (MemoryUseOrDef)current;
+                if(mssa.IsLiveOnEntryDef(useOrDef))
+                {
+                    break;
+                }
+
+                clobberingAccesses.Add(useOrDef);
+
+                var memoryInst = useOrDef.MemoryInst;
+                if(memoryInst == null)
+                {
+                    Debugger.Break();
+                }
+
+                else
+                {
+                    current = mssa.Walker.GetClobberingMemoryAccess(memoryInst);
+                }
+            }
+
+            // The initial access is just a `load`, so we discard it. 
+            // A load cannot be a clobbering access.
+            clobberingAccesses.Remove(initial);
+
+            // Traverse through all clobbering stores in the order that they would execute,
+            // while maintaining a list of concretized address values.
+            // If at any point a *non* concrete store is identified(e.g. a store of a symbolic value),
+            // then the whole routine terminates.
+            Dictionary<ulong, byte> concretizedBytes = new Dictionary<ulong, byte>();
+            foreach(var clobberInst in clobberingAccesses.Reverse().Select(x => x.MemoryInst))
+            {
+                // If the clobber is not a store, then it must be an atomic / fence, or some type of intrinsic.
+                // We don't yet support this.
+                if (clobberInst.InstructionOpcode != LLVMOpcode.LLVMStore)
+                    throw new InvalidOperationException($"Cannot track clobber with instruction: {clobberInst}.");
+
+                // If we are not storing a constant, then the value is unknown. We cannot safely resolve this.
+                var storeValue = clobberInst.GetOperand(0);
+                if (storeValue.Kind != LLVMValueKind.LLVMConstantIntValueKind)
+                    return null;
+
+                // If the store address is not a getelementptr, then it must be a global or something. 
+                // This should never happen.
+                var storeGep = clobberInst.GetOperand(1);
+                if (storeGep.InstructionOpcode != LLVMOpcode.LLVMGetElementPtr)
+                    return null;
+
+                // We only support analyze aliasing stores *directly* into a known binary offset.
+                // This is supported:
+                //      store i64 constant, [binary_section_address]
+                // This is *not* supported:
+                //      store i64 constant, [binary_section_address + symbolic_index]
+                var storeGepIndex = storeGep.GetOperand(1);
+                if (!BinaryAccessMatcher.IsConstantWithinBinarySection(storeGepIndex))
+                    return null;
+
+                var memValue = storeValue.ConstIntZExt;
+                var byteWidth = storeValue.TypeOf.IntWidth / 8;
+                var bytes = byteWidth switch
+                {
+                    1 => new byte[] { (byte)memValue },
+                    2 => BitConverter.GetBytes((ushort)memValue),
+                    4 => BitConverter.GetBytes((uint)memValue),
+                    8 => BitConverter.GetBytes(memValue),
+                    _ => throw new InvalidOperationException()
+                };
+
+                var storeOffset = BinaryAccessMatcher.GetBinarySectionOffset(storeGepIndex);
+                for(ulong i = 0; i < byteWidth; i++)
+                {
+                    concretizedBytes.Add(storeOffset + i, bytes[i]);
+                }
+            }
+
+            // Create a byte array containing the concrete loaded value.
+            var loadByteWidth = loadInst.TypeOf.IntWidth / 8;
+            var loadedBytes = new byte[loadByteWidth];
+            var loadOffset = BinaryAccessMatcher.GetBinarySectionOffset(gepIndex);
+            for(ulong i = 0; i < loadByteWidth; i++)
+            {
+                var address = loadOffset + i;
+                loadedBytes[i] = concretizedBytes.ContainsKey(address) ? concretizedBytes[address] : binary.ReadBytes(address, 1)[0];
+            }
+
+            // Create a constant ulong value.
+            var resolvedConstant = loadByteWidth switch
+            {
+                1 => loadedBytes[0],
+                2 => BitConverter.ToUInt16(loadedBytes),
+                4 => BitConverter.ToUInt32(loadedBytes),
+                8 => BitConverter.ToUInt64(loadedBytes),
+                _ => throw new InvalidOperationException()
+            };
+
+            return LLVMValueRef.CreateConstInt(loadInst.TypeOf, resolvedConstant);
         }
 
     }

@@ -69,6 +69,7 @@ var encoded = InstructionRelocator.EncodeInstructions(assembler.Instructions.ToL
 binary.WriteBytes(0x140015C47, encoded);
 */
 
+ControlFlowStructuringPass.binary = binary;
 
 // Instantiate dna.
 var dna = new Dna.Dna(binary);
@@ -80,7 +81,7 @@ var cfg = dna.RecursiveDescent.ReconstructCfg(funcAddr);
 // Instantiate the cpu architecture.
 var architecture = new X86CpuArchitecture(ArchitectureId.ARCH_X86_64);
 
-bool explore = false;
+bool explore = true;
 if (explore)
 {
     var cfgExplorer = new CfgExplorer(dna, architecture);
@@ -102,12 +103,12 @@ var llvmLifter = new LLVMLifter(architecture);
 // beforecustompipeline.ll
 var ctx = LLVMContextRef.Create();
 // -passes=sccp,sroa,dce,dse,adce,licm,gvn,newgvn -memdep-block-scan-limit=1000000000 -gvn-max-num-deps=25000000
-//var memBuffer = LlvmUtilities.CreateMemoryBuffer(@"C:\Users\colton\source\repos\Dna\Dna.Example\bin\x64\Debug\net7.0\cant_resolve.ll");
-//ctx.TryParseIR(memBuffer, out LLVMModuleRef unicornTraceModule, out string unicornLoadMsg);
+var memBuffer = LlvmUtilities.CreateMemoryBuffer(@"C:\Users\colton\source\repos\Dna\Dna.Example\bin\x64\Debug\net7.0\cant_resolve.ll");
+ctx.TryParseIR(memBuffer, out LLVMModuleRef unicornTraceModule, out string unicornLoadMsg);
 
-llvmLifter.Lift(liftedCfg);
-//llvmLifter.module = unicornTraceModule;
-//llvmLifter.llvmFunction = llvmLifter.Module.FirstFunction;
+//llvmLifter.Lift(liftedCfg);
+llvmLifter.module = unicornTraceModule;
+llvmLifter.llvmFunction = llvmLifter.Module.FirstFunction;
 
 /*
 LlvmUtilities.LLVMParseCommandLineOptions(new string[] { "-memdep-block-scan-limit=10000000",
@@ -182,12 +183,12 @@ var llPath = @"optimized_vm_entry2.ll";
 var cfPass = new ControlFlowStructuringPass();
 var pStructureFunction = Marshal.GetFunctionPointerForDelegate(cfPass.PtrStructureFunction);
 
-ControlFlowStructuringPass.binary = binary;
+//ControlFlowStructuringPass.binary = binary;
 
 // Run the standard O3 pipeline.
 for (int i = 0; i < 5; i++)
 {
-    OptimizationApi.OptimizeModule(llvmLifter.Module, llvmLifter.llvmFunction, false, false, 0, false, 0, false, false, pStructureFunction);
+   // OptimizationApi.OptimizeModule(llvmLifter.Module, llvmLifter.llvmFunction, false, false, 0, false, 0, false, false, pStructureFunction);
 }
 
 // Run the O3 pipeline with custom alias analysis.
