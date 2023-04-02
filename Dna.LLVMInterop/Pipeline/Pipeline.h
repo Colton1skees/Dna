@@ -64,7 +64,8 @@ namespace Dna::Pipeline
 		bool runConstantConcretization,
 		Dna::Passes::tReadBinaryContents readBinaryContents,
 		bool runStructuring,
-		bool justGVN = false)
+		bool justGVN,
+		Dna::Passes::tStructureFunction structureFunction)
 	{
 
 		count++;
@@ -100,7 +101,7 @@ namespace Dna::Pipeline
 		else
 
 		{
-			const char* argv[12] = { "mesa", "-simplifycfg-sink-common=false",
+			const char* argv[14] = { "mesa", "-simplifycfg-sink-common=false",
 		"-memdep-block-number-limit=10000000",
 		"-dse-memoryssa-defs-per-block-limit=10000000",
 		"-gvn-max-num-deps=25000000",
@@ -110,9 +111,11 @@ namespace Dna::Pipeline
 		"-memdep-block-scan-limit=1000000000",
 		"-unroll-count=1500",
 		"-unroll-threshold=100000000",
-		"-enable-store-refinement=0"
+		"-enable-store-refinement=0",
+		"-memssa-check-limit=99999999",
+		"-memssa-check-limit=99999999"
 			};
-			llvm::cl::ParseCommandLineOptions(12, argv);
+			llvm::cl::ParseCommandLineOptions(14, argv);
 		}
 
 
@@ -313,7 +316,7 @@ namespace Dna::Pipeline
 		FPM.add(llvm::createDeadStoreEliminationPass()); // added
 
 
-		if (false)
+		if (true)
 		{
 			/*
 				const char* args2[2] = { "testtwo", "-unroll-count=1500" };
@@ -393,10 +396,10 @@ namespace Dna::Pipeline
 		}
 
 		printf("running.");
-		if (count == 13)
+		if (count == 13 || count == 14 || count == 15 || count == 16 || count == 17)
 		{
-			printf("count.");
-			// FPM.add(new Dna::Passes::ControlFlowStructuringPass());
+			printf("countcf.");
+			FPM.add(new Dna::Passes::ControlFlowStructuringPass(structureFunction));
 		}
 
 		//FPM.add(llvm::createFixIrreduciblePass());

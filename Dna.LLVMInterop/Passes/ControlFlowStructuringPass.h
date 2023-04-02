@@ -66,8 +66,10 @@
 #include "llvm/Support/raw_ostream.h"
 #include "llvm/Transforms/InstCombine/InstCombine.h"
 #include "llvm/Transforms/Utils/Local.h"
+#include <llvm/Analysis/MemorySSA.h>
+#include <Passes/ClassifyingAliasAnalysisPass.h>
 namespace Dna::Passes {
-	typedef bool(__cdecl* tStructureFunction)(llvm::Function* func, llvm::LoopInfo* loopInfo);
+	typedef bool(__cdecl* tStructureFunction)(llvm::Function* func, llvm::LoopInfo* loopInfo, llvm::MemorySSA* memSsa);
 
 	struct ControlFlowStructuringPass : public llvm::FunctionPass
 	{
@@ -88,14 +90,17 @@ namespace Dna::Passes {
 		void getAnalysisUsage(llvm::AnalysisUsage& AU) const
 		{
 			AU.addRequired<llvm::LoopInfoWrapperPass>();
+			AU.addRequired<llvm::MemorySSAWrapperPass>();
 			AU.setPreservesAll();
 		}
 
 		virtual bool runOnFunction(llvm::Function& F)
 		{
 			llvm::LoopInfo& LI = getAnalysis<llvm::LoopInfoWrapperPass>().getLoopInfo();
+			llvm::MemorySSA& mssa = getAnalysis<llvm::MemorySSAWrapperPass>().getMSSA();
+			mssa.ensureOptimizedUses();
 			printf("structuring.");
-			return structureFunction(&F, &LI);
+			return structureFunction(&F, &LI, &mssa);
 		}
 	};
 

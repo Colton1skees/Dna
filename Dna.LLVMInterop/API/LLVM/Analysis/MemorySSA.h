@@ -100,6 +100,11 @@ namespace Dna::API {
 	{
 		return mem->getDefiningAccess();
 	}
+
+	DNA_EXPORT bool MemoryUseOrDef_IsOptimized(llvm::MemoryUseOrDef* mem)
+	{
+		return mem->isOptimized();
+	}
 }
 
 // MemoryPhi

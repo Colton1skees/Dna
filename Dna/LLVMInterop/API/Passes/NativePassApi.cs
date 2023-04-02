@@ -12,7 +12,7 @@ namespace Dna.LLVMInterop
     public static class NativePassApi
     {
         [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
-        public unsafe delegate bool dgStructureFunction(LLVMOpaqueValue* function, nint loopInfo);
+        public unsafe delegate bool dgStructureFunction(LLVMOpaqueValue* function, nint loopInfo, nint mssa);
 
         [DllImport("Dna.LLVMInterop", CallingConvention = CallingConvention.Cdecl)]
         public unsafe static extern LLVMOpaqueFunctionPass* CreateControlledNodeSplittingPass();

@@ -19,7 +19,7 @@ namespace Dna.LLVMInterop.API.LLVMBindings.Analysis
         public unsafe MemoryAccess? GetClobberingMemoryAccess(LLVMValueRef instruction)
         {
             var result = NativeMemorySSAWalkerApi.GetClobberingMemoryAccess(this, instruction);
-            return result == null ? null : result;
+            return result == null ? null : MemoryAccess.From(result);
         }
 
         public unsafe MemoryAccess? GetClobberingMemoryAccess(MemoryAccess memAccess)

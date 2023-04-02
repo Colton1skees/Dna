@@ -101,7 +101,7 @@ namespace Dna.LLVMInterop.Passes.Matchers
             return false;
         }
 
-        private static bool IsConstantWithinBinarySection(LLVMValueRef value)
+        public static bool IsConstantWithinBinarySection(LLVMValueRef value)
         {
             if (!IsConstantInt(value))
                 return false;

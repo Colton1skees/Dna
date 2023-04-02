@@ -34,6 +34,23 @@ namespace Dna.LLVMInterop.API.LLVMBindings.Analysis
             return result;
         }
 
+        public unsafe static MemoryAccess From(LLVMOpaqueMemoryAccess* access)
+        {
+            return From((nint)access);
+        }
+
+        public unsafe static MemoryAccess From(nint handle)
+        {
+            var kind = new LLVMValueRef(handle).Kind;
+            return kind switch
+            {
+                LLVMValueKind.LLVMMemoryDefValueKind => new MemoryUseOrDef(handle),
+                LLVMValueKind.LLVMMemoryUseValueKind => new MemoryUseOrDef(handle),
+                LLVMValueKind.LLVMMemoryPhiValueKind => new MemoryPhi(handle),
+                _ => throw new InvalidOperationException($"Cannot translate kind {kind} to memory access.")
+            };
+        }
+
         public unsafe static implicit operator LLVMOpaqueMemoryAccess*(MemoryAccess memAccess)
         {
             return (LLVMOpaqueMemoryAccess*)memAccess.Handle;
@@ -41,7 +58,7 @@ namespace Dna.LLVMInterop.API.LLVMBindings.Analysis
 
         public unsafe static implicit operator MemoryAccess(LLVMOpaqueMemoryAccess* memAccess)
         {
-            return new MemoryAccess((nint)memAccess);
+            return From(memAccess);
         }
     }
 }

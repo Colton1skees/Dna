@@ -35,7 +35,7 @@ namespace Dna.LLVMInterop.API.LLVMBindings.Analysis
 
             // Convert the ptr to a typed managed vector.
             var managedVec = new ManagedVector<MemoryAccess>((nint)vecPtr,
-                (nint ptr) => new MemoryAccess(ptr));
+                (nint ptr) => MemoryAccess.From(ptr));
 
             // Return the read only list.
             return managedVec.Items;
@@ -48,7 +48,7 @@ namespace Dna.LLVMInterop.API.LLVMBindings.Analysis
 
             // Convert the ptr to a typed managed vector.
             var managedVec = new ManagedVector<MemoryAccess>((nint)vecPtr,
-                (nint ptr) => new MemoryAccess(ptr));
+                (nint ptr) => MemoryAccess.From(ptr));
 
             // Return the read only list.
             return managedVec.Items;

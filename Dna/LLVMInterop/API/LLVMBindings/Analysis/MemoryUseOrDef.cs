@@ -11,6 +11,8 @@ namespace Dna.LLVMInterop.API.LLVMBindings.Analysis
     {
         public unsafe LLVMValueRef MemoryInst => NativeMemoryUseOrDefApi.GetMemoryInst(this);
 
+        public unsafe bool IsOptimized => NativeMemoryUseOrDefApi.IsOptimized(this);
+
         public unsafe MemoryAccess DefiningAccess => NativeMemoryUseOrDefApi.GetDefiningAccess(this);
 
         public MemoryUseOrDef(nint handle) : base(handle)

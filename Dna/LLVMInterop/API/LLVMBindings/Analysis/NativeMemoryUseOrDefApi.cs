@@ -16,5 +16,8 @@ namespace Dna.LLVMInterop.API.LLVMBindings.Analysis
 
         [DllImport("Dna.LLVMInterop", CallingConvention = CallingConvention.Cdecl, EntryPoint = "MemoryUseOrDef_GetDefiningAccess")]
         public unsafe static extern LLVMOpaqueMemoryAccess* GetDefiningAccess(LLVMOpaqueMemoryUseOrDef* useOrDef);
+
+        [DllImport("Dna.LLVMInterop", CallingConvention = CallingConvention.Cdecl, EntryPoint = "MemoryUseOrDef_IsOptimized")]
+        public unsafe static extern bool IsOptimized(LLVMOpaqueMemoryUseOrDef* useOrDef);
     }
 }

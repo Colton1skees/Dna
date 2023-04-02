@@ -12,8 +12,9 @@ namespace Dna::API {
 		bool runConstantConcretization,
 		Dna::Passes::tReadBinaryContents readBinaryContents,
 		bool runStructuring,
-		bool justGVN)
+		bool justGVN,
+		Dna::Passes::tStructureFunction structureFunction)
 	{
-		Dna::Pipeline::OptimizeModule(module, f, aggressiveUnroll, runClassifyingAliasAnalysis, getAliasResult, runConstantConcretization, readBinaryContents, runStructuring, justGVN);
+		Dna::Pipeline::OptimizeModule(module, f, aggressiveUnroll, runClassifyingAliasAnalysis, getAliasResult, runConstantConcretization, readBinaryContents, runStructuring, justGVN, structureFunction);
 	}
 }

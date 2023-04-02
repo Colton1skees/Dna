@@ -179,23 +179,28 @@ var ptrAlias = ClassifyingAliasAnalysisPass.PtrGetAliasResult;
 
 var llPath = @"optimized_vm_entry2.ll";
 
+var cfPass = new ControlFlowStructuringPass();
+var pStructureFunction = Marshal.GetFunctionPointerForDelegate(cfPass.PtrStructureFunction);
+
+ControlFlowStructuringPass.binary = binary;
+
 // Run the standard O3 pipeline.
 for (int i = 0; i < 5; i++)
 {
-    OptimizationApi.OptimizeModule(llvmLifter.Module, llvmLifter.llvmFunction, false, false, 0, false, 0, false);
+    OptimizationApi.OptimizeModule(llvmLifter.Module, llvmLifter.llvmFunction, false, false, 0, false, 0, false, false, pStructureFunction);
 }
 
 // Run the O3 pipeline with custom alias analysis.
-OptimizationApi.OptimizeModule(llvmLifter.Module, llvmLifter.llvmFunction, false, true, ptrAlias, false, 0, false);
+OptimizationApi.OptimizeModule(llvmLifter.Module, llvmLifter.llvmFunction, false, true, ptrAlias, false, 0, false, false, pStructureFunction);
 
 // Run the O3 pipeline with ptr alias analysis AND aggressive loop unrolling enabled.
-OptimizationApi.OptimizeModule(llvmLifter.Module, llvmLifter.llvmFunction, true, true, ptrAlias, false, 0, false);
+OptimizationApi.OptimizeModule(llvmLifter.Module, llvmLifter.llvmFunction, true, true, ptrAlias, false, 0, false, false, pStructureFunction);
 
 
 
 // Run the O3 pipeline one last time with custom alias analysis.
 llvmLifter.Module.PrintToFile("foo2.ll");
-OptimizationApi.OptimizeModule(llvmLifter.Module, llvmLifter.llvmFunction, false, true, ptrAlias, false, 0, false);
+OptimizationApi.OptimizeModule(llvmLifter.Module, llvmLifter.llvmFunction, false, true, ptrAlias, false, 0, false, false, pStructureFunction);
 
 //llvmLifter.Module.PrintToFile(llPath);
 //var myPass = new ConstantConcretizationPass(llvmLifter.llvmFunction, llvmLifter.builder, binary);
@@ -205,12 +210,12 @@ OptimizationApi.OptimizeModule(llvmLifter.Module, llvmLifter.llvmFunction, false
 
 PointerClassifier.Seen.Clear();
 PointerClassifier.print = true;
-for (int i = 0; i < 10; i++)
+for (int i = 0; i < 13; i++)
 {
     Console.WriteLine(i);
 
     llvmLifter.Module.PrintToFile("foo2.ll");
-    OptimizationApi.OptimizeModule(llvmLifter.Module, llvmLifter.llvmFunction, false, true, ptrAlias, false, 0, false);
+    OptimizationApi.OptimizeModule(llvmLifter.Module, llvmLifter.llvmFunction, false, true, ptrAlias, false, 0, false, false, pStructureFunction);
 
 
     if (i % 4 == 0)
@@ -224,7 +229,7 @@ for (int i = 0; i < 10; i++)
 
     llvmLifter.Module.PrintToFile("foo.ll");
     Console.WriteLine(i.ToString());
-    OptimizationApi.OptimizeModule(llvmLifter.Module, llvmLifter.llvmFunction, false, true, ptrAlias, false, 0, false, false);
+    OptimizationApi.OptimizeModule(llvmLifter.Module, llvmLifter.llvmFunction, false, true, ptrAlias, false, 0, false, false, pStructureFunction);
     Console.WriteLine("foo foo foo");
 }
 
@@ -232,6 +237,7 @@ for (int i = 0; i < 10; i++)
 llvmLifter.Module.PrintToFile(llPath);
 
 
+/*
 var fpm = new FunctionPassManager();
 var pmb = new PassManagerBuilder();
 var moduleManager = new PassManager();
@@ -247,9 +253,9 @@ fpm.Add(PassApi.CreateUnSwitchPass());
 fpm.Add(PassApi.CreateControlledNodeSplittingPass());
 
 // Structure the CFG.
-var cfPass = new ControlFlowStructuringPass();
-var nativeCfPass = PassApi.CreateControlFlowStructuringPass(cfPass.PtrStructureFunction);
-fpm.Add(nativeCfPass);
+//var cfPass = new ControlFlowStructuringPass();
+//var nativeCfPass = PassApi.CreateControlFlowStructuringPass(cfPass.PtrStructureFunction);
+//fpm.Add(nativeCfPass);
 pmb.PopulateFunctionPassManager(fpm);
 pmb.PopulateModulePassManager(moduleManager);
 
@@ -261,7 +267,7 @@ fpm.DoFinalization();
 
 moduleManager.Run(llvmLifter.llvmFunction.GlobalParent);
 
-
+*/
 ControlFlowGraph<LLVMValueRef> llvmGraph = new ControlFlowGraph<LLVMValueRef>(0);
 foreach (var llvmBlock in llvmLifter.llvmFunction.BasicBlocks)
 {
@@ -309,11 +315,11 @@ var dotGraph = GraphVisualizer.GetDotGraph(llvmGraph);
 var dot = dotGraph.Compile();
 File.WriteAllText("llvmGraph.dot", dot);
 
-var domTree = new ImmutableDomTree<LLVMValueRef>(llvmGraph);
-var loopAnalysis = new LoopAnalysis<LLVMValueRef>(llvmGraph, domTree);
+//var domTree = new ImmutableDomTree<LLVMValueRef>(llvmGraph);
+//var loopAnalysis = new LoopAnalysis<LLVMValueRef>(llvmGraph, domTree);
 
-var structurer = new StackingStructurer(llvmGraph, domTree);
-structurer.Structure();
+//var structurer = new StackingStructurer(llvmGraph, domTree);
+//structurer.Structure();
 
 bool compile = true;
 if (compile)
