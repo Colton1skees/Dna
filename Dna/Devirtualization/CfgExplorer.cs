@@ -6,6 +6,7 @@ using Dna.LLVMInterop.API.RegionAnalysis.Wrapper;
 using Dna.LLVMInterop.Passes;
 using Dna.Relocation;
 using Dna.Utilities;
+using DotNetGraph.Extensions;
 using ELFSharp.UImage;
 using System;
 using System.Collections.Generic;
@@ -57,11 +58,17 @@ namespace Dna.Devirtualization
 
         public void DevirtualizeRoutine(ulong address)
         {
+            int handlerCount = 0;
             while(true)
             {
                 // Apply recurside descent while feeding the CFG explorer with newly
                 // discovered edges.
                 var cfg = dna.RecursiveDescent.ReconstructCfg(address, GetDiscoveredEdges);
+
+
+                var dot = GraphVisualizer.GetDotGraph(cfg);
+                var compiled = dot.Compile();
+                File.WriteAllText($"partial_cfg_{handlerCount}.dot", compiled);
 
                 // Lift the control flow graph to our IR.
                 var cfgLifter = new CfgLifter(architecture);
@@ -71,7 +78,11 @@ namespace Dna.Devirtualization
                 var llvmLifter = new LLVMLifter(architecture);
                 llvmLifter.Lift(liftedCfg);
 
+                llvmLifter.Module.PrintToFile($"handler_{handlerCount}_preopt.ll");
+
                 OptimizeVirtualizedFunction(llvmLifter, cfg);
+
+                llvmLifter.Module.PrintToFile($"handler_{handlerCount}_postopt.ll");
 
                 // Compile to a .exe using clang.
                 Console.WriteLine("Compiling to an exe.");
@@ -82,6 +93,8 @@ namespace Dna.Devirtualization
                 Console.WriteLine("Loading into IDA.");
                 var exePath = IDALoader.Load(compiledPath);
                 Console.WriteLine("Loaded executable into IDA.");
+
+                handlerCount++;
             }
         }
 
@@ -111,7 +124,7 @@ namespace Dna.Devirtualization
                 Debugger.Break();
             }
 
-            ulong newRip = 0;
+            ulong? newRip = 0;
             foreach(var ripStore in ripStores)
             {
                 if(ripStore.GetOperand(0).Kind != LLVMSharp.Interop.LLVMValueKind.LLVMConstantIntValueKind)
@@ -131,14 +144,18 @@ namespace Dna.Devirtualization
                 newRip = constInt;
             }
 
-            foreach(var terminatorBlock in asmCfg.GetBlocks().Where(x => x.OutgoingEdges.Count == 0))
+            if (newRip == 0)
+                Debugger.Break();
+
+            var terminatorBlocks = asmCfg.GetBlocks().Where(x => x.OutgoingEdges.Count == 0);
+            foreach (var terminatorBlock in terminatorBlocks)
             {
                 // Create an edge list if it does not exist already.
                 learnedEdges.TryAdd(terminatorBlock.Address, new HashSet<ulong>());
 
                 // Save the learned edges.
                 var edgeList = learnedEdges[terminatorBlock.Address];
-                edgeList.Add(newRip);
+                edgeList.Add(newRip.Value);
             }
         }
 
