@@ -211,7 +211,8 @@ namespace Dna.LLVMInterop.Passes
                 var storeOffset = BinaryAccessMatcher.GetBinarySectionOffset(storeGepIndex);
                 for(ulong i = 0; i < byteWidth; i++)
                 {
-                    concretizedBytes.Add(storeOffset + i, bytes[i]);
+                    concretizedBytes[storeOffset + i] = bytes[i];
+                    //concretizedBytes.Add(storeOffset + i, bytes[i]);
                 }
             }
 

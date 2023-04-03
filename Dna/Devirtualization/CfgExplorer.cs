@@ -34,6 +34,8 @@ namespace Dna.Devirtualization
 
         Dictionary<ulong, HashSet<ulong>> learnedEdges = new();
 
+        private List<ulong> handlers = new();
+
         public CfgExplorer(IDna dna, ICpuArchitecture architecture)
         {
             this.dna = dna;
@@ -59,11 +61,38 @@ namespace Dna.Devirtualization
         public void DevirtualizeRoutine(ulong address)
         {
             int handlerCount = 0;
+            handlers.Add(address);
             while(true)
             {
+                var newCfg = new ControlFlowGraph<Iced.Intel.Instruction>(address);
+
+                var handlerCfgs = handlers.Select(x => dna.RecursiveDescent.ReconstructCfg(address)).ToList();
+
+                ulong blockCount = 0;
+                for(int i = 0; i < handlerCfgs.Count; i++)
+                {
+                    var handlerCfg = handlerCfgs[i];
+                    var exitBlocks = newCfg.GetBlocks().Where(x => x.OutgoingEdges.Count == 0).ToHashSet();
+
+                    foreach(var block in handlerCfg.GetBlocks())
+                    {
+                        // Create a new block in the new cfg.
+                        var newBlock = newCfg.CreateBlock(blockCount);
+
+                        // Copy the block instructions.
+                        newBlock.Instructions.AddRange(block.Instructions);
+
+                        //
+                    }
+
+                }
+
+                /*
+                //
                 // Apply recurside descent while feeding the CFG explorer with newly
                 // discovered edges.
                 var cfg = dna.RecursiveDescent.ReconstructCfg(address, GetDiscoveredEdges);
+
 
 
                 var dot = GraphVisualizer.GetDotGraph(cfg);
@@ -95,6 +124,7 @@ namespace Dna.Devirtualization
                 Console.WriteLine("Loaded executable into IDA.");
 
                 handlerCount++;
+                */
             }
         }
 
@@ -147,7 +177,10 @@ namespace Dna.Devirtualization
             if (newRip == 0)
                 Debugger.Break();
 
-            var terminatorBlocks = asmCfg.GetBlocks().Where(x => x.OutgoingEdges.Count == 0);
+            var terminatorBlocks = asmCfg.GetBlocks().Where(x => x.OutgoingEdges.Count == 0).ToList();
+
+            var terminatorInsts = terminatorBlocks.Select(x => x.ExitInstruction).ToList();
+            if(terminatorInsts.Any())
             foreach (var terminatorBlock in terminatorBlocks)
             {
                 // Create an edge list if it does not exist already.

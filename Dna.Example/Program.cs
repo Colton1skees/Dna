@@ -81,7 +81,7 @@ var cfg = dna.RecursiveDescent.ReconstructCfg(funcAddr);
 // Instantiate the cpu architecture.
 var architecture = new X86CpuArchitecture(ArchitectureId.ARCH_X86_64);
 
-bool explore = true;
+bool explore = false;
 if (explore)
 {
     var cfgExplorer = new CfgExplorer(dna, architecture);
@@ -103,7 +103,7 @@ var llvmLifter = new LLVMLifter(architecture);
 // beforecustompipeline.ll
 var ctx = LLVMContextRef.Create();
 // -passes=sccp,sroa,dce,dse,adce,licm,gvn,newgvn -memdep-block-scan-limit=1000000000 -gvn-max-num-deps=25000000
-var memBuffer = LlvmUtilities.CreateMemoryBuffer(@"C:\Users\colton\source\repos\Dna\Dna.Example\bin\x64\Debug\net7.0\cant_resolve.ll");
+var memBuffer = LlvmUtilities.CreateMemoryBuffer(@"C:\Users\colton\source\repos\Dna\Dna.Example\bin\x64\Debug\net7.0\gfdsgfd\unicorn_no_concrete.ll");
 ctx.TryParseIR(memBuffer, out LLVMModuleRef unicornTraceModule, out string unicornLoadMsg);
 
 //llvmLifter.Lift(liftedCfg);
@@ -131,7 +131,7 @@ LlvmUtilities.LLVMParseCommandLineOptions(new string[] { "-memdep-block-scan-lim
 //llvmLifter.Lift(liftedCfg);
 
 // Optimize the routine.
-bool optimize = false;
+bool optimize = true;
 if (optimize)
 {
     var passManager2 = llvmLifter.Module.CreateFunctionPassManager();
@@ -150,13 +150,15 @@ if (optimize)
     passManager2.AddDeadStoreEliminationPass();
     passManager2.AddAggressiveDCEPass();
     passManager2.InitializeFunctionPassManager();
-    for (int i = 0; i < 5; i++)
+    for (int i = 0; i < 10; i++)
     {
         passManager2.RunFunctionPassManager(llvmLifter.llvmFunction);
     }
 
     passManager2.FinalizeFunctionPassManager();
 }
+
+llvmLifter.module.PrintToFile("no_handle_post_o3.ll");
 
 var readBytes = (ulong address, uint size) =>
 {
@@ -211,7 +213,7 @@ OptimizationApi.OptimizeModule(llvmLifter.Module, llvmLifter.llvmFunction, false
 
 PointerClassifier.Seen.Clear();
 PointerClassifier.print = true;
-for (int i = 0; i < 13; i++)
+for (int i = 0; i < 1000; i++)
 {
     Console.WriteLine(i);
 
