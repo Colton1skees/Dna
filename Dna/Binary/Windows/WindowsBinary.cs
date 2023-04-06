@@ -33,26 +33,19 @@ namespace Dna.Binary.Windows
             Bytes = binaryBytes;
             PEFile = PEFile.FromBytes(binaryBytes);
             BaseAddress = baseAddress.HasValue ? baseAddress.Value : PEFile.OptionalHeader.ImageBase;
+
+            var tempFix = binaryBytes.ToList();
+            for(ulong i = 0; i < 1000; i++)
+            {
+                tempFix.Add(0x90);
+            }
+
+            Bytes = tempFix.ToArray();
         }
 
         /// <inheritdoc cref="IBinary.ReadBytes(ulong, int)"/>
         public byte[] ReadBytes(ulong address, int count = 15)
         {
-            if(address == 0x14006C44F)
-            {
-                return new byte[] { 0x5C };
-            }
-
-            if(address == 0x14006C450)
-            {
-                return new byte[] { 0x48, 0xC7, 0x04, 0x24, 0x50, 0x12, 0x00, 0x00 };
-            }
-
-            if(address == 0x14006C458)
-            {
-                return new byte[] { 0xE9, 0x49, 0x8D, 0xFA, 0xFF };
-            }
-
             // Allocate a buffer to store the results in.
             byte[] buffer = new byte[count];
 

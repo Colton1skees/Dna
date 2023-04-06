@@ -30,6 +30,8 @@ Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "Dna.LLVMInterop", "Dna.LLVM
 EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "TritonTranslator.Examples", "TritonTranslator\TritonTranslator.Examples\TritonTranslator.Examples.csproj", "{48698C75-4175-417F-B240-867BF49AD07D}"
 EndProject
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "SemanticExtractor", "TritonTranslator\SemanticExtractor\SemanticExtractor.csproj", "{44DF442D-CD3D-4BC8-86F8-01DE3290CA38}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -310,6 +312,30 @@ Global
 		{48698C75-4175-417F-B240-867BF49AD07D}.RelWithDebInfo|x64.Build.0 = Debug|Any CPU
 		{48698C75-4175-417F-B240-867BF49AD07D}.RelWithDebInfo|x86.ActiveCfg = Release|Any CPU
 		{48698C75-4175-417F-B240-867BF49AD07D}.RelWithDebInfo|x86.Build.0 = Release|Any CPU
+		{44DF442D-CD3D-4BC8-86F8-01DE3290CA38}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{44DF442D-CD3D-4BC8-86F8-01DE3290CA38}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{44DF442D-CD3D-4BC8-86F8-01DE3290CA38}.Debug|x64.ActiveCfg = Debug|Any CPU
+		{44DF442D-CD3D-4BC8-86F8-01DE3290CA38}.Debug|x64.Build.0 = Debug|Any CPU
+		{44DF442D-CD3D-4BC8-86F8-01DE3290CA38}.Debug|x86.ActiveCfg = Debug|Any CPU
+		{44DF442D-CD3D-4BC8-86F8-01DE3290CA38}.Debug|x86.Build.0 = Debug|Any CPU
+		{44DF442D-CD3D-4BC8-86F8-01DE3290CA38}.MinSizeRel|Any CPU.ActiveCfg = Debug|Any CPU
+		{44DF442D-CD3D-4BC8-86F8-01DE3290CA38}.MinSizeRel|Any CPU.Build.0 = Debug|Any CPU
+		{44DF442D-CD3D-4BC8-86F8-01DE3290CA38}.MinSizeRel|x64.ActiveCfg = Debug|Any CPU
+		{44DF442D-CD3D-4BC8-86F8-01DE3290CA38}.MinSizeRel|x64.Build.0 = Debug|Any CPU
+		{44DF442D-CD3D-4BC8-86F8-01DE3290CA38}.MinSizeRel|x86.ActiveCfg = Debug|Any CPU
+		{44DF442D-CD3D-4BC8-86F8-01DE3290CA38}.MinSizeRel|x86.Build.0 = Debug|Any CPU
+		{44DF442D-CD3D-4BC8-86F8-01DE3290CA38}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{44DF442D-CD3D-4BC8-86F8-01DE3290CA38}.Release|Any CPU.Build.0 = Release|Any CPU
+		{44DF442D-CD3D-4BC8-86F8-01DE3290CA38}.Release|x64.ActiveCfg = Release|Any CPU
+		{44DF442D-CD3D-4BC8-86F8-01DE3290CA38}.Release|x64.Build.0 = Release|Any CPU
+		{44DF442D-CD3D-4BC8-86F8-01DE3290CA38}.Release|x86.ActiveCfg = Release|Any CPU
+		{44DF442D-CD3D-4BC8-86F8-01DE3290CA38}.Release|x86.Build.0 = Release|Any CPU
+		{44DF442D-CD3D-4BC8-86F8-01DE3290CA38}.RelWithDebInfo|Any CPU.ActiveCfg = Release|Any CPU
+		{44DF442D-CD3D-4BC8-86F8-01DE3290CA38}.RelWithDebInfo|Any CPU.Build.0 = Release|Any CPU
+		{44DF442D-CD3D-4BC8-86F8-01DE3290CA38}.RelWithDebInfo|x64.ActiveCfg = Release|Any CPU
+		{44DF442D-CD3D-4BC8-86F8-01DE3290CA38}.RelWithDebInfo|x64.Build.0 = Release|Any CPU
+		{44DF442D-CD3D-4BC8-86F8-01DE3290CA38}.RelWithDebInfo|x86.ActiveCfg = Release|Any CPU
+		{44DF442D-CD3D-4BC8-86F8-01DE3290CA38}.RelWithDebInfo|x86.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
