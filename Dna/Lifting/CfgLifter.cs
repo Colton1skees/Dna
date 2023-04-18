@@ -80,12 +80,7 @@ namespace Dna.Lifting
 
         private void LiftBlock(BasicBlock<Iced.Intel.Instruction> inputBlock)
         {
-            List<Iced.Intel.Instruction> output = new List<Iced.Intel.Instruction>(inputBlock.Instructions.Count * 20);
-
-            inputBlock.Instructions.AddRange(output);
-
-            Console.WriteLine("inst count: {0}", inputBlock.Instructions.Count);
-
+            /*
             // Lift all instructions from native -> AST -> 3 address code representation.
             var liftedInstructions = inputBlock.Instructions
                 .SelectMany(x => translator.TranslateInstruction(architecture.Disassembly(x)))
@@ -95,6 +90,34 @@ namespace Dna.Lifting
             // Move the lifted instructions into the basic block.
             var liftedBlock = blockMapping[inputBlock];
             liftedBlock.Instructions.AddRange(liftedInstructions);
+
+            UpdateBlockExitInstruction(liftedBlock);
+            */
+
+            Console.WriteLine($"Lifting {inputBlock.Instructions.Count}");
+            var liftedBlock = blockMapping[inputBlock];
+            int i = 0;
+            foreach (var instruction in inputBlock.Instructions)
+            {
+                if(i % 50000 == 0)
+                {
+                    Console.WriteLine(i);
+                    System.GC.Collect();
+                }
+                var asts = translator
+                    .TranslateInstruction(architecture.Disassembly(instruction));
+
+                foreach(var ast in asts)
+                {
+                    //var idk = astConverter.ConvertFromSymbolicExpression(ast).ToList();
+                    liftedBlock.Instructions.AddRange(astConverter.ConvertFromSymbolicExpression(ast));
+                }
+
+                //    .SelectMany(x => astConverter.ConvertFromSymbolicExpression(x));
+
+                //liftedBlock.Instructions.AddRange(asts);
+                i++;
+            }
 
             UpdateBlockExitInstruction(liftedBlock);
         }

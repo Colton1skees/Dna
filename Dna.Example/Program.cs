@@ -284,6 +284,8 @@ if (emulate)
         }
     });
     */
+
+    bool done = false;
     int count = 0;
     unicornEmulator.SetInstExecutedCallback((ulong address, int size) =>
     {
@@ -303,10 +305,15 @@ if (emulate)
         var disassembled = dna.BinaryDisassembler.GetInstructionAt(symbolicRip);
         icedInstructions.Add(disassembled);
 
-        if (unicornRip == 0x1400012CC || count == 50000)
+        if (unicornRip == 0x1400012CC)
         {
-            Console.WriteLine("Dumping cfg.");
+            Console.WriteLine($"Dumping cfg at rip 0x{unicornRip.ToString("X")}.");
             Debugger.Break();
+            done = true;
+
+
+            unicornEmulator.Stop();
+            /*
             var uniCfg = new ControlFlowGraph<Iced.Intel.Instruction>(0x1400012BD);
             var entryBlock = uniCfg.CreateBlock(0x1400012BD);
             foreach (var insn in icedInstructions)
@@ -333,6 +340,7 @@ if (emulate)
             uniLlvmLifter.Module.PrintToFile(@"lifted_puma_red.ll");
             Console.WriteLine("Done...");
             Debugger.Break();
+            */
         }
 
         // symbolicEmulator.ExecuteNext();
@@ -342,10 +350,20 @@ if (emulate)
     // Execute the function.
     unicornEmulator.Start(0x1400012BD);
     symbolicEmulator.Start(0x1400012BD);
-
+    
     Console.WriteLine("Started");
-    Thread.Sleep(100000);
+    while (!done)
+        Thread.Sleep(1000);
+  //  Thread.Sleep(100000);
 }
+
+var uniCfg = new ControlFlowGraph<Iced.Intel.Instruction>(0x1400012BD);
+var entryBlock = uniCfg.CreateBlock(0x1400012BD);
+foreach (var insn in icedInstructions)
+    entryBlock.Instructions.Add(insn);
+
+
+var myIrCfg = cfgLifter.LiftCfg(uniCfg);
 
 // Lift the control flow graph to LLVM IR.
 var llvmLifter = new LLVMLifter(architecture);
