@@ -114,6 +114,11 @@ namespace Dna.Emulation.Unicorn
             Emulator.Start(addr, addr + 0x1000);
         }
 
+        public void Stop()
+        {
+            Emulator.Stop();
+        }
+
         /// <summary>
         /// Unicorn callback raised when unmapped memory is read or written.
         /// </summary>
