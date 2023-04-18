@@ -12,7 +12,8 @@
 - Visualization of control flow graphs(Graphviz)
 - IR optimization passes 
 - LLVM passes for simplifying obfuscated code
-- APIs for writing LLVM passes in C#, as well as bindings for various parts of LLVM(PassManager, MemorySSA, LoopInfo)
+- APIs for writing LLVM passes in C# (e.g. bindings for PassManager, MemorySSA, LoopInfo)
+- 
 - Function relocation(optionally across binaries, with some caveats)
 
 You can find an example usage [here](https://github.com/Colton1skees/Dna/blob/master/Dna.Example/Program.cs).
