@@ -1086,7 +1086,7 @@ StructuredFunction *RegionBuilder::buildRegions()
     RegionContext ctx;
 
     BasicBlock *entry = &m_func.getFunction().getEntryBlock();
-
+        
     Region *body = discoverRegion(ctx, /*processLoopBody=*/false, entry);
 
     printf("set body.");
