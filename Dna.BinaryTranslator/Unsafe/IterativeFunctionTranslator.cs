@@ -233,9 +233,7 @@ namespace Dna.BinaryTranslator.Unsafe
                 // Optimize the routine.
                 for (int i = 0; i < 2; i++)
                 {
-                    continue;
-                    Console.WriteLine("TODO: Uncomment OptimizeModule");
-                    //OptimizationApi.OptimizeModule(function.GlobalParent, function, false, false, 0, false, 0, false);
+                    OptimizationApi.OptimizeModule(function.GlobalParent, function, false, false, 0, false, 0, false);
 
                     // For some reason the set of passes in OptimizeModule optimizes away LLVM's
                     // `__C_specific_handler` personality function - even if it's being actively used as a personality function.
