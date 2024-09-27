@@ -14,6 +14,10 @@ Some other notable features:
 - Includes a strong API for writing LLVM passes natively in C#. We have bindings for e.g. `MemorySSA`, `LoopInfo`, dominator trees, pass pipeline management, etc. 
 - Graph visualization for LLVM IR and binary control flow graphs using graphviz or alternatively a script generator for binary ninja.
 
+Some caveats:
+- Only x86_64 is supported
+- Recompiled code is not CET compliant 
+
 # Dependencies
 - LLVM/LLVMSharp
 - Remill
