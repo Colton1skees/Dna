@@ -93,6 +93,11 @@ namespace Dna::API {
 
 // LoopInfo
 namespace Dna::API {
+	DNA_EXPORT llvm::LoopInfo* LoopInfo_Constructor()
+	{
+		return new llvm::LoopInfo();
+	}
+
 	DNA_EXPORT ImmutableManagedVector* LoopInfo_GetLoopsInPreorder(llvm::LoopInfo* loopInfo)
 	{
 		return ImmutableManagedVector::From(&loopInfo->getLoopsInPreorder());

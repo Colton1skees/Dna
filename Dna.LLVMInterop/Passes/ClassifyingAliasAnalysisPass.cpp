@@ -11,6 +11,8 @@ using namespace llvm::PatternMatch;
 namespace Dna::Passes {
 	tGetAliasResult ClassifyingAAResult::gGetAliasResult = nullptr;
 
+	ClassifyingAAResult::ClassifyingAAResult() {}
+
 	ClassifyingAAResult::ClassifyingAAResult(tGetAliasResult ptrGetAliasResult) : pGetAliasResult(ptrGetAliasResult) {}
 
 	bool ClassifyingAAResult::invalidate(llvm::Function& F, const llvm::PreservedAnalyses& PA, llvm::FunctionAnalysisManager::Invalidator& Inv)
@@ -18,7 +20,7 @@ namespace Dna::Passes {
 		return false;
 	}
 
-	llvm::AliasResult ClassifyingAAResult::alias(const llvm::MemoryLocation& locA, const llvm::MemoryLocation& locB, llvm::AAQueryInfo& AAQI)
+	llvm::AliasResult ClassifyingAAResult::alias(const llvm::MemoryLocation& locA, const llvm::MemoryLocation& locB, llvm::AAQueryInfo& AAQI, const llvm::Instruction* CtxI)
 	{
 		// If our managed implementation of alias analysis returns a valid result, then we use it.
 		// Otherwise, UINT8_MAX was returned, meaning that we must use the value obtained via LLVM's default alias analysis.
@@ -32,7 +34,7 @@ namespace Dna::Passes {
 		}
 
 		// If we cannot prove that the two memory locations are [NoAlias], then we fallback to the default alias analysis.
-		return AAResultBase::alias(locA, locB, AAQI);
+		return AAResultBase::alias(locA, locB, AAQI, CtxI);
 	}	
 
 	char SegmentsAAWrapperPass::ID = 0;

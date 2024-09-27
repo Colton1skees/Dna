@@ -93,6 +93,7 @@ namespace Dna.Lifting
                     var or = builder.BuildOr(op1(), op2(), "or");
                     store(or);
                     break;
+                // TODO: Fshl/fshr are not semantically correct.
                 case InstRol inst:
                     // Create the fshl intrinsic.
                     var rolType = LLVMTypeRef.CreateInt(inst.Bitsize);

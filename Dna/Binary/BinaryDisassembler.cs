@@ -41,5 +41,19 @@ namespace Dna.Binary
             decoder.IP = address;
             return decoder.Decode();
         }
+
+        /// <summary>
+        /// Disassembles a collection of bytes into a single iced instruction.
+        /// </summary>
+        /// <param name="address"></param>
+        /// <param name="bytes"></param>
+        /// <returns></returns>
+        public static Instruction GetInstructionFromBytes(ulong address, byte[] bytes, int bitness = 64)
+        {
+            var codeReader = new ByteArrayCodeReader(bytes);
+            var decoder = Iced.Intel.Decoder.Create(bitness, codeReader);
+            decoder.IP = address;
+            return decoder.Decode();
+        }
     }
 }

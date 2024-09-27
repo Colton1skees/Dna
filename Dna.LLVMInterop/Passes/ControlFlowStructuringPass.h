@@ -71,39 +71,36 @@
 namespace Dna::Passes {
 	typedef bool(__cdecl* tStructureFunction)(llvm::Function* func, llvm::LoopInfo* loopInfo, llvm::MemorySSA* memSsa);
 
-	struct ControlFlowStructuringPass : public llvm::FunctionPass
+	struct ControlFlowStructuringPass : public PassInfoMixin<ControlFlowStructuringPass>
 	{
 		static char ID;
 
 		tStructureFunction structureFunction;
 
-		ControlFlowStructuringPass(tStructureFunction structureFunction) : FunctionPass(ID)
+		explicit ControlFlowStructuringPass(tStructureFunction structureFunction)
 		{
 			this->structureFunction = structureFunction;
 		}
 
-		ControlFlowStructuringPass() : FunctionPass(ID) 
+		explicit ControlFlowStructuringPass() 
 		{
 
 		}
 
-		void getAnalysisUsage(llvm::AnalysisUsage& AU) const
-		{
-			AU.addRequired<llvm::LoopInfoWrapperPass>();
-			AU.addRequired<llvm::MemorySSAWrapperPass>();
-			AU.setPreservesAll();
-		}
 
-		virtual bool runOnFunction(llvm::Function& F)
+		llvm::PreservedAnalyses run(llvm::Function& F, llvm::FunctionAnalysisManager& fam)
 		{
-			llvm::LoopInfo& LI = getAnalysis<llvm::LoopInfoWrapperPass>().getLoopInfo();
-			llvm::MemorySSA& mssa = getAnalysis<llvm::MemorySSAWrapperPass>().getMSSA();
+			llvm::LoopInfo& LI = fam.getResult<llvm::LoopAnalysis>(F);
+			llvm::MemorySSA& mssa = fam.getResult<llvm::MemorySSAAnalysis>(F).getMSSA();
 			mssa.ensureOptimizedUses();
 			printf("structuring.");
-			return structureFunction(&F, &LI, &mssa);
+			bool changed = structureFunction(&F, &LI, &mssa);
+			if (changed)
+				return PreservedAnalyses::none();
+
+			return PreservedAnalyses::all();
 		}
 	};
 
 	char ControlFlowStructuringPass::ID = 0;
-	static llvm::RegisterPass<ControlFlowStructuringPass> X("cfstructuring", "Convert an unstructured flow graph into a structured AST.");
 }

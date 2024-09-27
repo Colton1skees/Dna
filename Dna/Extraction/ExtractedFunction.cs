@@ -9,12 +9,12 @@ using System.Threading.Tasks;
 namespace Dna.Extraction
 {
     /// <inheritdoc cref="IExtractedFunction" />
-    public class ExtractedFunction : IExtractedFunction
+    public class ExtractedFunction
     {
         /// <inheritdoc />
         public ControlFlowGraph<Instruction> Graph { get; set; }
 
         /// <inheritdoc />
-        public IEnumerable<IExtractedFunction> Callees { get; set; }
+        public IEnumerable<ExtractedFunction> Callees { get; set; }
     }
 }

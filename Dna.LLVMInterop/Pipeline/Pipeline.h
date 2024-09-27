@@ -5,8 +5,6 @@
 #include "llvm/ADT/SmallVector.h"
 #include "llvm/ADT/Triple.h"
 #include "llvm/Analysis/BasicAliasAnalysis.h"
-#include "llvm/Analysis/CFLAndersAliasAnalysis.h"
-#include "llvm/Analysis/CFLSteensAliasAnalysis.h"
 #include "llvm/Analysis/ScalarEvolutionAliasAnalysis.h"
 #include "llvm/Analysis/GlobalsModRef.h"
 #include "llvm/Analysis/InlineCost.h"
@@ -15,6 +13,7 @@
 #include "llvm/Analysis/TargetLibraryInfo.h"
 #include "llvm/Analysis/TypeBasedAliasAnalysis.h"
 #include "llvm/Analysis/MemoryDependenceAnalysis.h"
+#include "llvm/Analysis/DemandedBits.h"
 #include "llvm/IR/DataLayout.h"
 #include "llvm/IR/LegacyPassManager.h"
 #include "llvm/IR/Verifier.h"
@@ -30,14 +29,38 @@
 #include "llvm/Transforms/Instrumentation.h"
 #include "llvm/Transforms/Scalar.h"
 #include "llvm/Transforms/Scalar/GVN.h"
+#include "llvm/Transforms/Scalar/NewGVN.h"
+#include "llvm/Transforms/Scalar/EarlyCSE.h"
+#include "llvm/Transforms/Scalar/SCCP.h"
+#include "llvm/Transforms/Utils/Mem2Reg.h"
 #include "llvm/Transforms/Scalar/InstSimplifyPass.h"
+#include "llvm/Transforms/Scalar/IndVarSimplify.h"
 #include "llvm/Transforms/Scalar/SimpleLoopUnswitch.h"
+#include "llvm/Transforms/Scalar/JumpThreading.h"
+#include "llvm/Transforms/Scalar/CorrelatedValuePropagation.h"
+#include "llvm/Transforms/Scalar/CallSiteSplitting.h"
+#include "llvm/Transforms/Scalar/SpeculativeExecution.h"
+#include "llvm/Transforms/Scalar/BDCE.h"
+#include "llvm/Transforms/Scalar/ADCE.h"
+#include "llvm/Transforms/Scalar/Reassociate.h"
+#include "llvm/Transforms/Scalar/LoopSimplifyCFG.h"
+#include "llvm/Transforms/Scalar/SimplifyCFG.h"
+#include "llvm/Transforms/Scalar/LoopPassManager.h"
+#include "llvm/Transforms/Scalar/LoopUnrollPass.h"
+#include "llvm/Transforms/Scalar/SROA.h"
 #include "llvm/Transforms/Utils.h"
 #include "llvm/Transforms/Utils/Cloning.h"
 #include "llvm/Transforms/Vectorize.h"
+#include "llvm/Transforms/Scalar/DeadStoreElimination.h"
 #include <llvm/InitializePasses.h>
-
 #include "llvm/Transforms/IPO/AlwaysInliner.h"
+
+#include "souper/Parser/Parser.h"
+#include <souper/Extractor/Candidates.h>
+#include <souper/Extractor/ExprBuilder.h>
+#include <souper/Extractor/Solver.h>
+#include <souper/Infer/Z3Driver.h>
+#include <souper/Infer/Z3Expr.h>
 
 #include "Passes/ClassifyingAliasAnalysisPass.h"
 #include "Passes/ConstantConcretizationPass.h"
@@ -45,16 +68,638 @@
 #include "Passes/generator_jit_sl_function.h"
 #include "Passes/generator_jit_ast_compute.h"
 #include "Passes/ControlFlowStructuringPass.h"
+#include "Passes/JumpTableAnalysisPass.h"
 
 #include "Utilities/magic_enum.hpp"
 
 #include <API/RegionAPI/RegionAPI.h>
-
+#include "API/ExportDef.h"
+#include <tuple>
+#include <chrono>
 using namespace llvm::sl;
+
 
 namespace Dna::Pipeline
 {
+	int constCount = 0;
+
+	typedef struct ProvedConstant {
+		souper::Inst* I;
+		uint64_t V;
+
+		ProvedConstant(souper::Inst* I, uint64_t V) : I(I), V(V) {}
+	} ProvedConstant;
+
+	struct SouperContext 
+	{
+		souper::InstContext& InstCtx;
+		souper::ReplacementContext& ReplacementCtx;
+		souper::ExprBuilderContext& ExprBuilderCtx;
+		souper::ExprBuilderOptions& ExprBuilderOptions;
+
+		std::unique_ptr<souper::ExprBuilder> ExprBuilder;
+
+		Dna::Passes::tTrySolveConstant TrySolveConstant;
+	};
+
+	struct VariableSlice
+	{
+		uint32_t BitWidth;
+
+		// The jump table index variable being solved for. E.g. if you have jmp(table[%100]), then this is the %100 variable.
+		llvm::Value* Value;
+
+		souper::Inst* Ast;
+
+		VariableSlice(uint32_t bitWidth, llvm::Value* value, souper::Inst* ast)
+		{
+			this->BitWidth = bitWidth;
+			this->Value = value;
+			this->Ast = ast;
+		}
+	};
+
+	struct UnboundableVariableSlice : VariableSlice
+	{
+		souper::Inst* UnboundableDependency;
+
+		UnboundableVariableSlice(uint32_t bitWidth, llvm::Value* value, souper::Inst* ast, souper::Inst* unboundableDependency) : VariableSlice(bitWidth, value, ast)
+		{
+			this->UnboundableDependency = unboundableDependency;
+		}
+	};
+
+	struct BoundableVariableSlice : VariableSlice
+	{
+		BoundableVariableSlice(uint32_t bitWidth, llvm::Value* value, souper::Inst* ast) : VariableSlice(bitWidth, value, ast)
+		{
+
+		}
+	};
+
+	struct SolvableLoadOrVariable
+	{
+		// The jump table index variable being solved for. E.g. if you have jmp(table[%100]), then this is the %100 variable.
+		llvm::Value* Ptr;
+
+		// The optional load instruction that dereferences the pointer. This is optional because not all solved variables get dereferenced.
+		llvm::Value* LoadInst;
+
+		SolvableLoadOrVariable(llvm::Value* ptr, llvm::Value* loadInst)
+		{
+			this->Ptr = ptr;
+			this->LoadInst = loadInst;
+		}
+	};
+
 	int count = 0;
+
+	souper::CandidateReplacement* GetCandidate(souper::FunctionCandidateSet& FCS, souper::ExprBuilderOptions& EBO)
+	{
+		// Identify the candidate
+		souper::CandidateReplacement* CR = nullptr;
+		int count = 0;
+		for (auto& B : FCS.Blocks) {
+			for (auto& R : B->Replacements) {
+				if ((R.Origin != EBO.CandidateFilterInstruction) || (R.Mapping.LHS->Width != 64))
+					continue;
+				CR = &R;
+				count++;
+			}
+		}
+
+		if (CR == nullptr || count > 1)
+		{
+			llvm::report_fatal_error("identifyChildren (2): no available candidates!");
+			throw new std::invalid_argument("No available candidates or too many candidates!");
+		}
+
+		return CR;
+	}
+
+	souper::Inst* Slice(std::string toName, llvm::Function* function, llvm::Value* value, souper::InstContext& IC, souper::ReplacementContext& RC, souper::ExprBuilderContext& EBC, souper::ExprBuilderOptions& EBO)
+	{
+		llvm::outs() << *value;
+		llvm::outs() << "\n";
+		auto fcs = souper::ExtractCandidates(function, IC, EBC, EBO);
+
+		auto cand = GetCandidate(fcs, EBO);
+		llvm::outs() << "cand: " << cand;
+		llvm::outs() << "\n";
+		llvm::outs() << "toName: " << toName;
+		llvm::outs() << "\n";
+
+		//souper::Inst* ConstantVar = IC.createVar(cand->Mapping.LHS->Width, toName);
+		printf("created constant var!");
+		//cand->printLHS(llvm::outs(), RC, true);
+		auto mapping =  cand->Mapping.LHS;
+		printf("got lhs");
+		return mapping;
+	}
+
+	bool GetSolutions(std::vector<ProvedConstant>& RecoveredConstants, souper::Inst& inst, souper::Inst& pc, souper::InstContext& InstCtx, Dna::Passes::tTrySolveConstant TrySolveConstant)
+	{
+		if (constCount == 0)
+		{
+			constCount++;
+			//return false;
+		}
+
+
+		souper::Inst* ConstantVar = InstCtx.createVar(inst.Width, "ConstantVar" + std::to_string(constCount));
+		souper::InstMapping IM(&inst, ConstantVar);
+		constCount++;
+		//auto RecoveredConstants = solvedConstants;
+
+		do
+		{
+			std::vector<souper::Inst*> ModelInstructions;
+			// Populate the preconditions
+			std::vector<souper::Inst*> Preconditions;
+			//Preconditions.push_back(&pc);
+			souper::Inst* Precondition = nullptr;
+			// Build the exclusions
+			for (const auto& RecoveredConstant : RecoveredConstants) {
+				souper::Inst* NotConstant =
+					InstCtx.getInst(souper::Inst::Ne, 64, { &inst, RecoveredConstant.I });
+				Preconditions.push_back(NotConstant);
+			}
+
+
+			Preconditions.push_back(&pc);
+			// Add the preconditions
+			if (!Preconditions.empty())
+				Precondition = InstCtx.getInst(souper::Inst::And, 1, Preconditions);
+			// Build the query
+			souper::BlockPCs BPCs;
+			std::vector<souper::InstMapping> PCs;
+
+			// TODO: verify why the BPCs and PCs may lead to no results sometimes
+			// const auto &Query = souper::BuildQuery(IC, CR->BPCs, CR->PCs, IM, &ModelInstructions, Precondition, true);
+			const auto& Query = souper::BuildQuery(InstCtx, BPCs, PCs, IM, &ModelInstructions, Precondition, true);
+
+			llvm::outs() << "[+] SMT Query:\n";
+			llvm::outs() << Query << "\n";
+			printf("queried!");
+
+
+			auto name = ConstantVar->Name;
+			uint64_t outConst = 0;
+			auto result = TrySolveConstant(_strdup(Query.c_str()), _strdup(name.c_str()), &outConst);
+			printf("query executed!");
+
+			std::cout << "is sat: " << result << std::endl;
+			if (result)
+			{
+				RecoveredConstants.push_back(ProvedConstant(&inst, outConst));
+			}
+			std::cout << "out const: " << outConst << std::endl;
+		}
+
+		while (true);
+	}
+
+	void CollectInputVariables(souper::Inst& inst, std::vector<souper::Inst*>& inputVariables)
+	{
+		switch (inst.K)
+		{
+			case souper::Inst::Var:
+				inputVariables.push_back(&inst);
+				break;
+
+			case souper::Inst::Kind::Phi:
+			case souper::Inst::Kind::Add:
+			case souper::Inst::Kind::AddNSW:
+			case souper::Inst::Kind::AddNUW:
+			case souper::Inst::Kind::AddNW:
+			case souper::Inst::Kind::Sub:
+			case souper::Inst::Kind::SubNSW:
+			case souper::Inst::Kind::SubNUW:
+			case souper::Inst::Kind::SubNW:
+			case souper::Inst::Kind::Mul:
+			case souper::Inst::Kind::MulNSW:
+			case souper::Inst::Kind::MulNUW:
+			case souper::Inst::Kind::MulNW:
+			case souper::Inst::Kind::UDiv:
+			case souper::Inst::Kind::SDiv:
+			case souper::Inst::Kind::UDivExact:
+			case souper::Inst::Kind::SDivExact:
+			case souper::Inst::Kind::URem:
+			case souper::Inst::Kind::SRem:
+			case souper::Inst::Kind::And:
+			case souper::Inst::Kind::Or:
+			case souper::Inst::Kind::Xor:
+			case souper::Inst::Kind::Shl:
+			case souper::Inst::Kind::ShlNSW:
+			case souper::Inst::Kind::ShlNUW:
+			case souper::Inst::Kind::ShlNW:
+			case souper::Inst::Kind::LShr:
+			case souper::Inst::Kind::LShrExact:
+			case souper::Inst::Kind::AShr:
+			case souper::Inst::Kind::AShrExact:
+			case souper::Inst::Kind::Select:
+			case souper::Inst::Kind::ZExt:
+			case souper::Inst::Kind::SExt:
+			case souper::Inst::Kind::Trunc:
+			case souper::Inst::Kind::Eq:
+			case souper::Inst::Kind::Ne:
+			case souper::Inst::Kind::Ult:
+			case souper::Inst::Kind::Slt:
+			case souper::Inst::Kind::Ule:
+			case souper::Inst::Kind::Sle:
+			case souper::Inst::Kind::CtPop:
+			case souper::Inst::Kind::BSwap:
+			case souper::Inst::Kind::Cttz:
+			case souper::Inst::Kind::Ctlz:
+			case souper::Inst::Kind::BitReverse:
+			case souper::Inst::Kind::FShl:
+			case souper::Inst::Kind::FShr:
+			case souper::Inst::Kind::ExtractValue:
+			case souper::Inst::Kind::SAddWithOverflow:
+			case souper::Inst::Kind::SAddO:
+			case souper::Inst::Kind::UAddWithOverflow:
+			case souper::Inst::Kind::UAddO:
+			case souper::Inst::Kind::SSubWithOverflow:
+			case souper::Inst::Kind::SSubO:
+			case souper::Inst::Kind::USubWithOverflow:
+			case souper::Inst::Kind::USubO:
+			case souper::Inst::Kind::SMulWithOverflow:
+			case souper::Inst::Kind::SMulO:
+			case souper::Inst::Kind::UMulWithOverflow:
+			case souper::Inst::Kind::UMulO:
+			case souper::Inst::Kind::SAddSat:
+			case souper::Inst::Kind::UAddSat:
+			case souper::Inst::Kind::SSubSat:
+			case souper::Inst::Kind::USubSat:
+			case souper::Inst::Kind::Freeze:
+			case souper::Inst::Kind::Const:
+				for (auto& operand : inst.Ops)
+
+					CollectInputVariables(*operand, inputVariables);
+				break;
+
+			default:
+			{
+				auto msg = "Unrecognized souper inst kind: " + std::string(inst.getKindName(inst.K));
+				llvm::report_fatal_error(msg.c_str());
+				throw new std::invalid_argument(msg);
+			}
+		}
+	}
+
+
+	DNA_EXPORT void Solve(llvm::Function* function, llvm::CallInst* remillJumpCall, llvm::Value* value, llvm::BasicBlock* indirectJump, llvm::LazyValueInfo* lvi, Dna::Passes::tTrySolveConstant trySolveConstant)
+	{
+		// Setup souper context
+		souper::InstContext IC;
+		souper::ReplacementContext RC;
+		souper::ExprBuilderContext EBC;
+		souper::ExprBuilderOptions EBO;
+		souper::FunctionCandidateSet FCS;
+
+		// Create a persistent klee expression builder. 
+		// This is necessary because we're iteratively building queries with shared state.
+		auto EBP = souper::createKLEEBuilder(IC);
+
+
+		// Extract the path constraints necessary to reach remill_jump.
+		// Note that due to souper limitations, the expectation here is that the value being used is
+		// defined in the same block as the remill_jump intrinsic.
+		// If it's not defined the expectation is that the caller of Solve()
+		// will create an expression *right* before the remill_jump call that looks like:
+		//	%pc_ptr = add i64 %pc_to_solve, i64 0
+		EBO.CandidateFilterInstruction = value;
+		FCS = souper::ExtractCandidates(function, IC, EBC, EBO);
+		auto cand = GetCandidate(FCS, EBO);
+		souper::Inst* pcInst = IC.createVar(cand->Mapping.LHS->Width, "PcInst");
+		auto indirectJumpPathConstraint = EBP->getBlockPCs(pcInst);
+
+		std::vector<ProvedConstant> newOutConstants;
+
+		auto hasSolution = GetSolutions(newOutConstants, *cand->Mapping.LHS, *indirectJumpPathConstraint, IC, trySolveConstant);
+
+		// Create the solving set. 
+		auto unsolvedVariables = std::vector<UnboundableVariableSlice>();
+		auto solvingQueue = std::vector<SolvableLoadOrVariable>();
+		// Push back (value to solve for - which is a pointer in this case, and nullptr which represents the LoadInst operand of SolvableLoadOrVariable).
+		solvingQueue.push_back(SolvableLoadOrVariable(value, nullptr));
+		int ct = 0;
+		while (true)
+		{
+			// Throw if we encounter too many variables that are unboundable.
+			// TODO: Support *multiple* dependant memory loads, so long as they don't recurse into each other. 
+			if (solvingQueue.size() > 4)
+			{
+				throw std::invalid_argument("Failed to solve jump table. Number of unboundable inputs exceeds the maximum of 4.");
+			}
+
+			// Fetch the latest variable we are solving for.
+			auto toSolve = solvingQueue.back();
+
+			// Compute the ptr bitwidth.
+			auto bitWidth = toSolve.LoadInst != nullptr ? toSolve.LoadInst->getType()->getIntegerBitWidth() : 64;
+
+			auto possiblyBoundedIndex = Slice("PcInst" + std::to_string(ct), function, toSolve.Ptr, IC, RC, EBC, EBO);
+			printf("sliced.");
+			ct++;
+
+			// If we've found a boundable variable, then we need to backtrack and 
+			// try solving all of the collected slices using the bounds we have now.
+			// Note that this works for 99.9% of jump tables, but it will fail
+			// if you have like (bounded_load[a]) + (bounded_load[b]) where
+			// bounded load B is encountered first in the backwards slicing.
+			// In reality we should try to bound back as far as possible(up to a maximum depth of ~5-6).
+			llvm::outs() << "trying to solve: ";
+			llvm::outs() << toSolve.Ptr;
+			llvm::outs() << *toSolve.Ptr;
+			llvm::outs() << "\n";
+			printf("checking if bounded.");
+			std::vector<ProvedConstant> outConstants;
+
+			auto hasSolution = GetSolutions(outConstants, *possiblyBoundedIndex, *indirectJumpPathConstraint, IC, trySolveConstant);
+			//auto hasSolution = false;
+			if (hasSolution)
+			{
+				printf("has solution!");
+				// Construct a boundable variable slice instance.
+				auto boundableVariable = BoundableVariableSlice(bitWidth, toSolve.Ptr, possiblyBoundedIndex);
+
+				// Sort the unsolved variables in the order that they must be solved.
+				// I.e. if you have a nested jump table, we order this such that the final 'jmp' target is placed at the
+				// end of the list. Also note that the current boundable variable is not included in the list.
+				std::reverse(solvingQueue.begin(), solvingQueue.end());
+
+				// TODO: Solve the set of outgoing addresses.
+				throw std::invalid_argument("todo!");
+			}
+
+			else
+			{
+				printf("does not have a solution!. Collect the input variables.");
+				// Get all input variables.
+				std::vector<souper::Inst*> inputVariables;
+				printf("getting input variables.");
+				CollectInputVariables(*possiblyBoundedIndex, inputVariables);
+				printf("got input variables");
+				// Throw if there is more than one input variable.
+				if (inputVariables.size() != 1)
+				{
+					auto msg = "Found potentially too many or 0 input variables to unbounded expression.";
+					llvm::report_fatal_error(msg);
+					throw new std::invalid_argument(msg);
+				}
+
+				// Throw if we can't pin the input variable to a single input LLVM IR variable. (This is typically a load).
+				printf("getting src");
+				auto src = inputVariables[0];
+				printf("got src.");
+				auto llvmSrc = src->Origins[0];
+				if (src->Origins.size() != 1)
+				{
+					auto msg = "Found potentially too many or 0 origins to unbounded expression.";
+					llvm::report_fatal_error(msg);
+					throw new std::invalid_argument(msg);
+				}
+
+				llvm::Value* ptr = llvmSrc;
+				if (llvm::LoadInst* load = dyn_cast<llvm::LoadInst>(llvmSrc))
+				{
+					if (llvm::GetElementPtrInst* gep = dyn_cast<llvm::GetElementPtrInst>(load->getOperand(0)))
+					{
+						ptr = gep->getOperand(1);
+					}
+
+					else
+					{
+						auto msg = "Load operand is not a gep. It's probably a function argument or something.";
+						llvm::report_fatal_error(msg);
+						throw new std::invalid_argument(msg);
+					}
+				}
+
+				llvm::outs() << "ptr: ";
+				llvm::outs() << *ptr;
+				llvm::outs() << "\n";
+
+				for (auto queued : solvingQueue)
+				{
+					if (queued.Ptr == ptr)
+					{
+						auto msg = "Encountered recursive solving dependency.";
+						llvm::report_fatal_error(msg);
+						throw new std::invalid_argument(msg);
+					}
+				}
+
+				// Record the set of data necessary to revisit and solve this jump table.
+				// If we can bound one of the predecessors, then we revisit and solve this variable later.
+				auto unboundableVariable = UnboundableVariableSlice(bitWidth, toSolve.Ptr, possiblyBoundedIndex, src);
+				unsolvedVariables.push_back(unboundableVariable);
+
+				// Queue up the ptr for solving.
+				auto maybeSolvable = SolvableLoadOrVariable(ptr, llvmSrc);
+				solvingQueue.push_back(maybeSolvable);
+			}
+		}
+	}
+
+	DNA_EXPORT Dna::API::ImmutableManagedVector* TrySolveAllValues(souper::InstContext* ctx, Dna::API::ImmutableManagedVector* blocksPcs, Dna::API::ImmutableManagedVector* pcs,
+		souper::InstMapping* mapping, souper::Inst* precondition, bool negate, bool dropUb,
+		Dna::Passes::tTrySolveConstant trySolveConstant,
+		int maxSolutions, bool* success
+	)
+	{
+		std::cout << "TrySolveAllValues!" << std::endl;
+		// BlockPC = std::vector<BlockPCMapping>
+		// Cast the managed vector to a vector of <BlockPCMapping> values.
+		std::vector<souper::BlockPCMapping> BPCs;
+		auto bpcPtrs = (std::vector<souper::BlockPCMapping*>*)blocksPcs->items;
+		for (auto blockPc : *bpcPtrs)
+			BPCs.push_back(*blockPc);
+
+		// Cast the managed vector to a vector of <InstMapping>
+		std::vector<souper::InstMapping> PCs;
+		auto pcPtrs = (std::vector<souper::InstMapping*>*)pcs->items;
+		for (auto pc : *pcPtrs)
+			PCs.push_back(*pc);
+
+		// Before we needed to perform clones since souper::BuildQuery expected vectors of value types.
+		// But here no cloning is needed since ModelVars is a vec of reference types.
+
+		std::cout << "creating builder!" << std::endl;
+		auto EB = souper::createKLEEBuilder(*ctx);
+
+		//souper::Inst* Cand = EB->GetCandidateExprForReplacement(BPCs, PCs, *mapping, precondition, negate, dropUb);
+
+		std::cout << "creating solver!" << std::endl;
+		souper::Z3Driver solver(mapping->LHS, PCs, *ctx, BPCs, {}, 1000);
+
+		std::vector<ProvedConstant> RecoveredConstants;
+		auto lhs = mapping->LHS;
+		/*
+		std::vector<souper::Inst*> Preconditions;
+		while (true)
+		{
+			for (const auto& RecoveredConstant : RecoveredConstants) {
+				souper::Inst* NotConstant =
+					ctx.getInst(souper::Inst::Ne, 64, { lhs, RecoveredConstant.I });
+				precondition.push_back(NotConstant);
+			}
+		}*/
+
+		souper::Inst* ConstantVar = ctx->createVar(lhs->Width, "ConstantVar");
+		// Map the variable to the left-hand side
+		souper::InstMapping IM(lhs, ConstantVar);
+
+		//std::cout << "about to solve!" << std::endl;
+		int count = 0;
+		bool solvedAll = false;
+
+		auto Solver = solver.Solver;
+
+		//std::cout << "got solver" << std::endl;
+		std::chrono::steady_clock::time_point begin = std::chrono::steady_clock::now();
+		auto Cond = EB->GetCandidateExprForReplacement(BPCs, PCs, IM, precondition, negate, dropUb);
+	//	std::cout << "got cond" << std::endl;
+		auto one = solver.ctx.bv_val(0, 1);
+	//	std::cout << "got one" << std::endl;
+		solver.Translate(Cond);
+		auto assert = solver.Get(Cond) == one;
+	//	std::cout << "got asert" << std::endl;
+		Solver.add(assert);
+	//	std::cout << "added" << std::endl;
+		do
+		{
+			if (count > maxSolutions)
+			{
+				solvedAll = false;
+				break;
+			}
+
+			count++;
+
+		//	std::cout << "checking: " << std::endl;
+			auto check = Solver.check();
+			if (check == z3::sat)
+			{
+				solver.Model = Solver.get_model();
+				//std::cout << "sat!" << std::endl;
+				auto maybeConstant = solver.getModelVal(ConstantVar);
+				//std::cout << "got maybe constant!" << std::endl;
+				auto constant = maybeConstant.value().getZExtValue();
+			//	std::cout << "got constant!" << std::endl;
+				RecoveredConstants.push_back(ProvedConstant(lhs, constant));
+			//	std::cout << "pushed!" << std::endl;
+				auto imLhs = solver.Get(IM.LHS);
+				//std::cout << "got imLhs!" << std::endl;
+				auto tempCond = imLhs != solver.ctx.bv_val(constant, IM.LHS->Width);
+				//std::cout << "got tempCond!" << std::endl;
+				Solver.add(tempCond);
+				//std::cout << "added tempCond!" << std::endl;
+
+				//std::cout << "out const: " << std::hex << "0x" << constant << " ";
+				//std::cout << "Time difference = " << std::chrono::duration_cast<std::chrono::milliseconds>(end - begin).count() << "[ms]" << std::endl;
+			}
+
+			else if (check == z3::unsat)
+			{
+				printf("found all possible solutions!\n");
+				solvedAll = true;
+				break;
+			}
+
+			else
+			{
+				std::cout << "z3 timeout!" << std::endl;
+			//	printf("timeout!");
+				llvm::report_fatal_error("z3 timeout!");
+				exit(1);
+			}
+		}
+
+		while (true);
+
+		*success = solvedAll;
+		auto vec = new std::vector<uint64_t*>();
+		for (auto& constInt : RecoveredConstants)
+		{
+			auto ptr = new uint64_t;
+			*ptr = constInt.V;
+			vec->push_back(ptr);
+		}
+
+		std::chrono::steady_clock::time_point end = std::chrono::steady_clock::now();
+		std::cout << "Ms spent solving: = " << std::chrono::duration_cast<std::chrono::milliseconds>(end - begin).count() << "[ms]" << std::endl;
+		return Dna::API::ImmutableManagedVector::NonCopyingFrom(vec);
+	}
+
+	DNA_EXPORT void SliceValue(llvm::Function* function, llvm::Value* value)
+	{
+		// Use Souper
+		souper::InstContext IC;
+		souper::ExprBuilderContext EBC;
+		souper::ExprBuilderOptions EBO;
+		souper::FunctionCandidateSet FCS;
+
+		EBO.CandidateFilterInstruction = value;
+		FCS = souper::ExtractCandidates(function, IC, EBC, EBO);
+
+		// Identify the candidate
+		souper::CandidateReplacement* CR = nullptr;
+		int count = 0;
+		for (auto& B : FCS.Blocks) {
+			for (auto& R : B->Replacements) {
+				if ((R.Origin != EBO.CandidateFilterInstruction) || (R.Mapping.LHS->Width != 64))
+					continue;
+				CR = &R;
+				count++;
+			}
+		}
+
+		if (!CR || count > 1)
+			llvm::report_fatal_error("identifyChildren (2): no available candidates!");
+		// Get the solutions
+		souper::Inst* Solution = nullptr;
+		// Create a new variable
+		souper::Inst* ConstantVar = IC.createVar(CR->Mapping.LHS->Width, "ConstantVar");
+		// Map the variable to the left-hand side
+		souper::InstMapping IM(CR->Mapping.LHS, ConstantVar);
+		// Search the valid solutions
+
+		do {
+			std::vector<souper::Inst*> ModelInstructions;
+			std::vector<llvm::APInt> ModelValues;
+			// Populate the preconditions
+			std::vector<souper::Inst*> Preconditions;
+			souper::Inst* Precondition = nullptr;
+			// Build the exclusions
+			/*
+			for (const auto &RecoveredConstant : RecoveredConstants) {
+			  souper::Inst *NotConstant =
+				  IC.getInst(souper::Inst::Ne, 64, {CR->Mapping.LHS, RecoveredConstant.I});
+			  Preconditions.push_back(NotConstant);
+			}
+			 */
+			 // Add the preconditions
+			if (!Preconditions.empty())
+				Precondition = IC.getInst(souper::Inst::And, 1, Preconditions);
+			// Build the query
+			souper::BlockPCs BPCs;
+			std::vector<souper::InstMapping> PCs;
+			// TODO: verify why the BPCs and PCs may lead to no results sometimes
+			// const auto &Query = souper::BuildQuery(IC, CR->BPCs, CR->PCs, IM, &ModelInstructions, Precondition, true);
+			const auto& Query = souper::BuildQuery(IC, BPCs, PCs, IM, &ModelInstructions, Precondition, true);
+			// Debug print the SMT query if requested
+			if (true) {
+				llvm::outs() << "[+] SMT Query:\n";
+				llvm::outs() << Query << "\n";
+			}
+
+
+		}
+
+		while (true);
+	}
 
 	void OptimizeModule(llvm::Module* module,
 		llvm::Function* f,
@@ -127,25 +772,27 @@ namespace Dna::Pipeline
 		llvm::initializeAnalysis(Registry);
 		llvm::initializeTransformUtils(Registry);
 		llvm::initializeInstCombine(Registry);
-		llvm::initializeInstrumentation(Registry);
 		llvm::initializeTargetLibraryInfoWrapperPassPass(Registry);
 		llvm::initializeGlobalsAAWrapperPassPass(Registry);
 		llvm::initializeGVNLegacyPassPass(Registry);
 		llvm::initializeDependenceAnalysisWrapperPassPass(Registry);
+		//llvm::initializeIPSCCPLegacyPassPass(Registry);
 		initializeTarget(Registry);
 
 		// Create pass managers.
-		llvm::legacy::FunctionPassManager FPM(module);
-		llvm::PassManagerBuilder PMB;
+		llvm::FunctionPassManager FPM;
+		//llvm::PassManagerBuilder PMB;
 		llvm::legacy::PassManager module_manager;
-
+		FunctionAnalysisManager FAM;
+		ModulePassManager MPM;
+		ModuleAnalysisManager MAM;
+		llvm::LoopPassManager LPM;
 		// Configure pipeline.
-		PMB.OptLevel = 3;
-		PMB.SizeLevel = 2;
-		PMB.DisableUnrollLoops = true; //!Guide.RunLoopPasses;
-		PMB.RerollLoops = false;
-		PMB.SLPVectorize = false;
-		PMB.LoopVectorize = false;
+	//	PMB.OptLevel = 3;
+	//	PMB.SizeLevel = 2;
+	//	PMB.DisableUnrollLoops = true; //!Guide.RunLoopPasses;
+	//	PMB.SLPVectorize = false;
+	//	PMB.LoopVectorize = false;
 
 
 		/*
@@ -200,7 +847,7 @@ namespace Dna::Pipeline
 		llvm::cl::ParseCommandLineOptions(11, args99999);
 		*/
 
-		/*
+		
 		const char* argv67[12] = { "mesa", "-simplifycfg-sink-common=false",
 				"-memdep-block-number-limit=10000000",
 				"-dse-memoryssa-defs-per-block-limit=10000000",
@@ -215,106 +862,133 @@ namespace Dna::Pipeline
 		};
 
 		llvm::cl::ParseCommandLineOptions(12, argv67);
-			*/
+			
 
 		if (justGVN)
 		{
 			printf("just gvn. \n");
-			FPM.add(llvm::createCFLSteensAAWrapperPass());
-			FPM.add(llvm::createGlobalsAAWrapperPass());
-			FPM.add(llvm::createSCEVAAWrapperPass());
+			//FPM.add(llvm::createCFLSteensAAWrapperPass());
+			//FPM.addPass(llvm::createGlobalsAAWrapperPass());
+			//FPM.addPass(llvm::SCEVAAWrapperPass());
 			//FPM.add(llvm::createTypeBasedAAWrapperPass());
-			FPM.add(llvm::createScopedNoAliasAAWrapperPass());
-			FPM.add(llvm::createBasicAAWrapperPass());
-			//FPM.add(llvm::createLCSSAPass());
+			//MPM.addPass(llvm::ScopedNoAliasAAWrapperPass());
+			//FPM.addPass(llvm::BasicAAWrapperPass());
+			//FPM.addPass(llvm::createLCSSAPass());
 
 			// TODO: Properly pass the alias analysis func ptr.
 			Dna::Passes::ClassifyingAAResult::gGetAliasResult = getAliasResult;
 
-			FPM.add(Dna::Passes::createSegmentsAAWrapperPass());
+			for (int i = 0; i < 100; i++)
+			{
+				printf("TODO: Upgrade SegmentsExternalAAWrapperPass to LLVM16.");
+			}
+			//MPM.addPass(Dna::Passes::createSegmentsAAWrapperPass());
 
-			FPM.add(new Dna::Passes::SegmentsExternalAAWrapperPass());
+			//MPM.addPass(new Dna::Passes::SegmentsExternalAAWrapperPass());
 
-			FPM.add(llvm::createGVNPass(false));
+			FPM.addPass(llvm::GVNPass(llvm::GVNOptions()));
 
-			//FPM.add(llvm::)
+			//FPM.addPass(llvm::)
 
-			PMB.populateFunctionPassManager(FPM);
-			PMB.populateModulePassManager(module_manager);
+			//PMB.populateFunctionPassManager(FPM);
+			//PMB.populateModulePassManager(module_manager);
 
-			FPM.doInitialization();
+			//FPM.doInitialization();
 
-			FPM.run(*f);
+			//FPM.run(*f, FAM);
 
-			FPM.doFinalization();
-
-			module_manager.run(*f->getParent());
+			MPM.addPass(createModuleToFunctionPassAdaptor(std::move(FPM)));
+			MPM.run(*f->getParent(), MAM);
 
 			return;
 		}
 		// Add the alias analysis passes.
 		// Note: CSE i
-		FPM.add(llvm::createEarlyCSEPass(true));
-		FPM.add(llvm::createReassociatePass());
-		FPM.add(llvm::createEarlyCSEPass(true));
-		FPM.add(llvm::createCFLSteensAAWrapperPass());
-		//FPM.add(llvm::createGlobalsAAWrapperPass());
-		FPM.add(llvm::createSCEVAAWrapperPass());
-		//FPM.add(llvm::createTypeBasedAAWrapperPass());
-		//FPM.add(llvm::createScopedNoAliasAAWrapperPass());
-		FPM.add(llvm::createBasicAAWrapperPass());
+		FPM.addPass(llvm::EarlyCSEPass(true));
+		FPM.addPass(llvm::ReassociatePass());
+		FPM.addPass(llvm::EarlyCSEPass(true));
+		//FPM.addPass(llvm::createGlobalsAAWrapperPass());
+		//FPM.addPass(llvm::SCEVAAWrapperPass());
+		//FPM.addPass(llvm::createTypeBasedAAWrapperPass());
+		//FPM.addPass(llvm::createScopedNoAliasAAWrapperPass());
+		//FPM.addPass(llvm::BasicAAWrapperPass());
 		if (runClassifyingAliasAnalysis)
 		{
+			for (int i = 0; i < 100; i++)
+			{
+				printf("TODO: Upgrade SegmentsExternalAAWrapperPass to LLVM16.");
+			}
 			// TODO: Properly pass the alias analysis func ptr.
-			Dna::Passes::ClassifyingAAResult::gGetAliasResult = getAliasResult;
+			//Dna::Passes::ClassifyingAAResult::gGetAliasResult = getAliasResult;
 
-			FPM.add(Dna::Passes::createSegmentsAAWrapperPass());
+			//MPM.addPass(Dna::Passes::createSegmentsAAWrapperPass());
 
-			FPM.add(new Dna::Passes::SegmentsExternalAAWrapperPass());
+			//MPM.addPass(Dna::Passes::SegmentsExternalAAWrapperPass());
 		}
-		FPM.add(llvm::createSROAPass());
-		FPM.add(llvm::createEarlyCSEPass(true));
-		FPM.add(llvm::createSpeculativeExecutionPass());
-		FPM.add(llvm::createJumpThreadingPass(99999));
-		FPM.add(llvm::createCorrelatedValuePropagationPass());
-		FPM.add(llvm::createCFGSimplificationPass());
+		FPM.addPass(llvm::SROAPass({}));
+		FPM.addPass(llvm::EarlyCSEPass(true));
+		FPM.addPass(llvm::SpeculativeExecutionPass());
+		FPM.addPass(llvm::JumpThreadingPass(99999));
+		FPM.addPass(llvm::CorrelatedValuePropagationPass());
+		FPM.addPass(llvm::SimplifyCFGPass());
 
+	
+		//FPM.addPass(llvm::CallSiteSplittingPass());
+
+		//FPM.addPass(llvm::createIPSCCPPass());
+
+		//FPM.addPass(llvm::createCalledValuePropagationPass());
+		FPM.addPass(llvm::PromotePass());
+		FPM.addPass(llvm::InstCombinePass());
+		FPM.addPass(llvm::SpeculativeExecutionPass());
+		
+		//FPM.addPass(llvm::LazyValueInfo());
+		FPM.addPass(llvm::JumpThreadingPass(999999));
+		FPM.addPass(llvm::JumpThreadingPass(-1));
+		FPM.addPass(llvm::CorrelatedValuePropagationPass());
+		LPM.addPass(llvm::LoopSimplifyCFGPass());
+
+
+		FPM.addPass(llvm::GVNPass(llvm::GVNOptions()));
+		FPM.addPass(llvm::SCCPPass());
+		FPM.addPass(llvm::BDCEPass());
+		
 
 		// Add various optimization passes.
-		FPM.add(llvm::createInstructionCombiningPass());
-		FPM.add(llvm::createJumpThreadingPass());
-		FPM.add(llvm::createCorrelatedValuePropagationPass());
-		FPM.add(llvm::createCFGSimplificationPass());
-		FPM.add(llvm::createAggressiveInstCombinerPass());
-		FPM.add(llvm::createInstructionCombiningPass());
-		FPM.add(llvm::createReassociatePass());
-		FPM.add(llvm::createSROAPass());
-		//FPM.add(llvm::createMergedLoadStoreMotionPass());
-		FPM.add(llvm::createNewGVNPass());
-		FPM.add(llvm::createSCCPPass());
-		FPM.add(llvm::createBitTrackingDCEPass());
-		//FPM.add(llvm::createInstructionCombiningPass());
-		FPM.add(llvm::createDeadStoreEliminationPass());
+		FPM.addPass(llvm::InstCombinePass());
+		FPM.addPass(llvm::JumpThreadingPass());
+		FPM.addPass(llvm::CorrelatedValuePropagationPass());
+		FPM.addPass(llvm::SimplifyCFGPass());
+		//FPM.addPass(llvm::createAggressiveInstCombinerPass());
+		FPM.addPass(llvm::InstCombinePass());
+		FPM.addPass(llvm::ReassociatePass());
+		FPM.addPass(llvm::SROAPass({}));
+		//FPM.addPass(llvm::createMergedLoadStoreMotionPass());
+		FPM.addPass(llvm::NewGVNPass());
+		FPM.addPass(llvm::SCCPPass());
+		FPM.addPass(llvm::BDCEPass());
+		//FPM.addPass(llvm::InstCombinePass());
+		FPM.addPass(llvm::DSEPass());
 
-		FPM.add(llvm::createGVNHoistPass());
-		FPM.add(llvm::createNewGVNPass());
-		FPM.add(llvm::createGVNPass(false));
+		FPM.addPass(llvm::GVNHoistPass());
+		FPM.addPass(llvm::NewGVNPass());
+		FPM.addPass(llvm::GVNPass(llvm::GVNOptions()));
 		// Note: This legacy GVN pass is necessary for DSE to work properly.
 
 
-		FPM.add(llvm::createAggressiveDCEPass());
-		FPM.add(llvm::createCFGSimplificationPass());
-		FPM.add(llvm::createInstructionCombiningPass());
-		FPM.add(llvm::createDeadStoreEliminationPass()); // added
-		FPM.add(llvm::createCFGSimplificationPass());    // added
-		FPM.add(llvm::createInstructionCombiningPass()); // added
-		FPM.add(llvm::createCFGSimplificationPass());    // added
-		FPM.add(llvm::createDeadStoreEliminationPass()); // added
-		FPM.add(llvm::createGVNPass(true));
-		if (runConstantConcretization)
-			FPM.add(Dna::Passes::getConstantConcretizationPassPass(readBinaryContents)); // added
-		FPM.add(llvm::createDeadStoreEliminationPass()); // added
-		FPM.add(llvm::createGVNPass(true));
+		FPM.addPass(llvm::ADCEPass());
+		FPM.addPass(llvm::SimplifyCFGPass());
+		FPM.addPass(llvm::InstCombinePass());
+		FPM.addPass(llvm::DSEPass()); // added
+		FPM.addPass(llvm::SimplifyCFGPass());    // added
+		FPM.addPass(llvm::InstCombinePass()); // added
+		FPM.addPass(llvm::SimplifyCFGPass());    // added
+		FPM.addPass(llvm::DSEPass()); // added
+		FPM.addPass(llvm::GVNPass(llvm::GVNOptions()));
+		//if (runConstantConcretization)
+		//	FPM.addPass(Dna::Passes::getConstantConcretizationPassPass(readBinaryContents)); // added
+		FPM.addPass(llvm::DSEPass()); // added
+		FPM.addPass(llvm::GVNPass(llvm::GVNOptions()));
 
 		if (true)
 		{
@@ -325,10 +999,11 @@ namespace Dna::Pipeline
 				llvm::cl::ParseCommandLineOptions(2, args3);
 				const char* args4[2] = { "testfiyr", "-memdep-block-scan-limit=1000000" };
 				llvm::cl::ParseCommandLineOptions(2, args4);
-				FPM.add(llvm::createLoopUnrollPass(3, false, false, 9999999999, -1, 1));
+				FPM.addPass(llvm::createLoopUnrollPass(3, false, false, 9999999999, -1, 1));
 				*/
 
-			FPM.add(llvm::createLoopUnrollPass(3, false, false, 2000, -1, 1));
+			//LPM.addPass((llvm::LoopUnrollPass*)llvm::createLoopUnrollPass(3, false, false, 2000, -1, 1));
+			FPM.addPass(llvm::LoopUnrollPass(llvm::LoopUnrollOptions(3, false, false)));
 		}
 
 		//const char* args17[2] = { "testfiyr", "-memdep-block-scan-limit=1000000" };
@@ -345,54 +1020,53 @@ namespace Dna::Pipeline
 			}
 		}
 		*/
-		FPM.add(llvm::createIndVarSimplifyPass());
-		FPM.add(llvm::createConstraintEliminationPass());
+		LPM.addPass(llvm::IndVarSimplifyPass());
+		//FPM.addPass(llvm::CreateConstraintEliminationPass());
 
-		FPM.add(llvm::createSROAPass());
-		FPM.add(llvm::createEarlyCSEPass());
-		FPM.add(llvm::createDeadStoreEliminationPass()); // added
-		FPM.add(llvm::createSCCPPass());
-		FPM.add(llvm::createSROAPass());
-		FPM.add(llvm::createAggressiveDCEPass());
-		//FPM.add(llvm::createReassociatePass());
+		FPM.addPass(llvm::SROAPass({}));
+		FPM.addPass(llvm::EarlyCSEPass());
+		FPM.addPass(llvm::DSEPass()); // added
+		FPM.addPass(llvm::SCCPPass());
+		FPM.addPass(llvm::SROAPass({}));
+		FPM.addPass(llvm::ADCEPass());
+		//FPM.addPass(llvm::createReassociatePass());
 
 		// Note: We should avoid pointer PHIs here.
 		if (false)
 		{
-			FPM.add(llvm::createCFGSimplificationPass());
-			FPM.add(llvm::sl::createControlledNodeSplittingPass());
-			FPM.add(llvm::createCFGSimplificationPass());
-			FPM.add(llvm::sl::createUnswitchPass());
+			FPM.addPass(llvm::SimplifyCFGPass());
+			//FPM.addPass(new llvm::sl::ControlledNodeSplittingPass());
+			FPM.addPass(llvm::SimplifyCFGPass());
+		//	FPM.addPass(llvm::sl::createUnswitchPass());
 		}
 
-		//FPM.add(llvm::createLoopRotatePass());
+		//FPM.addPass(llvm::createLoopRotatePass());
 
 
-		FPM.add(llvm::createGVNPass(false));
-		//FPM.add(llvm::createFixIrreduciblePass());
+		FPM.addPass(llvm::GVNPass(llvm::GVNOptions()));
+		//FPM.addPass(llvm::createFixIrreduciblePass());
 
-		//FPM.add(llvm::createFixIrreduciblePass());
-		//FPM.add(llvm::createGVNPass(false));
-		//FPM.add(llvm::createNewGVNPass());
-		//FPM.add(llvm::createStructurizeCFGPass());
+		//FPM.addPass(llvm::createFixIrreduciblePass());
+		//FPM.addPass(llvm::createGVNPass(false));
+		//FPM.addPass(llvm::createNewGVNPass());
+		//FPM.addPass(llvm::createStructurizeCFGPass());
 
 
-		bool cns = true;
+		bool cns = false;
 		if (cns)
 		{
-			FPM.add(llvm::createCFGSimplificationPass());
-			FPM.add(llvm::sl::createControlledNodeSplittingPass());
-			FPM.add(llvm::createCFGSimplificationPass());
-			FPM.add(llvm::sl::createUnswitchPass());       // get rid of all switch instructions
-			FPM.add(llvm::createLoopSimplifyCFGPass());    // ensure all exit blocks are dominated by
+			FPM.addPass(llvm::SimplifyCFGPass());
+			FPM.addPass(llvm::sl::ControlledNodeSplittingPass());
+			FPM.addPass(llvm::sl::UnswitchPass());       // get rid of all switch instructions
+			LPM.addPass(llvm::LoopSimplifyCFGPass());    // ensure all exit blocks are dominated by
 			// the loop header
-			FPM.add(llvm::sl::createLoopExitEnumerationPass());  // ensure all loops have <= 1 exits
-			FPM.add(llvm::sl::createUnswitchPass());       // get rid of all switch instructions
+			//FPM.addPass(llvm::sl::LoopExitEnumerationPass());  // ensure all loops have <= 1 exits
+			FPM.addPass(llvm::sl::UnswitchPass());       // get rid of all switch instructions
 			// introduced by the loop exit enumeration
 
-			FPM.add(llvm::sl::createControlledNodeSplittingPass());
+			FPM.addPass(llvm::sl::ControlledNodeSplittingPass());
 
-		//	FPM.add(new Dna::Passes::ControlFlowStructuringPass());
+		//	FPM.addPass(new Dna::Passes::ControlFlowStructuringPass());
 		}
 
 		printf("running.");
@@ -400,39 +1074,39 @@ namespace Dna::Pipeline
 		if(structureFunction != nullptr)
 		{
 			printf("countcf.");
-			FPM.add(new Dna::Passes::ControlFlowStructuringPass(structureFunction));
+			//llvm::FunctionPass* fp = new Dna::Passes::ControlFlowStructuringPass(structureFunction);
+			FPM.addPass(Dna::Passes::ControlFlowStructuringPass(structureFunction));
 		}
 
-		//FPM.add(llvm::createFixIrreduciblePass());
-		//FPM.add(llvm::createStructurizeCFGPass());
+		//FPM.addPass(llvm::createFixIrreduciblePass());
+		//FPM.addPass(llvm::createStructurizeCFGPass());
 
-		PMB.populateFunctionPassManager(FPM);
-		PMB.populateModulePassManager(module_manager);
+	//	PMB.populateFunctionPassManager(FPM);
+	//	PMB.populateModulePassManager(module_manager);
 
 		if (false)
 		{
-			auto structuringPass = (llvm::sl::StructuredControlFlowPass*)llvm::sl::createASTComputePass();
-			module_manager.add(structuringPass);
+			//auto structuringPass = (llvm::sl::StructuredControlFlowPass*)llvm::sl::createASTComputePass();
+			//MPM.addPass(llvm::sl::StructuredControlFlowPass());
 		}
 
 
-		FPM.doInitialization();
 
 		try
 		{
+			MPM.addPass(createModuleToFunctionPassAdaptor(std::move(FPM)));
+			MPM.run(*f->getParent(), MAM);
 			//f->dump();
 
-			FPM.run(*f);
+			//FPM.run(*f, FAM);
 		}
 
 		catch (...)
 		{
-			printf("excasdesption\n");
+			printf("exception\n");
 			//f->dump();
-			printf("brasdasduh.");
 		}
-		FPM.doFinalization();
 
-		module_manager.run(*f->getParent());
+		//module_manager.run(*f->getParent());
 	}
 }

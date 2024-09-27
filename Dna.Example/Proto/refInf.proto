@@ -1,0 +1,33 @@
+syntax = "proto2";
+
+package RefInf;
+
+message RefList{
+  repeated Reference ref = 1;
+// belows are deprecated
+  optional uint64 text_start = 2 [default = 0];
+  optional uint64 text_end = 3[default = 0];
+  optional uint64 rodata_start = 4[default = 0];
+  optional uint64 rodata_end = 5[default = 0];
+  optional uint64 data_start = 6[default = 0];
+  optional uint64 data_end = 7[default = 0];
+  optional uint64 datarel_start = 8[default = 0];
+  optional uint64 datarel_end = 9[default = 0];
+  optional uint64 initarray_start = 10[default = 0];
+  optional uint64 initarray_end = 11[default = 0];
+}
+
+message Reference{
+  required uint64 ref_va = 1;
+  required uint32 ref_size = 2;
+  optional uint64 target_va = 3;
+  enum RefKind {
+    C2C = 0;
+    C2D = 1;
+    D2C = 2;
+    D2D = 3;
+  }
+  optional RefKind kind = 4;
+  optional bool jt_entry = 5;
+  optional bool is_rela = 6;
+}

@@ -1,6 +1,8 @@
-﻿using Iced.Intel;
+﻿using Dna.Relocation;
+using Iced.Intel;
 using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.Linq;
 using System.Runtime.CompilerServices;
 using System.Text;
@@ -74,6 +76,14 @@ namespace Dna.Extensions
             return false;
         }
 
+        public static bool IsCall(this FlowControl flowControl)
+        {
+            if (flowControl == FlowControl.Call || flowControl == FlowControl.IndirectCall)
+                return true;
+
+            return false;
+        }
+
         public static bool IsRet(this FlowControl flowControl)
         {
             return flowControl == FlowControl.Return;
@@ -128,6 +138,65 @@ namespace Dna.Extensions
                 default:
                     throw new InvalidOperationException(String.Format("Operand {0} is not a branch.", kind));
             }
+        }
+
+        public static bool HasImmediateBranchTarget(this Instruction instruction)
+        {
+            switch (instruction.Op0Kind)
+            {
+                case OpKind.FarBranch16:
+                case OpKind.FarBranch32:
+                case OpKind.NearBranch16:
+                case OpKind.NearBranch32:
+                case OpKind.NearBranch64:
+                case OpKind.Immediate16:
+                case OpKind.Immediate32:
+                case OpKind.Immediate32to64:
+                case OpKind.Immediate64:
+                case OpKind.Immediate8:
+                case OpKind.Immediate8to16:
+                case OpKind.Immediate8to32:
+                case OpKind.Immediate8to64:
+                case OpKind.Immediate8_2nd:
+                    return true;
+                default:
+                    return false;
+            }
+        }
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public static ulong GetImmediateBranchTarget(this Instruction instruction)
+        {
+            switch (instruction.Op0Kind)
+            {
+                case OpKind.FarBranch16:
+                    return instruction.FarBranch16;
+                case OpKind.FarBranch32:
+                    return instruction.FarBranch32;
+                case OpKind.NearBranch16:
+                    return instruction.NearBranch16;
+                case OpKind.NearBranch32:
+                    return instruction.NearBranch32;
+                case OpKind.NearBranch64:
+                    return instruction.NearBranch64;
+                case OpKind.Immediate16:
+                case OpKind.Immediate32:
+                case OpKind.Immediate32to64:
+                case OpKind.Immediate64:
+                case OpKind.Immediate8:
+                case OpKind.Immediate8to16:
+                case OpKind.Immediate8to32:
+                case OpKind.Immediate8to64:
+                case OpKind.Immediate8_2nd:
+                    return instruction.GetImmediate(0);
+                default:
+                    throw new InvalidOperationException(String.Format("Operand kind {0} is not a branch.", instruction.Op0Kind));
+            }
+        }
+
+        public static byte[] GetBytes(this Instruction instruction)
+        {
+            return InstructionEncoder.EncodeInstruction(instruction, instruction.IP);
         }
     }
 }

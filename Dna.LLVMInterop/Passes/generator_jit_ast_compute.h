@@ -46,7 +46,7 @@ class StructuredFunction;
 
 /// This pass computes a structured control flow above the LLVM control flow.
 /// Irreducible control flow is removed using "Controlled Node Splitting".
-class StructuredControlFlowPass : public ModulePass
+class StructuredControlFlowPass : public PassInfoMixin<StructuredControlFlowPass>
 {
 public:
     static char ID;
@@ -57,17 +57,10 @@ public:
     explicit StructuredControlFlowPass();
 
     /// Destructor.
-    ~StructuredControlFlowPass() override;
-
-    void getAnalysisUsage(
-        AnalysisUsage &usage) const final;
-
-    StringRef getPassName() const final {
-        return "Structured Control Flow";
-    }
+    ~StructuredControlFlowPass();
 
     /// Process a whole module.
-    bool runOnModule(Module &M) final;
+    PreservedAnalyses run(Module& M, ModuleAnalysisManager& AM);
 
     /// Get the structured function for the given LLVM function.
     /// Returns nullptr, if the LLVM function is unknown.
@@ -83,57 +76,48 @@ public:
 
 private:
 
-private:
+public:
     /// Map from LLVM functions to structured functions.
     std::map<llvm::Function *, StructuredFunction *> m_structured_function_map;
 };
 
 /// Creates a new AST compute pass.
 ///
-Pass *createASTComputePass();
+StructuredControlFlowPass*createASTComputePass();
 
 
 /// This pass ensures that loops only have one exit node as preparation
 // for the StructuredControlFlowPass.
-class LoopExitEnumerationPass : public FunctionPass
+class LoopExitEnumerationPass : public PassInfoMixin<LoopExitEnumerationPass>
 {
 public:
     static char ID;
 
 public:
-    LoopExitEnumerationPass();
+    explicit LoopExitEnumerationPass();
 
-    void getAnalysisUsage(AnalysisUsage &usage) const final;
-
-    bool runOnFunction(Function& function) final;
-
-    StringRef getPassName() const final {
-        return "Loop exit enumeration";
-    }
+    PreservedAnalyses run(Function& function, FunctionAnalysisManager& fam);
 };
 
-Pass *createLoopExitEnumerationPass();
+LoopExitEnumerationPass *createLoopExitEnumerationPass();
 
 /// This pass converts switches to if cascades.
-class UnswitchPass : public FunctionPass
+class UnswitchPass : public PassInfoMixin<UnswitchPass>
 {
 public:
     static char ID;
 
 public:
-    UnswitchPass();
+    explicit UnswitchPass();
 
-    void getAnalysisUsage(llvm::AnalysisUsage &usage) const final;
+   // void getAnalysisUsage(llvm::AnalysisUsage &usage) const final;
 
-    bool runOnFunction(Function &function) final;
+    PreservedAnalyses run(Function& f, FunctionAnalysisManager& fam);
 
-    StringRef getPassName() const final {
-        return "Unswitch";
-    }
 
-private:
+public:
     /// Fixes the PHI nodes in the given block, when the predecessor old_pred is replaced
-    /// by new_pred.
+    /// by new_pred. 
     static void fixPhis(
         BasicBlock *bb,
         BasicBlock *old_pred,
@@ -142,7 +126,7 @@ private:
 };
 
 /// Creates the "unswitch" pass.
-Pass *createUnswitchPass();
+UnswitchPass* createUnswitchPass();
 
 } // sl;
 } // llvm;

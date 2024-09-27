@@ -21,11 +21,6 @@ namespace Dna
         public BinaryDisassembler BinaryDisassembler { get; }
 
         /// <summary>
-        /// <see cref="IDna.LinearSweep"/>
-        /// </summary>
-        public ICfgReconstructor LinearSweep { get; }
-
-        /// <summary>
         /// <see cref="IDna.RecursiveDescent"/>
         /// </summary>
         public ICfgReconstructor RecursiveDescent { get; }
@@ -34,7 +29,6 @@ namespace Dna
         {
             Binary = binary;
             BinaryDisassembler = new BinaryDisassembler(binary);
-            LinearSweep = new LinearSweepReconstructor(this);
             RecursiveDescent = new RecursiveDescentReconstructor(this);
         }
     }

@@ -1,0 +1,127 @@
+﻿
+using Dna.Binary.Windows;
+using Dna.BinaryTranslator.Unsafe;
+using Dna.ControlFlow;
+using Dna.LLVMInterop.API.Remill.Arch;
+using LLVMSharp.Interop;
+using Rivers.Analysis.Partitioning;
+using System;
+using System.Collections.Generic;
+using System.Diagnostics;
+using System.Linq;
+using System.Text;
+using System.Threading.Tasks;
+
+namespace Dna.Decompiler.GroundTruth
+{
+    public class DisassemblyGroundTruth
+    {
+        public void Run()
+        {
+            var mod = Blocks.module.Parser.ParseFrom(File.ReadAllBytes(@"C:\Users\colton\Downloads\Calc\Block-idaBlocks-notepad++.exe.pb"));
+            var functionsWithJumpTables = mod.Fuc.Where(x => x.Bb.Any(x => x.Child.Count > 2)).ToList();
+            foreach (var func in functionsWithJumpTables)
+            {
+
+                Console.WriteLine("func: " + func.Va.ToString("X"));
+                //  foreach(var bblok in item.Bb)
+                //      Console.WriteLine("child block: " + bblok.Va.ToString("X"));
+
+                foreach (var bblok in func.Bb.Where(x => x.Child.Count > 2))
+                {
+                    Console.WriteLine("    dispatcher block: " + (bblok.Va).ToString("X") + " at parent " + bblok.Parent.ToString("X"));
+                }
+            }
+
+            Console.WriteLine("");
+            Console.WriteLine("");
+
+            var bin = WindowsBinary.From(@"C:\Users\colton\Downloads\Calc\notepad++.exe");
+            var dna = new Dna(bin);
+            var ctx = LLVMContextRef.Global;
+            var arch = new RemillArch(ctx, RemillOsId.kOSLinux, RemillArchId.kArchAMD64_AVX512);
+
+            ulong lastFunc = 0;
+            foreach (var func in functionsWithJumpTables.Skip(4))
+            {
+                lastFunc = func.Va;
+                Console.WriteLine($"Lifting func: {func.Va.ToString("X")}");
+
+                // 0x140098660 = sane cfg that requires iterative solving
+                // 0x1400B5110 = pathological notepad++ function
+                IterativeFunctionTranslator.Translate(dna, arch, LLVMContextRef.Global, 0x14014AD80);
+            }
+
+            Console.WriteLine(lastFunc);
+            Console.WriteLine("Done.");
+            Debugger.Break();
+        }
+
+        public void RunOld()
+        {
+            Console.WriteLine("running");
+            Debugger.Break();
+
+            var bin = new LinuxBinary(64, File.ReadAllBytes(@"C:\Users\colton\source\repos\x86_dataset\linux\libs\clang_O0\libtiff.so.5.4.0"), 0);
+
+
+
+            var dna = new Dna(bin);
+            var cfg = dna.RecursiveDescent.ReconstructCfg(0x2C570);
+            //Console.WriteLine(GraphFormatter.FormatGraph(cfg));
+
+            var module = Blocks.module.Parser.ParseFrom(File.ReadAllBytes(@"C:\Users\colton\source\repos\x86_dataset\linux\libs\clang_O0\gtBlock_libtiff.so.5.4.0.pb"));
+
+            /*
+            var fooBar = module.Fuc.Single(x => x.Va == 0x1B380);
+            Console.WriteLine($"Function: {fooBar.Va.ToString("X")}");
+            foreach (var block in fooBar.Bb)
+            {
+                //if (block.Parent != fooBar.Va)
+                //    continue;
+                //Console.WriteLine(block.HasVa);
+                Console.WriteLine(" - 0x" + block.Va.ToString("X"));
+            }
+            */
+
+            var target = module.Fuc.Where(x => x.Bb.Any(x => x.Child.Count > 2)).ToList();
+            foreach(var item in target)
+            {
+
+                Console.WriteLine("func: " + item.Va.ToString("X"));
+              //  foreach(var bblok in item.Bb)
+              //      Console.WriteLine("child block: " + bblok.Va.ToString("X"));
+
+                foreach (var bblok in item.Bb.Where(x => x.Child.Count > 2))
+                {
+                    Console.WriteLine("    dispatcher block: " + bblok.Va.ToString("X") + " at parent " + bblok.Parent.ToString("X"));
+                }
+            }
+            //Console.WriteLine(target.First().Va.ToString("X"));
+
+            //egregious jump table case: 3005C
+            ulong firstCase = 0x14CA0;
+            firstCase = 0x1FE4D;
+            firstCase = 0x2FC00; // egregious case
+            //firstCase = 0x2FFF6; // Literally perfect case to test on: right before the egregious jump. Jump table analysis works fine here.
+            //firstCase = 0x54C40;
+            //firstCase = 0x02C570;
+            //firstCase = 0x21070;
+            firstCase = 0x1FD90;
+            firstCase = 0x157A0;
+            firstCase = 0x36410; // 4 jtables
+            firstCase = 0x23A50;
+            firstCase = 0x157A0;
+            //firstCase = 0x0AA70;
+            var ctx = LLVMContextRef.Global;
+            //var sbt = new IterativeFunctionTranslator(dna, ctx);
+            //sbt.LiftFunction(firstCase);
+            var arch = new RemillArch(ctx, RemillOsId.kOSWindows, RemillArchId.kArchAMD64_AVX512);
+            IterativeFunctionTranslator.Translate(dna, arch, LLVMContextRef.Global, firstCase);
+
+
+            Console.WriteLine(module);
+            Console.WriteLine("");
+        }
+    }
+}

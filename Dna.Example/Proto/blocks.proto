@@ -1,0 +1,59 @@
+syntax = "proto2";
+
+package blocks;
+
+message module{
+  repeated Function fuc = 1;
+  optional uint64 text_start = 2 [default = 0];
+  optional uint64 text_end = 3 [default = 0];
+  optional bool split_block = 4 [default = false]; // split the basic block by `call` instruction
+}
+
+message Function{
+  required uint64 va = 1;
+  repeated BasicBlock bb = 2;
+  repeated CalledFunction calledFunction= 3;
+  optional uint32 type = 4 [default = 0]; // 0 represents that the function is normal.
+					  // 1 represents that the function is `dummy`.
+					  // As we can't collect correct function information from handwritten assemble file
+					 // So we create a dummy function for every handwritten assemble object
+}
+
+message CalledFunction{
+  required uint64 va = 1;
+}
+
+message Child{
+  required uint64 va = 1;
+}
+
+message Instruction{
+  required uint64 va = 1;
+  optional uint32 size = 2 [default = 0];
+  optional uint32 call_type = 3 [default = 0]; // 1 is direct call or indirect call, 2 is indirect call, 3 is direct call.
+}
+
+message BasicBlock{
+  required uint64 va = 1;
+  required uint64 parent = 2;
+  repeated Child child = 3;
+  repeated Instruction instructions = 4;
+  optional uint32 size = 5 [default = 0]; // basic block actual size, not include padding
+  optional uint32 padding = 6 [default = 0];
+  optional uint32 type = 7 [default = 0]; // other type
+					    // direct call instruction
+				    // indirect call instruction
+				    //ret instruction
+				    //conditional jump(direct)
+				    //direct jump
+				    //indirect jump
+				    //jump table
+				    //non-return function call
+				    //fall_through
+				    //overlapping instruction(not used)
+				    //tail call
+				    // fall through to another function. these two functin share some codes
+				    // jump to another function start, but in current functin range. that is                       these two function share some codes
+				    // dummy jump table
+ optional bool terminate = 8 [default = false]; // does this block contains terminate instruction, like ud2
+}

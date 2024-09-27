@@ -1187,26 +1187,27 @@ namespace llvm {
             return changed;
         }
 
-        // Constructor.
-        ControlledNodeSplittingPass::ControlledNodeSplittingPass()
-            : FunctionPass(ID)
-        {
-        }
-
         // Run this pass on the given function.
-        bool ControlledNodeSplittingPass::runOnFunction(Function& function)
+        PreservedAnalyses ControlledNodeSplittingPass::run(Function& function, FunctionAnalysisManager& AM)
         {
             CNSFunction astFunction(function);
 
             CNSLimitGraph LG(astFunction);
 
-            return LG.removeIrreducibleControlFlow();
+            bool changed = LG.removeIrreducibleControlFlow();
+
+            if (changed)
+            {
+                return PreservedAnalyses::none();
+            }
+
+            return PreservedAnalyses::all();
         }
 
         char ControlledNodeSplittingPass::ID = 0;
 
         //------------------------------------------------------------------------------
-        Pass* createControlledNodeSplittingPass()
+        ControlledNodeSplittingPass* createControlledNodeSplittingPass()
         {
             return new ControlledNodeSplittingPass();
         }

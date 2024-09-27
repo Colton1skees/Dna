@@ -48,7 +48,7 @@ namespace Dna.Binary.Windows
             var section = ELFFile.Sections
                 .Where(x => x is Section<ulong>)
                 .Cast<Section<ulong>>()
-                .Single(x => x.LoadAddress <= offset && (x.LoadAddress + x.Size) >= (offset + (ulong)count));
+                .Single(x => x.LoadAddress <= offset && (x.LoadAddress + x.Size) >= (offset + (ulong)count) && (x.Name == ".text" || x.Name == ".rodata"));
 
             // Allocate a buffer to store the results in.
             byte[] buffer = new byte[count];

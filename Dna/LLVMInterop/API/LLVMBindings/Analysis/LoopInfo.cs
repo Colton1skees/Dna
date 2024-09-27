@@ -17,6 +17,11 @@ namespace Dna.LLVMInterop.API.LLVMBindings.Analysis
 
         public IReadOnlyList<Loop> TopLevelLoops => GetTopLevelLoops();
 
+        public unsafe LoopInfo()
+        {
+            Handle = (nint)NativeLoopInfoApi.Constructor();
+        }
+
         public LoopInfo(nint handle)
         {
             this.Handle = handle;
@@ -48,7 +53,11 @@ namespace Dna.LLVMInterop.API.LLVMBindings.Analysis
             return managedVec.Items;
         }
 
-        public unsafe Loop GetLoopFor(LLVMBasicBlockRef block) => NativeLoopInfoApi.GetLoopFor(this, block);
+        public unsafe Loop? GetLoopFor(LLVMBasicBlockRef block)
+        {
+            var ptr = NativeLoopInfoApi.GetLoopFor(this, block);
+            return ptr == null ? (Loop?)null : ptr;
+        }
 
         public unsafe uint GetLoopDepth(LLVMBasicBlockRef block) => NativeLoopInfoApi.GetLoopDepth(this, block);
 

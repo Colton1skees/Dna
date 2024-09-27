@@ -1,4 +1,6 @@
-﻿using AsmResolver.PE.File;
+﻿using AsmResolver;
+using AsmResolver.Patching;
+using AsmResolver.PE.File;
 using AsmResolver.PE.File.Headers;
 using System;
 using System.Collections.Generic;
@@ -33,14 +35,6 @@ namespace Dna.Binary.Windows
             Bytes = binaryBytes;
             PEFile = PEFile.FromBytes(binaryBytes);
             BaseAddress = baseAddress.HasValue ? baseAddress.Value : PEFile.OptionalHeader.ImageBase;
-
-            var tempFix = binaryBytes.ToList();
-            for(ulong i = 0; i < 1000; i++)
-            {
-                tempFix.Add(0x90);
-            }
-
-            Bytes = tempFix.ToArray();
         }
 
         /// <inheritdoc cref="IBinary.ReadBytes(ulong, int)"/>
@@ -66,6 +60,31 @@ namespace Dna.Binary.Windows
 
             // Write the raw data to the binary.
             Array.Copy(bytes, 0, Bytes, (int)PEFile.RvaToFileOffset((uint)offset), bytes.Length);
+        }
+
+        public void WriteMutableByte(ulong address, byte input)
+        {
+            var offset = address - BaseAddress;
+            var seg = PEFile.GetSectionContainingRva((uint)offset);
+
+            var segBytes = seg.ToArray();
+            Array.Copy(new byte[] { input }, 0, segBytes, (int)(offset - seg.Rva), 1);
+            var physicalContents = new DataSegment(segBytes);
+            seg.Contents = new VirtualSegment(physicalContents, seg.Contents.GetVirtualSize());
+            PEFile.UpdateHeaders();
+        }
+
+        public void WriteMutableBytes(ulong address, byte[] input)
+        {
+            for(int i = 0; i < input.Length; i++)
+            {
+                WriteMutableByte(address + (ulong)i, input[i]);
+            }
+        }
+
+        public static WindowsBinary From(string filePath, ulong? baseAddress = null)
+        {
+            return new WindowsBinary(64, File.ReadAllBytes(filePath), baseAddress);
         }
     }
 }

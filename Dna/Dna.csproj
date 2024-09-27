@@ -34,7 +34,6 @@
   </ItemGroup>
 
   <ItemGroup>
-    <None Include="..\..\llvm-project-15.0.7.src\llvm\build\RelWithDebInfo\bin\LLVM-C.dll" />
     <None Include="..\x64\Release\Dna.LLVMInterop.dll" Link="Dna.LLVMInterop.dll">
       <CopyToOutputDirectory>Always</CopyToOutputDirectory>
     </None>
@@ -44,11 +43,14 @@
   </ItemGroup>
 
   <ItemGroup>
-    <PackageReference Include="AsmResolver" Version="4.9.0" />
-    <PackageReference Include="AsmResolver.PE.File" Version="4.9.0" />
+    <PackageReference Include="AsmResolver" Version="5.3.0" />
+    <PackageReference Include="AsmResolver.PE" Version="5.3.0" />
+    <PackageReference Include="AsmResolver.PE.File" Version="5.3.0" />
+    <PackageReference Include="AutomaticGraphLayout" Version="1.1.12" />
     <PackageReference Include="ELFSharp" Version="2.16.1" />
     <PackageReference Include="Iced" Version="1.17.0" />
-    <PackageReference Include="LLVMSharp" Version="15.0.0-beta1" />
+    <PackageReference Include="LLVMSharp" Version="16.0.0" />
+    <PackageReference Include="LLVMSharp.Interop" Version="16.0.0" />
     <PackageReference Include="Microsoft.Z3" Version="4.11.2" />
     <PackageReference Include="Rivers" Version="0.1.0" />
     <PackageReference Include="WebAssembly" Version="1.2.1" />

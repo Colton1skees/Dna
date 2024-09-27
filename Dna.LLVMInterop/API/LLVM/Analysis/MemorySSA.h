@@ -156,8 +156,8 @@ namespace Dna::API {
 	DNA_EXPORT llvm::MemoryLocation* MemoryLocation_GetOrNone(llvm::Instruction* instruction)
 	{
 		auto result = llvm::MemoryLocation::getOrNone(instruction);
-		if (result.hasValue())
-			return new llvm::MemoryLocation(result.getValue());
+		if (result.has_value())
+			return new llvm::MemoryLocation(result.value());
 		return nullptr;
 	}
 

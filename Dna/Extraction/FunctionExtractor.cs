@@ -10,12 +10,11 @@ using System.Threading.Tasks;
 
 namespace Dna.Extraction
 {
-    /// <inheritdoc cref="IFunctionExtractor" />
-    public class FunctionExtractor : IFunctionExtractor
+    public class FunctionExtractor 
     {
         private readonly IDna dna;
 
-        private readonly Dictionary<ulong, IExtractedFunction> extractedFunctions = new Dictionary<ulong, IExtractedFunction>();
+        private readonly Dictionary<ulong, ExtractedFunction> extractedFunctions = new Dictionary<ulong, ExtractedFunction>();
 
         public FunctionExtractor(IDna dna)
         {
@@ -23,7 +22,7 @@ namespace Dna.Extraction
         }
 
         /// <inheritdoc />
-        public IExtractedFunction ExtractFunction(ulong start, ulong? end = null)
+        public ExtractedFunction ExtractFunction(ulong start, ulong? end = null)
         {
             var functionGraph = dna.RecursiveDescent.ReconstructCfg(start);
             var graphEnd = functionGraph.GetInstructions().Max(x => x.IP);
@@ -39,7 +38,7 @@ namespace Dna.Extraction
             extractedFunctions.Add(start, extractedFunction);
 
             // Recursively parse all callees, while avoiding functions which have already been extracted.
-            var callees = new List<IExtractedFunction>();
+            var callees = new List<ExtractedFunction>();
             var calleeAddresses = GetFunctionCalleeAddresses(functionGraph).Distinct();
             foreach(var calleeAddress in calleeAddresses)
             {

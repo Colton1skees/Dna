@@ -157,26 +157,8 @@ namespace Dna.Emulation.Symbolic
             var buffer = new byte[size];
             for(int i = 0; i < size; i++)
             {
-                if(addr == 0x0140001299)
-                {
-
-                }
-
-                /*
-                var value = engine.MemoryDefinitions
-                    .Single(x => FastEvaluate(x.Key) == addr + (ulong)i)
-                    .Value;
-                */
-                
-                if(addr == 0x0010001ff40)
-                {
-
-                }
-
-
                 var memNode = new MemoryNode(new IntegerNode(addr + (ulong)i, 64), 8);
                 var value = engine.MemoryDefinitions[memNode];
-
                 buffer[i] = (byte)FastEvaluate(value);
             }
             return buffer;
@@ -190,10 +172,6 @@ namespace Dna.Emulation.Symbolic
 
         public void WriteMemory(ulong addr, byte[] buffer)
         {
-            if (addr == 0x010001ffb8)
-            {
-                //Debugger.Break();
-            }
             for (int i = 0; i < buffer.Length; i++)
             {
                 var memNode = new MemoryNode(new IntegerNode(addr + (ulong)i, 64), 8);
@@ -214,9 +192,6 @@ namespace Dna.Emulation.Symbolic
             // Fetch and decode the instruction at the current symbolic RIP.
             var rip = GetRegister(register_e.ID_REG_X86_RIP);
 
-            //if (rip == 0x1400012A3)
-                //Debugger.Break();
-
             var bytes = ReadMemory(rip, 16);
             var instruction = GetInstructionFromBytes(rip, bytes);
 
@@ -232,12 +207,6 @@ namespace Dna.Emulation.Symbolic
             // Symbolically execute each lifted linear instruction.
             foreach(var lifted in liftedInstructions)
             {
-                if(rip == 0x14004605F)
-                    Console.WriteLine(lifted);
-                    /*
-                    if (lifted.ToString().Contains("Reg(rip):64 ="))
-                        Debugger.Break();
-                    */
                 engine.ExecuteInstruction(lifted);
             }
         }
@@ -250,18 +219,6 @@ namespace Dna.Emulation.Symbolic
             decoder.IP = address;
             return decoder.Decode();
         }
-
-        /*
-        private void OnMemoryRead(Emulator emulator, MemoryType type, ulong address, int size, ulong value, object userData)
-        {
-            memReadCallback?.Invoke(address, size);
-        }
-
-        private void OnMemoryWrite(Emulator emulator, MemoryType type, ulong address, int size, ulong value, object userData)
-        {
-            memWriteCallback?.Invoke(address, size, value);
-        }
-        */
 
         public void SetMemoryReadCallback(dgOnMemoryRead callback)
         {
@@ -289,7 +246,7 @@ namespace Dna.Emulation.Symbolic
             return null;
         }
 
-        public Microsoft.Z3.Expr GetZ3Ast(AbstractNode ast)
+        public Expr GetZ3Ast(AbstractNode ast)
         {
             var isDefined = (AbstractNode obj) =>
             {
@@ -323,17 +280,7 @@ namespace Dna.Emulation.Symbolic
         private ulong EvaluateToUlong(AbstractNode ast)
         {
             var z3Ast = GetZ3Ast(ast);
-
-            //var solver = z3Translator.Solver;
-
             var evaluated = z3Ast.Simplify();
-
-           // var solver = z3Translator.Ctx.MkSolver("QF_BV");
-
-          //  var checkd = solver.Check();
-
-
-            //var evaluated = solver.Model.Eval(z3Translator.Ctx.MkBV2Int((BitVecExpr)z3Ast, false), false);
             return ((BitVecNum)evaluated).UInt64;
         }
     }

@@ -101,9 +101,6 @@ namespace Dna.Optimization.Passes
                 // Get the current instruction.
                 var inst = reversedInstructions[i];
 
-             //   if (inst.ToString().Contains("Reg(rip):64 ="))
-                //    Debugger.Break();
-
                 int iCopy = reversedInstructions.Count - i - 1;
 
                 // Get the instruction destination.
@@ -121,8 +118,6 @@ namespace Dna.Optimization.Passes
                 bool isReadBeforeWritten = lastRead == -1 ? false : lastRead > iCopy && lastRead < lastWrite;
 
                 // Update the hashset indices.
-              //  if (instDest.Name.ToLower().Contains("af"))
-                 //   Debugger.Break();
                 if (destUses.WriteIndices.Last() != iCopy)
                 {
                     destUses.WriteIndices.Remove(destUses.WriteIndices.Last());
@@ -155,7 +150,6 @@ namespace Dna.Optimization.Passes
                     }
                 }
             }
-
 
             var newList = new List<AbstractInst>(instructions.Count - indicesToDelete.Count);
             for(int i = 0; i < instructions.Count; i++)

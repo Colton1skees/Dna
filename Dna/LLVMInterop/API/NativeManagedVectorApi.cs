@@ -10,6 +10,9 @@ namespace Dna.LLVMInterop.API
 {
     public static class NativeManagedVectorApi
     {
+        [DllImport("Dna.LLVMInterop", CallingConvention = CallingConvention.Cdecl, EntryPoint = "ImmutableManagedVector_FromManagedArray")]
+        public unsafe static extern nint FromManagedArray(nint inputArray, int count);
+
         [DllImport("Dna.LLVMInterop", CallingConvention = CallingConvention.Cdecl, EntryPoint = "ImmutableManagedVector_GetCount")]
         public unsafe static extern int GetCount(nint managedVector);
 

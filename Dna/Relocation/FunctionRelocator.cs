@@ -1,7 +1,6 @@
 ﻿using Dna.ControlFlow;
 using Dna.Extensions;
 using Dna.Extraction;
-using Dna.Reinsertion;
 using Iced.Intel;
 using System;
 using System.Collections.Generic;
@@ -14,11 +13,11 @@ using System.Threading.Tasks;
 namespace Dna.Relocation
 {
     /// <inheritdoc cref="IFunctionRelocator"/>
-    public class FunctionRelocator : IFunctionRelocator
+    public class FunctionRelocator 
     {
         private readonly IDna dna;
 
-        private readonly Dictionary<ulong, IExtractedFunction> relocatedFunctions = new Dictionary<ulong, IExtractedFunction>();
+        private readonly Dictionary<ulong, ExtractedFunction> relocatedFunctions = new Dictionary<ulong, ExtractedFunction>();
 
         private readonly Dictionary<ulong, ulong> relocatedFunctionAddresses = new Dictionary<ulong, ulong>();
 
@@ -32,7 +31,7 @@ namespace Dna.Relocation
         }
 
         /// <inheritdoc cref="IFunctionRelocator.RelocateFunction(IExtractedFunction, ulong)"/>
-        public byte[] RelocateFunction(IExtractedFunction function, ulong relocRip, out ulong endRip)
+        public byte[] RelocateFunction(ExtractedFunction function, ulong relocRip, out ulong endRip)
         {
             bool isRoot = isRootFunction;
             isRootFunction = false;
@@ -74,7 +73,7 @@ namespace Dna.Relocation
             var finalBytes = Enumerable.Repeat<byte>(0x90, (int)(finalEndRip - startRip)).ToList();
             foreach(var relocBlock in relocationMapping.Values)
             {
-                var bytes = InstructionRelocator.EncodeInstructions(relocBlock.RelocatedInstructions, relocBlock.RelocatedRip, out ulong encodedEnd);
+                var bytes = InstructionEncoder.EncodeInstructions(relocBlock.RelocatedInstructions, relocBlock.RelocatedRip, out ulong encodedEnd);
                 if (encodedEnd > relocBlock.RelocatedRip + (ulong)relocBlock.RelocatedSize)
                     throw new Exception("Block is too big....");
 
@@ -86,7 +85,7 @@ namespace Dna.Relocation
             return finalBytes.ToArray();
         }
 
-        private List<RelocatedBlock> RelocateBasicBlocks(IExtractedFunction function, ulong relocRip, out ulong endRip)
+        private List<RelocatedBlock> RelocateBasicBlocks(ExtractedFunction function, ulong relocRip, out ulong endRip)
         {
             // Allocate each basic block sequentially.
             List<RelocatedBlock> output = new List<RelocatedBlock>();
@@ -115,7 +114,7 @@ namespace Dna.Relocation
             int maxJccSize = 8;
 
             // TODO: Implement properly.
-            var maxSize = InstructionRelocator.EncodeInstructions(block.Instructions, block.Address + ushort.MaxValue, out ulong endRip).Length;
+            var maxSize = InstructionEncoder.EncodeInstructions(block.Instructions, block.Address + ushort.MaxValue, out ulong endRip).Length;
             if (block.ExitInstruction.FlowControl == FlowControl.ConditionalBranch)
                 maxSize += maxJccSize;
 
@@ -145,7 +144,7 @@ namespace Dna.Relocation
                 }
 
                 // If the function is not a branch or call, we can safely relocate it.
-                var relocatedInst = InstructionRelocator.RelocateInstructions(new List<Instruction>() { inst }, rip).Single();
+                var relocatedInst = InstructionEncoder.RelocateInstructions(new List<Instruction>() { inst }, rip).Single();
                 relocatedBlock.RelocatedInstructions.Add(relocatedInst);
                 rip += (ulong)relocatedInst.Length;
             }
@@ -154,7 +153,7 @@ namespace Dna.Relocation
             var exitInstruction = block.ExitInstruction;
             if (exitInstruction.FlowControl == FlowControl.Return)
             {
-                var relocatedInst = InstructionRelocator.RelocateInstructions(new List<Instruction>() { exitInstruction }, rip).Single();
+                var relocatedInst = InstructionEncoder.RelocateInstructions(new List<Instruction>() { exitInstruction }, rip).Single();
                 relocatedBlock.RelocatedInstructions.Add(relocatedInst);
                 return;
             }
@@ -164,7 +163,7 @@ namespace Dna.Relocation
                 // If the jmp is indirect, then all we can do is relocate it.
                 if (!exitInstruction.Op0Kind.IsImmediate())
                 {
-                    var relocatedInst = InstructionRelocator.RelocateInstructions(new List<Instruction>() { exitInstruction }, rip).Single();
+                    var relocatedInst = InstructionEncoder.RelocateInstructions(new List<Instruction>() { exitInstruction }, rip).Single();
                     relocatedBlock.RelocatedInstructions.Add(relocatedInst);
                     return;
                 }

@@ -1,7 +1,6 @@
 #pragma once
 
 #include <llvm/Analysis/AliasAnalysis.h>
-#include <llvm/Pass.h>
 #include <unordered_map>
 #include <memory>
 #include <set>
@@ -17,18 +16,20 @@ namespace Dna::Passes {
 	// this pass will return a [NoAlias] for these two memory accesses.
 	// If two memory accesses cannot be proved to [NoAlias], then we
 	// fall back to the results of the basic alias analysis pass.
-	class ClassifyingAAResult : public llvm::AAResultBase<ClassifyingAAResult> 
+	class ClassifyingAAResult : public llvm::AAResultBase
 	{
-		friend llvm::AAResultBase<ClassifyingAAResult>;
+		friend llvm::AAResultBase;
 
 	public:
 		static tGetAliasResult gGetAliasResult;
+
+		ClassifyingAAResult();
 
 		ClassifyingAAResult(tGetAliasResult);
 
 		bool invalidate(llvm::Function& F, const llvm::PreservedAnalyses& PA, llvm::FunctionAnalysisManager::Invalidator& Inv);
 
-		llvm::AliasResult alias(const llvm::MemoryLocation& locA, const llvm::MemoryLocation& locB, llvm::AAQueryInfo& AAQI);
+		llvm::AliasResult alias(const llvm::MemoryLocation& locA, const llvm::MemoryLocation& locB, llvm::AAQueryInfo& AAQI, const llvm::Instruction* CtxI);
 
 	private:
 		tGetAliasResult pGetAliasResult;

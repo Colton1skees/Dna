@@ -22,6 +22,12 @@ namespace Dna::API {
 		}
 
 		template <class T>
+		static ImmutableManagedVector* From(const std::vector<const T*>* input)
+		{
+			return ImmutableManagedVector::From((std::vector<T*>*)input);
+		}
+
+		template <class T>
 		static ImmutableManagedVector* NonCopyingFrom(const std::vector<T*>* input)
 		{
 			auto managedVector = new ImmutableManagedVector();
@@ -63,9 +69,19 @@ namespace Dna::API {
 			return items->at(index);
 		}
 
-	private:
 		std::vector<void*>* items = new std::vector<void*>();
 	};
+
+	// Helper function that's exported to managed code. This allows us to create vectors
+	// from managed code.
+	DNA_EXPORT ImmutableManagedVector* ImmutableManagedVector_FromManagedArray(void** inputArray, int count)
+	{
+		auto items = new std::vector<void*>();
+		for (int i = 0; i < count; i++)
+			items->push_back(inputArray[i]);
+
+		return ImmutableManagedVector::NonCopyingFrom(items);
+	}
 
 	DNA_EXPORT unsigned int ImmutableManagedVector_GetCount(ImmutableManagedVector* vec)
 	{

@@ -7,6 +7,7 @@ using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.Linq;
+using System.Net;
 using System.Text;
 using System.Threading.Tasks;
 
@@ -16,31 +17,45 @@ namespace Dna.Reconstruction
     {
         private readonly IDna dna;
 
-        private readonly Assembler assembler;
-
         private ControlFlowGraph<Instruction> graph;
 
         public RecursiveDescentReconstructor(IDna dna)
         {
-            assembler = new Assembler(dna.Binary.Bitness);
             this.dna = dna;
         }
 
-        public ControlFlowGraph<Instruction> ReconstructCfg(ulong address, Func<BasicBlock<Instruction>, IEnumerable<ulong>> pGetOutgoingEdges = null)
+        public ControlFlowGraph<Instruction> ReconstructCfg(ulong address, Func<BasicBlock<Instruction>, IEnumerable<ulong>> pGetOutgoingEdges = null, IEnumerable<ulong> sehExceptBlockAddresses = null)
         {
             // Initialize a control flow graph with a single node,
             // starting at the provided address.
             graph = new ControlFlowGraph<Instruction>(address);
-            var basicBlock = DisassembleBlock(graph, address);
+
+            // Apply recursive descent at the block start.
+            RecursivelyDescend(graph, address, pGetOutgoingEdges);
+
+            // For each SEH '__except' block, add it to the control flow graph
+            // with no incoming edges. This is necessary since `__except` are valid parts of a control flow graph,
+            // but they are often not reachable through recursive descent.
+            foreach(var addr in sehExceptBlockAddresses ?? Enumerable.Empty<ulong>())
+                RecursivelyDescend(graph, addr, pGetOutgoingEdges);
+
+            return graph;
+        }
+
+        // Apply recursive descent starting at the provided address.
+        private void RecursivelyDescend(ControlFlowGraph<Instruction> graph, ulong addr, Func<BasicBlock<Instruction>, IEnumerable<ulong>> pGetOutgoingEdges)
+        {
+            // Skip if the __except block was already added to the cfg.
+            if (graph.Nodes.Contains(addr.ToString("X")))
+                return;
+
+            // Disassemble the block.
+            var basicBlock = DisassembleBlock(graph, addr);
 
             // Recursively follow all new paths.
             var edges = GetBlockEdges(basicBlock, pGetOutgoingEdges);
             foreach (var edge in edges)
                 RecursiveHandleBlock(graph, edge, basicBlock, pGetOutgoingEdges);
-
-            // Collapse pairs of duplicated blocks into a single block.
-            //RemoveDuplicatedBlocks();
-            return graph;
         }
 
         private BasicBlock<Instruction> DisassembleBlock(ControlFlowGraph<Instruction> graph, ulong address)
@@ -82,14 +97,10 @@ namespace Dna.Reconstruction
                     edges.Add(exitInstruction.NextIP);
             }
 
-            if(edges.Count == 0 && pGetOutgoingEdges == null)
-            {
-                //Debugger.Break();
-            }
-
             if(edges.Count == 0 && pGetOutgoingEdges != null)
             {
-                return pGetOutgoingEdges(block);
+                var learnedEdges = pGetOutgoingEdges(block);
+                return learnedEdges == null ? new List<ulong>() : learnedEdges;
             }
 
             return edges;
@@ -136,54 +147,5 @@ namespace Dna.Reconstruction
 
             return targetNode;
         }
-
-        private void RemoveDuplicatedBlocks()
-        {
-            // Get a list of all basic blocks.
-            var blocks = graph.GetBlocks();
-
-            // Group the basic blocks via their exit instruction's address.
-            var blockGrouping = blocks
-                .GroupBy(x => x.ExitInstruction.IP)
-                .ToDictionary(x => x.Key, x => x.ToList());
-
-            foreach(var group in blockGrouping.Where(x => x.Value.Count > 1))
-            {
-                // Throw if the block was duplicated more than once.
-                // TODO: Refactor this to handle an infinite amount of block duplications.
-                if (group.Value.Count > 2)
-                    throw new InvalidOperationException("Basic blocks with more than a single duplication cannot be collapsed.");
-
-                // Identify the source block which was copied from, along with the block
-                // which contains the copy.
-                var blockWithCopy = group.Value.MaxBy(x => x.Instructions.Count);
-                var originalBlock = group.Value.Single(x => x != blockWithCopy);
-
-                // Remove all duplicated instructions from the block.
-                var startIndex = blockWithCopy.Instructions.IndexOf(originalBlock.EntryInstruction);
-                blockWithCopy.Instructions.RemoveRange(startIndex, blockWithCopy.Instructions.Count - startIndex);
-
-                // Update the block exit instruction.
-                var jmpInstIP = blockWithCopy.ExitInstruction.NextIP;
-                assembler.jmp(jmpInstIP);
-                var jmpInst = InstructionRelocator.RelocateInstructions(new List<Instruction>() { assembler.Instructions.Last() }, jmpInstIP).Single();
-
-                // Insert a jump to the copied from block, then update the edges.
-                blockWithCopy.Instructions.Add(jmpInst);
-                blockWithCopy.OutgoingEdges.Clear();
-                blockWithCopy.OutgoingEdges.Add(new Edge(blockWithCopy, originalBlock));
-
-                // Collect any previously existing circular references.
-                var edgesToDelete = blockWithCopy.IncomingEdges
-                    .Where(x => x.Source == originalBlock && x.Target == originalBlock)
-                    .ToList();
-
-                // Delete all circular references.
-                foreach(var edge in edgesToDelete)
-                    blockWithCopy.IncomingEdges.Remove(edge);
-            }
-        }
-
-        
     }
 }

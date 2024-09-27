@@ -12,6 +12,12 @@ namespace Dna.LLVMInterop
 {
     public static class LLVMToCFG
     {
+        /// <summary>
+        /// https://github.com/numba/llvmlite/issues/741.
+        ///  Branches are strange.  The operands are ordered: [Cond, FalseDest,] TrueDest.
+        /// </summary>
+        /// <param name="function"></param>
+        /// <returns></returns>
         public static ControlFlowGraph<LLVMValueRef> GetCFG(LLVMValueRef function)
         {
             ControlFlowGraph<LLVMValueRef> llvmGraph = new ControlFlowGraph<LLVMValueRef>(0);

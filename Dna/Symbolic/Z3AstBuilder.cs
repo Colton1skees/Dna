@@ -106,7 +106,6 @@ namespace Dna.Symbolic
         private string GetVariableNode(AbstractNode node)
         {
             var text = node.ToString().Replace("(", "").Replace(")", "");
-            //Console.WriteLine(text);
             return text;
         }
 

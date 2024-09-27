@@ -30,16 +30,6 @@ namespace Dna.LLVMInterop.Passes
             if(gep.InstructionOpcode != LLVMOpcode.LLVMGetElementPtr)
                 return PointerType.Unk;
 
-            /*
-            var slice = SliceInst(gep);
-            foreach (var item in slice.Reverse())
-            {
-                var text = item.ToString();
-                text = new string(text.SkipWhile(x => x == ' ').ToArray());
-                Console.WriteLine("    " + text);
-            }
-            */
-
             if (StackAccessMatcher.IsStackAccess(gep.GetOperand(1)))
             {
                 return PointerType.LocalStack;
@@ -55,7 +45,7 @@ namespace Dna.LLVMInterop.Passes
                 return PointerType.Segment;
             }
 
-            
+            // Debug logging
             if(!Seen.Contains(gep) && print)
             {
                 Seen.Add(gep);
@@ -67,9 +57,6 @@ namespace Dna.LLVMInterop.Passes
                     text = new string(text.SkipWhile(x => x == ' ').ToArray());
                     Console.WriteLine("    " + text);
                 }
-
-                Console.WriteLine("done");
-                //Debugger.Break();
             }
             
 

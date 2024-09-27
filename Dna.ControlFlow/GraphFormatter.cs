@@ -46,8 +46,6 @@ namespace Dna.ControlFlow
             stringBuilder.AppendLine(String.Format("BasicBlock (0x{0}):", block.Address.ToString("X")));
             foreach (var instruction in block.Instructions)
             {
-                Console.WriteLine();
-                Console.WriteLine(instruction);
                 stringBuilder.AppendLine(instruction?.ToString());
             }
             return stringBuilder.ToString();

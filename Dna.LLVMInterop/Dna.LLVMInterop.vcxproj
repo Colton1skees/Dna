@@ -1,4 +1,4 @@
-<?xml version="1.0" encoding="utf-8"?>
+﻿<?xml version="1.0" encoding="utf-8"?>
 <Project DefaultTargets="Build" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
   <ItemGroup Label="ProjectConfigurations">
     <ProjectConfiguration Include="Debug|Win32">
@@ -72,8 +72,8 @@
   <PropertyGroup Label="UserMacros" />
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
     <LinkIncremental>true</LinkIncremental>
-    <IncludePath>C:\Users\colton\source\repos\Dna\Dna.LLVMInterop;C:\Users\colton\source\repos\llvm-project-15.0.7.src\llvm\build\include;C:\Users\colton\source\repos\llvm-project-15.0.7.src\llvm\include;$(IncludePath)</IncludePath>
-    <LibraryPath>C:\Users\colton\source\repos\llvm-project-15.0.7.src\llvm\build\RelWithDebInfo\lib;$(LibraryPath)</LibraryPath>
+    <IncludePath>C:\Users\colton\source\repos\klee\include;C:\Users\colton\source\repos\Dna\Dna.LLVMInterop\souper\include;C:\Users\colton\source\repos\cxx-common-cmake-win\cxx-common-cmake\build\remill-prefix\src\remill\include;C:\Users\colton\source\repos\Dna\Dna.LLVMInterop;C:\Users\colton\source\repos\cxx-common-cmake-win\cxx-common-cmake\build\install\include;$(IncludePath)</IncludePath>
+    <LibraryPath>C:\Users\colton\source\repos\cxx-common-cmake-win\cxx-common-cmake\build\install\lib;$(LibraryPath)</LibraryPath>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
     <IncludePath>C:\Users\colton\source\repos\Dna\llvm-15.0.3-win64\include;$(IncludePath)</IncludePath>
@@ -142,10 +142,11 @@
       <ConformanceMode>true</ConformanceMode>
       <PrecompiledHeader>NotUsing</PrecompiledHeader>
       <PrecompiledHeaderFile>pch.h</PrecompiledHeaderFile>
-      <LanguageStandard>stdcpp20</LanguageStandard>
+      <LanguageStandard>stdcpp17</LanguageStandard>
       <LanguageStandard_C>stdc17</LanguageStandard_C>
       <Optimization>Disabled</Optimization>
       <InlineFunctionExpansion>Disabled</InlineFunctionExpansion>
+      <RuntimeLibrary>MultiThreadedDLL</RuntimeLibrary>
     </ClCompile>
     <Link>
       <SubSystem>Windows</SubSystem>
@@ -153,20 +154,27 @@
       <OptimizeReferences>true</OptimizeReferences>
       <GenerateDebugInformation>DebugFull</GenerateDebugInformation>
       <EnableUAC>false</EnableUAC>
-      <AdditionalDependencies>LLVM-C.lib;LLVMAArch64AsmParser.lib;LLVMAArch64CodeGen.lib;LLVMAArch64Desc.lib;LLVMAArch64Disassembler.lib;LLVMAArch64Info.lib;LLVMAArch64Utils.lib;LLVMAggressiveInstCombine.lib;LLVMAMDGPUAsmParser.lib;LLVMAMDGPUCodeGen.lib;LLVMAMDGPUDesc.lib;LLVMAMDGPUDisassembler.lib;LLVMAMDGPUInfo.lib;LLVMAMDGPUTargetMCA.lib;LLVMAMDGPUUtils.lib;LLVMAnalysis.lib;LLVMARMAsmParser.lib;LLVMARMCodeGen.lib;LLVMARMDesc.lib;LLVMARMDisassembler.lib;LLVMARMInfo.lib;LLVMARMUtils.lib;LLVMAsmParser.lib;LLVMAsmPrinter.lib;LLVMAVRAsmParser.lib;LLVMAVRCodeGen.lib;LLVMAVRDesc.lib;LLVMAVRDisassembler.lib;LLVMAVRInfo.lib;LLVMBinaryFormat.lib;LLVMBitReader.lib;LLVMBitstreamReader.lib;LLVMBitWriter.lib;LLVMBPFAsmParser.lib;LLVMBPFCodeGen.lib;LLVMBPFDesc.lib;LLVMBPFDisassembler.lib;LLVMBPFInfo.lib;LLVMCFGuard.lib;LLVMCFIVerify.lib;LLVMCodeGen.lib;LLVMCore.lib;LLVMCoroutines.lib;LLVMCoverage.lib;LLVMDebugInfoCodeView.lib;LLVMDebuginfod.lib;LLVMDebugInfoDWARF.lib;LLVMDebugInfoGSYM.lib;LLVMDebugInfoMSF.lib;LLVMDebugInfoPDB.lib;LLVMDemangle.lib;LLVMDiff.lib;LLVMDlltoolDriver.lib;LLVMDWARFLinker.lib;LLVMDWP.lib;LLVMExecutionEngine.lib;LLVMExegesis.lib;LLVMExegesisAArch64.lib;LLVMExegesisMips.lib;LLVMExegesisPowerPC.lib;LLVMExegesisX86.lib;LLVMExtensions.lib;LLVMFileCheck.lib;LLVMFrontendOpenACC.lib;LLVMFrontendOpenMP.lib;LLVMFuzzerCLI.lib;LLVMFuzzMutate.lib;LLVMGlobalISel.lib;LLVMHexagonAsmParser.lib;LLVMHexagonCodeGen.lib;LLVMHexagonDesc.lib;LLVMHexagonDisassembler.lib;LLVMHexagonInfo.lib;LLVMInstCombine.lib;LLVMInstrumentation.lib;LLVMInterfaceStub.lib;LLVMInterpreter.lib;LLVMipo.lib;LLVMIRReader.lib;LLVMJITLink.lib;LLVMLanaiAsmParser.lib;LLVMLanaiCodeGen.lib;LLVMLanaiDesc.lib;LLVMLanaiDisassembler.lib;LLVMLanaiInfo.lib;LLVMLibDriver.lib;LLVMLineEditor.lib;LLVMLinker.lib;LLVMLTO.lib;LLVMMC.lib;LLVMMCA.lib;LLVMMCDisassembler.lib;LLVMMCJIT.lib;LLVMMCParser.lib;LLVMMipsAsmParser.lib;LLVMMipsCodeGen.lib;LLVMMipsDesc.lib;LLVMMipsDisassembler.lib;LLVMMipsInfo.lib;LLVMMIRParser.lib;LLVMMSP430AsmParser.lib;LLVMMSP430CodeGen.lib;LLVMMSP430Desc.lib;LLVMMSP430Disassembler.lib;LLVMMSP430Info.lib;LLVMNVPTXCodeGen.lib;LLVMNVPTXDesc.lib;LLVMNVPTXInfo.lib;LLVMObjCARCOpts.lib;LLVMObjCopy.lib;LLVMObject.lib;LLVMObjectYAML.lib;LLVMOption.lib;LLVMOrcJIT.lib;LLVMOrcShared.lib;LLVMOrcTargetProcess.lib;LLVMPasses.lib;LLVMPowerPCAsmParser.lib;LLVMPowerPCCodeGen.lib;LLVMPowerPCDesc.lib;LLVMPowerPCDisassembler.lib;LLVMPowerPCInfo.lib;LLVMProfileData.lib;LLVMRemarks.lib;LLVMRISCVAsmParser.lib;LLVMRISCVCodeGen.lib;LLVMRISCVDesc.lib;LLVMRISCVDisassembler.lib;LLVMRISCVInfo.lib;LLVMRuntimeDyld.lib;LLVMScalarOpts.lib;LLVMSelectionDAG.lib;LLVMSparcAsmParser.lib;LLVMSparcCodeGen.lib;LLVMSparcDesc.lib;LLVMSparcDisassembler.lib;LLVMSparcInfo.lib;LLVMSupport.lib;LLVMSymbolize.lib;LLVMSystemZAsmParser.lib;LLVMSystemZCodeGen.lib;LLVMSystemZDesc.lib;LLVMSystemZDisassembler.lib;LLVMSystemZInfo.lib;LLVMTableGen.lib;LLVMTableGenGlobalISel.lib;LLVMTarget.lib;LLVMTestingSupport.lib;LLVMTextAPI.lib;LLVMTransformUtils.lib;LLVMVEAsmParser.lib;LLVMVECodeGen.lib;LLVMVectorize.lib;LLVMVEDesc.lib;LLVMVEDisassembler.lib;LLVMVEInfo.lib;LLVMWebAssemblyAsmParser.lib;LLVMWebAssemblyCodeGen.lib;LLVMWebAssemblyDesc.lib;LLVMWebAssemblyDisassembler.lib;LLVMWebAssemblyInfo.lib;LLVMWebAssemblyUtils.lib;LLVMWindowsDriver.lib;LLVMWindowsManifest.lib;LLVMX86AsmParser.lib;LLVMX86CodeGen.lib;LLVMX86Desc.lib;LLVMX86Disassembler.lib;LLVMX86Info.lib;LLVMX86TargetMCA.lib;LLVMXCoreCodeGen.lib;LLVMXCoreDesc.lib;LLVMXCoreDisassembler.lib;LLVMXCoreInfo.lib;LLVMXRay.lib;llvm_gtest.lib;llvm_gtest_main.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalDependencies>clangHandleLLVM.lib;LLVM-C.lib;LLVMAArch64AsmParser.lib;LLVMAArch64CodeGen.lib;LLVMAArch64Desc.lib;LLVMAArch64Disassembler.lib;LLVMAArch64Info.lib;LLVMAArch64Utils.lib;LLVMAggressiveInstCombine.lib;LLVMAMDGPUAsmParser.lib;LLVMAMDGPUCodeGen.lib;LLVMAMDGPUDesc.lib;LLVMAMDGPUDisassembler.lib;LLVMAMDGPUInfo.lib;LLVMAMDGPUTargetMCA.lib;LLVMAMDGPUUtils.lib;LLVMAnalysis.lib;LLVMARMAsmParser.lib;LLVMARMCodeGen.lib;LLVMARMDesc.lib;LLVMARMDisassembler.lib;LLVMARMInfo.lib;LLVMARMUtils.lib;LLVMAsmParser.lib;LLVMAsmPrinter.lib;LLVMAVRAsmParser.lib;LLVMAVRCodeGen.lib;LLVMAVRDesc.lib;LLVMAVRDisassembler.lib;LLVMAVRInfo.lib;LLVMBinaryFormat.lib;LLVMBitReader.lib;LLVMBitstreamReader.lib;LLVMBitWriter.lib;LLVMBPFAsmParser.lib;LLVMBPFCodeGen.lib;LLVMBPFDesc.lib;LLVMBPFDisassembler.lib;LLVMBPFInfo.lib;LLVMCFGuard.lib;LLVMCFIVerify.lib;LLVMCodeGen.lib;LLVMCodeGenTypes.lib;LLVMCore.lib;LLVMCoroutines.lib;LLVMCoverage.lib;LLVMDebugInfoBTF.lib;LLVMDebugInfoCodeView.lib;LLVMDebuginfod.lib;LLVMDebugInfoDWARF.lib;LLVMDebugInfoGSYM.lib;LLVMDebugInfoLogicalView.lib;LLVMDebugInfoMSF.lib;LLVMDebugInfoPDB.lib;LLVMDemangle.lib;LLVMDiff.lib;LLVMDlltoolDriver.lib;LLVMDWARFLinker.lib;LLVMDWARFLinkerParallel.lib;LLVMDWP.lib;LLVMExecutionEngine.lib;LLVMExegesis.lib;LLVMExegesisAArch64.lib;LLVMExegesisMips.lib;LLVMExegesisPowerPC.lib;LLVMExegesisX86.lib;LLVMExtensions.lib;LLVMFileCheck.lib;LLVMFrontendHLSL.lib;LLVMFrontendOpenACC.lib;LLVMFrontendOpenMP.lib;LLVMFuzzerCLI.lib;LLVMFuzzMutate.lib;LLVMGlobalISel.lib;LLVMHexagonAsmParser.lib;LLVMHexagonCodeGen.lib;LLVMHexagonDesc.lib;LLVMHexagonDisassembler.lib;LLVMHexagonInfo.lib;LLVMInstCombine.lib;LLVMInstrumentation.lib;LLVMInterfaceStub.lib;LLVMInterpreter.lib;LLVMipo.lib;LLVMIRPrinter.lib;LLVMIRReader.lib;LLVMJITLink.lib;LLVMLanaiAsmParser.lib;LLVMLanaiCodeGen.lib;LLVMLanaiDesc.lib;LLVMLanaiDisassembler.lib;LLVMLanaiInfo.lib;LLVMLibDriver.lib;LLVMLineEditor.lib;LLVMLinker.lib;LLVMLoongArchAsmParser.lib;LLVMLoongArchCodeGen.lib;LLVMLoongArchDesc.lib;LLVMLoongArchDisassembler.lib;LLVMLoongArchInfo.lib;LLVMLTO.lib;LLVMMC.lib;LLVMMCA.lib;LLVMMCDisassembler.lib;LLVMMCJIT.lib;LLVMMCParser.lib;LLVMMipsAsmParser.lib;LLVMMipsCodeGen.lib;LLVMMipsDesc.lib;LLVMMipsDisassembler.lib;LLVMMipsInfo.lib;LLVMMIRParser.lib;LLVMMSP430AsmParser.lib;LLVMMSP430CodeGen.lib;LLVMMSP430Desc.lib;LLVMMSP430Disassembler.lib;LLVMMSP430Info.lib;LLVMNVPTXCodeGen.lib;LLVMNVPTXDesc.lib;LLVMNVPTXInfo.lib;LLVMObjCARCOpts.lib;LLVMObjCopy.lib;LLVMObject.lib;LLVMObjectYAML.lib;LLVMOption.lib;LLVMOrcJIT.lib;LLVMOrcShared.lib;LLVMOrcTargetProcess.lib;LLVMPasses.lib;LLVMPowerPCAsmParser.lib;LLVMPowerPCCodeGen.lib;LLVMPowerPCDesc.lib;LLVMPowerPCDisassembler.lib;LLVMPowerPCInfo.lib;LLVMProfileData.lib;LLVMRemarks.lib;LLVMRISCVAsmParser.lib;LLVMRISCVCodeGen.lib;LLVMRISCVDesc.lib;LLVMRISCVDisassembler.lib;LLVMRISCVInfo.lib;LLVMRISCVTargetMCA.lib;LLVMRuntimeDyld.lib;LLVMScalarOpts.lib;LLVMSelectionDAG.lib;LLVMSparcAsmParser.lib;LLVMSparcCodeGen.lib;LLVMSparcDesc.lib;LLVMSparcDisassembler.lib;LLVMSparcInfo.lib;LLVMSupport.lib;LLVMSymbolize.lib;LLVMSystemZAsmParser.lib;LLVMSystemZCodeGen.lib;LLVMSystemZDesc.lib;LLVMSystemZDisassembler.lib;LLVMSystemZInfo.lib;LLVMTableGen.lib;LLVMTableGenCommon.lib;LLVMTableGenGlobalISel.lib;LLVMTarget.lib;LLVMTargetParser.lib;LLVMTextAPI.lib;LLVMTransformUtils.lib;LLVMVEAsmParser.lib;LLVMVECodeGen.lib;LLVMVectorize.lib;LLVMVEDesc.lib;LLVMVEDisassembler.lib;LLVMVEInfo.lib;LLVMWebAssemblyAsmParser.lib;LLVMWebAssemblyCodeGen.lib;LLVMWebAssemblyDesc.lib;LLVMWebAssemblyDisassembler.lib;LLVMWebAssemblyInfo.lib;LLVMWebAssemblyUtils.lib;LLVMWindowsDriver.lib;LLVMWindowsManifest.lib;LLVMX86AsmParser.lib;LLVMX86CodeGen.lib;LLVMX86Desc.lib;LLVMX86Disassembler.lib;LLVMX86Info.lib;LLVMX86TargetMCA.lib;LLVMXCoreCodeGen.lib;LLVMXCoreDesc.lib;LLVMXCoreDisassembler.lib;LLVMXCoreInfo.lib;LLVMXRay.lib;remill_arch.lib;remill_bc.lib;remill_os.lib;remill_version.lib;remill_arch_aarch64.lib;remill_arch_sleigh.lib;remill_arch_sparc32.lib;remill_arch_sparc64.lib;remill_arch_x86.lib;decomp.lib;sla.lib;slaSupport.lib;gflags_static.lib;gflags_nothreads_static.lib;glog.lib;xed.lib;xed-ild.lib;shlwapi.lib;libz3.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <StackReserveSize>536870912</StackReserveSize>
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
     <ClInclude Include="API\ExportDef.h" />
     <ClInclude Include="API\ExportedAPI.h" />
+    <ClInclude Include="API\ImmutableManagedPair.h" />
     <ClInclude Include="API\LLVM\Analysis\LoopInfo.h" />
     <ClInclude Include="API\LLVM\Analysis\MemorySSA.h" />
+    <ClInclude Include="API\LLVM\IR\CFG.h" />
+    <ClInclude Include="API\LLVM\IR\Dominators.h" />
     <ClInclude Include="API\LLVM\IR\LegacyPassManager.h" />
     <ClInclude Include="API\LLVM\Pass.h" />
     <ClInclude Include="API\LLVM\Transforms\IPO\PassManagerBuilder.h" />
     <ClInclude Include="API\LLVM\Transforms\Scalar.h" />
     <ClInclude Include="API\ImmutableManagedVector.h" />
+    <ClInclude Include="API\LLVM\Transforms\Utils.h" />
+    <ClInclude Include="API\LLVM\Transforms\Utils\Cloning.h" />
     <ClInclude Include="API\OptimizationAPI\OptimizationAPI.h" />
+    <ClInclude Include="API\OptimizationAPI\OptimizationUtils.h" />
     <ClInclude Include="API\Passes\Passes.h" />
     <ClInclude Include="API\RegionAPI\BaseRegionAPI.h" />
     <ClInclude Include="API\RegionAPI\ComplexRegionAPI.h" />
@@ -174,7 +182,18 @@
     <ClInclude Include="API\RegionAPI\IfThenRegionAPI.h" />
     <ClInclude Include="API\RegionAPI\RegionAPI.h" />
     <ClInclude Include="API\RegionAPI\ReturnRegionAPI.h" />
+    <ClInclude Include="API\Remill\Arch\Arch.h" />
+    <ClInclude Include="API\Remill\Arch\Context.h" />
+    <ClInclude Include="API\Remill\Arch\Instruction.h" />
+    <ClInclude Include="API\Remill\BC\InstructionLifter.h" />
+    <ClInclude Include="API\Remill\BC\IntrinsicTable.h" />
+    <ClInclude Include="API\Remill\BC\Optimizer.h" />
+    <ClInclude Include="API\Remill\BC\Util.h" />
+    <ClInclude Include="API\souper\SouperExprBuilder.h" />
+    <ClInclude Include="API\souper\SouperCandidates.h" />
+    <ClInclude Include="API\souper\SouperInst.h" />
     <ClInclude Include="Arch\X86\X86Registers.h" />
+    <ClInclude Include="Passes\BoundsSolver.h" />
     <ClInclude Include="Passes\ClassifyingAliasAnalysisPass.h" />
     <ClInclude Include="Passes\compilercore_assert.h" />
     <ClInclude Include="Passes\ConstantConcretizationPass.h" />
@@ -182,11 +201,34 @@
     <ClInclude Include="Passes\ControlledNodeSplittingPass.h" />
     <ClInclude Include="Passes\generator_jit_ast_compute.h" />
     <ClInclude Include="Passes\generator_jit_sl_function.h" />
+    <ClInclude Include="Passes\JumpTableAnalysisPass.h" />
     <ClInclude Include="Passes\mdl_assert.h" />
     <ClInclude Include="Passes\PassUtilities.h" />
     <ClInclude Include="Pipeline\Pipeline.h" />
-    <ClInclude Include="Symex\ICpuEmulatorState.h" />
-    <ClInclude Include="Symex\LLVMSymbolicExecutor.h" />
+    <ClInclude Include="souper\include\souper\Codegen\Codegen.h" />
+    <ClInclude Include="souper\include\souper\Extractor\Candidates.h" />
+    <ClInclude Include="souper\include\souper\Extractor\ExprBuilder.h" />
+    <ClInclude Include="souper\include\souper\Infer\AbstractInterpreter.h" />
+    <ClInclude Include="souper\include\souper\Infer\AliveDriver.h" />
+    <ClInclude Include="souper\include\souper\Infer\ConstantSynthesis.h" />
+    <ClInclude Include="souper\include\souper\Infer\EnumerativeSynthesis.h" />
+    <ClInclude Include="souper\include\souper\Infer\InstSynthesis.h" />
+    <ClInclude Include="souper\include\souper\Infer\Interpreter.h" />
+    <ClInclude Include="souper\include\souper\Infer\Preconditions.h" />
+    <ClInclude Include="souper\include\souper\Infer\Pruning.h" />
+    <ClInclude Include="souper\include\souper\Infer\Verification.h" />
+    <ClInclude Include="souper\include\souper\Infer\Z3Driver.h" />
+    <ClInclude Include="souper\include\souper\Infer\Z3Expr.h" />
+    <ClInclude Include="souper\include\souper\Inst\Inst.h" />
+    <ClInclude Include="souper\include\souper\Inst\InstGraph.h" />
+    <ClInclude Include="souper\include\souper\KVStore\KVStore.h" />
+    <ClInclude Include="souper\include\souper\Parser\Parser.h" />
+    <ClInclude Include="souper\include\souper\SMTLIB2\Solver.h" />
+    <ClInclude Include="souper\include\souper\Tool\CandidateMapUtils.h" />
+    <ClInclude Include="souper\include\souper\Tool\GetSolver.h" />
+    <ClInclude Include="souper\include\souper\Util\DfaUtils.h" />
+    <ClInclude Include="souper\include\souper\Util\LLVMUtils.h" />
+    <ClInclude Include="souper\include\souper\Util\UniqueNameSet.h" />
     <ClInclude Include="Utilities\magic_enum.hpp" />
     <ClInclude Include="Utilities\magic_enum_containers.hpp" />
     <ClInclude Include="Utilities\magic_enum_format.hpp" />
@@ -194,18 +236,43 @@
     <ClInclude Include="Utilities\magic_enum_switch.hpp" />
   </ItemGroup>
   <ItemGroup>
+    <ClCompile Include="..\..\klee\lib\Expr\Expr.cpp" />
+    <ClCompile Include="..\..\klee\lib\Expr\ExprPPrinter.cpp" />
+    <ClCompile Include="..\..\klee\lib\Expr\ExprSMTLIBPrinter.cpp" />
+    <ClCompile Include="..\..\klee\lib\Expr\Updates.cpp" />
     <ClCompile Include="dllmain.cpp" />
     <ClCompile Include="Passes\ClassifyingAliasAnalysisPass.cpp" />
     <ClCompile Include="Passes\compilercore_assert.cpp" />
     <ClCompile Include="Passes\ConstantConcretizationPass.cpp" />
     <ClCompile Include="Passes\ControlledNodeSplittingPass.cpp" />
     <ClCompile Include="Passes\generator_jit_ast_compute.cpp" />
-    <ClCompile Include="Symex\LLVMSymbolicExecutor.cpp" />
+    <ClCompile Include="souper\lib\Codegen\Codegen.cpp" />
+    <ClCompile Include="souper\lib\Codegen\MachineCost.cpp" />
+    <ClCompile Include="souper\lib\Extractor\Candidates.cpp" />
+    <ClCompile Include="souper\lib\Extractor\ExprBuilder.cpp" />
+    <ClCompile Include="souper\lib\Extractor\KLEEBuilder.cpp" />
+    <ClCompile Include="souper\lib\Extractor\Solver.cpp" />
+    <ClCompile Include="souper\lib\Infer\AbstractInterpreter.cpp" />
+    <ClCompile Include="souper\lib\Infer\AliveDriver.cpp" />
+    <ClCompile Include="souper\lib\Infer\ConstantSynthesis.cpp" />
+    <ClCompile Include="souper\lib\Infer\EnumerativeSynthesis.cpp" />
+    <ClCompile Include="souper\lib\Infer\InstSynthesis.cpp" />
+    <ClCompile Include="souper\lib\Infer\Interpreter.cpp" />
+    <ClCompile Include="souper\lib\Infer\Preconditions.cpp" />
+    <ClCompile Include="souper\lib\Infer\Pruning.cpp" />
+    <ClCompile Include="souper\lib\Infer\Verification.cpp" />
+    <ClCompile Include="souper\lib\Infer\Z3Driver.cpp" />
+    <ClCompile Include="souper\lib\Infer\Z3Expr.cpp" />
+    <ClCompile Include="souper\lib\Inst\Inst.cpp" />
+    <ClCompile Include="souper\lib\KVStore\KVStore.cpp" />
+    <ClCompile Include="souper\lib\Parser\Parser.cpp" />
+    <ClCompile Include="souper\lib\Pass\Pass.cpp" />
+    <ClCompile Include="souper\lib\SMTLIB2\smtlib_Solver.cpp" />
+    <ClCompile Include="souper\lib\Tool\CandidateMapUtils.cpp" />
   </ItemGroup>
   <ItemGroup>
-    <None Include="..\llvm-15.0.3-win64\bin\LLVM-C.dll">
-      <DeploymentContent>true</DeploymentContent>
-    </None>
+    <None Include="souper\include\souper\KVStore\KVSocket.h.in" />
+    <None Include="souper\include\souper\Tool\GetSolver.h.in" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">

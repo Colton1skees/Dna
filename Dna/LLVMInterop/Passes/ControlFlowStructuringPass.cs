@@ -64,7 +64,7 @@ namespace Dna.LLVMInterop.Passes
         private bool StructureFunctionInternal(LLVMValueRef function, nint pLoopInfo, nint m)
         {
             Console.WriteLine($"Structuring function: {function.Name}");
-            function.GlobalParent.PrintToFile("parent_before_structuring.ll");
+            function.GlobalParent.WriteToLlFile("parent_before_structuring.ll");
 
             cfg = LLVMToCFG.GetCFG(function);
             domTree = new ImmutableDomTree<LLVMValueRef>(cfg);

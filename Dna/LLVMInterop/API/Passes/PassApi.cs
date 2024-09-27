@@ -31,5 +31,10 @@ namespace Dna.LLVMInterop
         {
             return NativePassApi.CreateControlFlowStructuringPass(Marshal.GetFunctionPointerForDelegate(structureFunction));
         }
+
+        public unsafe static FunctionPass CreateJumpTableAnalysisPass(dgSolveJumpTableBounds structureFunction, dgTrySolveConstant trySolveConstant)
+        {
+            return NativePassApi.CreateJumpTableAnalysisPass(Marshal.GetFunctionPointerForDelegate(structureFunction), Marshal.GetFunctionPointerForDelegate(trySolveConstant));
+        }
     }
 }

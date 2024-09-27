@@ -1501,7 +1501,6 @@ Region *IfContext::createIfRegion(
 
 // Constructor.
 StructuredControlFlowPass::StructuredControlFlowPass()
-: ModulePass(ID)
 {
 }
 
@@ -1513,34 +1512,15 @@ StructuredControlFlowPass::~StructuredControlFlowPass()
     }
 }
 
-void StructuredControlFlowPass::getAnalysisUsage(AnalysisUsage &usage) const
+PreservedAnalyses StructuredControlFlowPass::run(Module& M, ModuleAnalysisManager& AM)
 {
-    usage.addRequired<DominatorTreeWrapperPass>();
-    usage.addRequired<LoopInfoWrapperPass>();
-    usage.setPreservesAll();
-}
-
-bool StructuredControlFlowPass::runOnModule(Module &M)
-{
-    for (Function &func : M.functions()) {
-        if (func.isDeclaration()) {
-            continue;
-        }
-
-        RegionBuilder RB(
-            func,
-            getAnalysis<DominatorTreeWrapperPass>(func).getDomTree(),
-            getAnalysis<LoopInfoWrapperPass>(func).getLoopInfo());
-
-        m_structured_function_map[&func] = RB.buildRegions();
-    }
-    return false;
+    return PreservedAnalyses::none();
 }
 
 char StructuredControlFlowPass::ID = 0;
 
 //------------------------------------------------------------------------------
-Pass *createASTComputePass()
+StructuredControlFlowPass* createASTComputePass()
 {
     return new StructuredControlFlowPass();
 }
@@ -1751,14 +1731,9 @@ void RegionBuilder::dumpRegionGraph(
 
 
 LoopExitEnumerationPass::LoopExitEnumerationPass()
-    : FunctionPass( ID )
 {
 }
 
-void LoopExitEnumerationPass::getAnalysisUsage(AnalysisUsage &usage) const
-{
-    usage.addRequired<LoopInfoWrapperPass>();
-}
 
 /// Based on a reference PHI, fill up all PHI nodes in the given block with undef values
 /// for any missing predecessors.
@@ -1810,14 +1785,19 @@ static void relocatePhis(BasicBlock *src_bb, BasicBlock *tgt_bb)
             new_phi->addIncoming(val, block);
         }
         phi->replaceAllUsesWith(new_phi);
-        exit_it = phi->getParent()->getInstList().erase(exit_it);
+        while (true)
+        {
+            printf("ABORT");
+        }
+
+        //exit_it = phi->getParent()->getInstList().erase(exit_it);
     }
 }
 
-bool LoopExitEnumerationPass::runOnFunction(Function &function)
+PreservedAnalyses LoopExitEnumerationPass::run(Function &function, FunctionAnalysisManager& fam)
 {
     bool changed = false;
-    LoopInfo &loop_info = getAnalysis<LoopInfoWrapperPass>().getLoopInfo();
+    LoopInfo& loop_info = fam.getResult<LoopAnalysis>(function);
     LLVMContext &llvm_context = function.getContext();
 
     // ensure that every loop only has one exit and this exit is part of the parent loop,
@@ -1899,26 +1879,24 @@ bool LoopExitEnumerationPass::runOnFunction(Function &function)
         }
     }
 
-    return changed;
+    if (changed)
+        return PreservedAnalyses::none();
+    return PreservedAnalyses::all();
 }
 
 char LoopExitEnumerationPass::ID = 0;
 
-Pass* createLoopExitEnumerationPass()
+LoopExitEnumerationPass* createLoopExitEnumerationPass()
 {
     return new LoopExitEnumerationPass();
 }
 
 
 
-UnswitchPass::UnswitchPass()
-: FunctionPass( ID )
+UnswitchPass::UnswitchPass() 
 {
 }
 
-void UnswitchPass::getAnalysisUsage(AnalysisUsage &usage) const
-{
-}
 
 // Fixes the PHI nodes in the given block, when the predecessor old_pred is replaced by new_pred.
 void UnswitchPass::fixPhis(
@@ -1935,7 +1913,7 @@ void UnswitchPass::fixPhis(
     }
 }
 
-bool UnswitchPass::runOnFunction(Function &function)
+PreservedAnalyses UnswitchPass::run(Function &function, FunctionAnalysisManager& fam)
 {
     bool changed = false;
     LLVMContext &llvm_context = function.getContext();
@@ -1966,12 +1944,14 @@ bool UnswitchPass::runOnFunction(Function &function)
         }
     }
 
-    return changed;
+    if (changed)
+        return PreservedAnalyses::none();
+    return PreservedAnalyses::all();
 }
 
 char UnswitchPass::ID = 0;
 
-Pass *createUnswitchPass()
+UnswitchPass* createUnswitchPass()
 {
     return new UnswitchPass();
 }

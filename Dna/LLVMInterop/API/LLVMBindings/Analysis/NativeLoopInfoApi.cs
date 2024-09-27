@@ -11,6 +11,9 @@ namespace Dna.LLVMInterop.API.LLVMBindings.Analysis
 {
     public static unsafe class NativeLoopInfoApi
     {
+        [DllImport("Dna.LLVMInterop", CallingConvention = CallingConvention.Cdecl, EntryPoint = "LoopInfo_Constructor")]
+        public unsafe static extern LLVMOpaqueLoopInfo* Constructor();
+
         [DllImport("Dna.LLVMInterop", CallingConvention = CallingConvention.Cdecl, EntryPoint = "LoopInfo_GetLoopsInPreorder")]
         public unsafe static extern OpaqueManagedVector<LLVMOpaqueLoop>* GetLoopsInPreOrder(LLVMOpaqueLoopInfo* loopInfo);
 

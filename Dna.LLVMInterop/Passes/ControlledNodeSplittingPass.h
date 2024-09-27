@@ -34,28 +34,23 @@ namespace llvm {
 
 		/// This pass computes a reducible AST above the control flow.
 		/// Irreducible control flow is removed using "Controlled Node Splitting".
-		class ControlledNodeSplittingPass : public FunctionPass
+		class ControlledNodeSplittingPass : public PassInfoMixin<ControlledNodeSplittingPass>
 		{
 		public:
 			static char ID;
 
 		public:
 			/// Constructor.
-			ControlledNodeSplittingPass();
+			explicit ControlledNodeSplittingPass()
+			{
 
-			/// Run this pass on the given function.
-			///
-			/// \param function  the LLVM function
-			bool runOnFunction(Function& function) final;
-
-			/// Get the name of the pass.
-			StringRef getPassName() const final {
-				return "Controlled Node Splitting";
 			}
+
+			PreservedAnalyses run(Function& F, FunctionAnalysisManager& AM);
 		};
 
 		/// Create the "Controlled Node Splitting" pass.
-		Pass* createControlledNodeSplittingPass();
+		ControlledNodeSplittingPass* createControlledNodeSplittingPass();
 
 	} // sl
 } // llvm

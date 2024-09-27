@@ -21,11 +21,6 @@ namespace Dna
         public BinaryDisassembler BinaryDisassembler { get; }
 
         /// <summary>
-        /// Class for performing linear sweep disassembly.
-        /// </summary>
-        public ICfgReconstructor LinearSweep { get; }
-
-        /// <summary>
         /// Class for performing recursive descent disassembly.
         /// </summary>
         public ICfgReconstructor RecursiveDescent { get; }

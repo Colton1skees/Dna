@@ -23,6 +23,15 @@ namespace Dna.LLVMInterop.API
             this.convertPtr = convertPtr;
         }
 
+        public unsafe static ManagedVector<T> From(nint[] items, Func<nint, T> convertPtr)
+        {
+            fixed (nint* pointerToFirst = items)
+            {
+                var ptr = NativeManagedVectorApi.FromManagedArray((nint)pointerToFirst, items.Length);
+                return new ManagedVector<T>(ptr, convertPtr);
+            }
+        }
+
         private IReadOnlyList<T> GetItems()
         {
             List<T> output = new();

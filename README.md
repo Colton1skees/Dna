@@ -1,28 +1,27 @@
 # Dna
 
-**Dna** is a static analysis framework for **x86/x64**, mainly geared towards deobfuscation. It offers:
-- **Instruction semantics** for x86/x64 via [TritonTranslator](https://github.com/Colton1skees/TritonTranslator)
-- Symbolic execution
-- Mixed boolean-arithmetic(MBA) simplification
-- SMT solver integration
-- Control flow graph recovery
-- Lifting to LLVM IR
-- Emulation 
-- Parsing of executable file formats
-- Visualization of control flow graphs(Graphviz)
-- IR optimization passes 
-- LLVM passes for simplifying obfuscated code
-- APIs for writing LLVM passes in C# (e.g. bindings for PassManager, MemorySSA, LoopInfo)
-- Function relocation(optionally across binaries, with some caveats)
+`Dna` is a static binary analysis framework built on top of LLVM. Notably it's written almost entirely in C#, including managed bindings for LLVM, Remill, and Souper.
 
-You can find an example usage [here](https://github.com/Colton1skees/Dna/blob/master/Dna.Example/Program.cs).
+# Functionality
 
- # Setup
- 
-The .NET component of Dna is supported on Windows, Linux, and Mac OSX. The C++ component(LLVM.Interop) has been used exclusively on windows. 
+`Dna` implements an iterative control flow graph reconstruction inspired heavily by the [SATURN](https://arxiv.org/pdf/1909.01752) paper. It iteratively applies recursive descent, lifting (using remill), and path solving until the complete control flow graph is recovered. In the case of jump tables, we use a recursive algorithm based on `Souper` and z3 to solve the set of possible jump table targets. You can find the iterative exploration algorithm [here](https://github.com/Colton1skees/Dna/blob/4a833fa197f777f985dde1b7bb8b27fd0801a991/Dna.BinaryTranslator/Unsafe/IterativeFunctionTranslator.cs#L48), and the jump table solving algorithm [here](https://github.com/Colton1skees/Dna/blob/master/Dna.BinaryTranslator/JmpTables/Precise/SouperJumpTableSolver.cs#L41).
 
-To get the C++ component building, extract [this precompiled version of llvm](https://github.com/LLVMParty/REVIDE/releases/download/libraries/llvm-15.0.3-win64.7z) to the root directory of Dna. 
+Once a control flow graph has been fully explored, it can then be recompiled to x86 and reinserted into the binary using the algorithms from [here](https://github.com/Colton1skees/Dna/blob/master/Dna.BinaryTranslator/Safe/SafeFunctionTranslator.cs#L46) and [here](https://github.com/Colton1skees/Dna/blob/master/Dna.BinaryTranslator/Safe/FunctionGroupCompiler.cs#L27). Though the compiled code is not pretty by *any* means, it should run. That being said, it is still a research prototype - bugs and edge cases are expected.
 
+Some other notable features:
+- Supports *most* jump tables, including MSVC's nested or so-called compressed jump tables.
+- Supports lifting code with SEH. When SEH is present, `try`/`catch` statements and `filter` functions are correctly hooked up to the control flow graph. Though the recompiler does not (yet) fix up the SEH entries when reinserting code back into the binary. 
+- Includes a strong API for writing LLVM passes natively in C#. We have bindings for e.g. `MemorySSA`, `LoopInfo`, dominator trees, pass pipeline management, etc. 
+- Graph visualization for LLVM IR and binary control flow graphs using graphviz or alternatively a script generator for binary ninja.
 
-# Status
-Dna is now archived. It may be unarchived later on.
+# Dependencies
+- LLVM/LLVMSharp
+- Remill
+- Souper
+- AsmResolver
+- Rivers
+
+Note that `Dna` is currently based on LLVM 17.
+
+# Building
+`Dna` will not build out of the box. Custom patches to remill and souper were needed for this to build on windows. If you would like to work on Dna, open an issue or email me `colton1skees@gmail.com`. At some point I may publish proper build steps, but I make no guarantees.

@@ -12,7 +12,7 @@ using namespace llvm;
 //
 DNA_EXPORT FunctionPass* CreateAlignmentFromAssumptionsPass()
 {
-    return createAlignmentFromAssumptionsPass();
+    return CreateAlignmentFromAssumptionsPass();
 }
 
 //===----------------------------------------------------------------------===//
@@ -21,7 +21,7 @@ DNA_EXPORT FunctionPass* CreateAlignmentFromAssumptionsPass()
 //
 DNA_EXPORT FunctionPass* CreateAnnotationRemarksLegacyPass()
 {
-    return createAnnotationRemarksLegacyPass();
+    return CreateAnnotationRemarksLegacyPass();
 }
 
 //===----------------------------------------------------------------------===//
@@ -30,7 +30,7 @@ DNA_EXPORT FunctionPass* CreateAnnotationRemarksLegacyPass()
 //
 DNA_EXPORT FunctionPass* CreateSCCPPass()
 {
-    return createSCCPPass();
+    return CreateSCCPPass();
 }
 
 //===----------------------------------------------------------------------===//
@@ -61,7 +61,7 @@ DNA_EXPORT FunctionPass* CreateDeadCodeEliminationPass()
 //
 DNA_EXPORT FunctionPass* CreateDeadStoreEliminationPass()
 {
-    return createDeadStoreEliminationPass();
+    return CreateDeadStoreEliminationPass();
 }
 
 //===----------------------------------------------------------------------===//
@@ -70,7 +70,7 @@ DNA_EXPORT FunctionPass* CreateDeadStoreEliminationPass()
 // values.
 DNA_EXPORT FunctionPass* CreateCallSiteSplittingPass()
 {
-    return createCallSiteSplittingPass();
+    return CreateCallSiteSplittingPass();
 }
 
 //===----------------------------------------------------------------------===//
@@ -81,7 +81,7 @@ DNA_EXPORT FunctionPass* CreateCallSiteSplittingPass()
 //
 DNA_EXPORT FunctionPass* CreateAggressiveDCEPass()
 {
-    return createAggressiveDCEPass();
+    return CreateAggressiveDCEPass();
 }
 
 //===----------------------------------------------------------------------===//
@@ -114,7 +114,7 @@ DNA_EXPORT Pass* CreateLoopGuardWideningPass()
 //
 DNA_EXPORT FunctionPass* CreateBitTrackingDCEPass()
 {
-    return createBitTrackingDCEPass();
+    return CreateBitTrackingDCEPass();
 }
 
 //===----------------------------------------------------------------------===//
@@ -133,7 +133,7 @@ DNA_EXPORT FunctionPass* CreateSROAPass()
 //
 DNA_EXPORT Pass* CreateInductiveRangeCheckEliminationPass()
 {
-    return createInductiveRangeCheckEliminationPass();
+    return CreateInductiveRangeCheckEliminationPass();
 }
 
 //===----------------------------------------------------------------------===//
@@ -143,7 +143,7 @@ DNA_EXPORT Pass* CreateInductiveRangeCheckEliminationPass()
 //
 DNA_EXPORT Pass* CreateIndVarSimplifyPass()
 {
-    return createIndVarSimplifyPass();
+    return CreateIndVarSimplifyPass();
 }
 
 //===----------------------------------------------------------------------===//
@@ -157,7 +157,8 @@ DNA_EXPORT Pass* CreateLICMPass()
 
 DNA_EXPORT Pass* CreateLICMPass2(unsigned LicmMssaOptCap, unsigned LicmMssaNoAccForPromotionCap, bool AllowSpeculation)
 {
-    return createLICMPass(LicmMssaOptCap, LicmMssaNoAccForPromotionCap, AllowSpeculation);
+    return nullptr;
+   // return CreateLICMPass(LicmMssaOptCap, LicmMssaNoAccForPromotionCap, AllowSpeculation);
 }
 
 //===----------------------------------------------------------------------===//
@@ -186,7 +187,7 @@ DNA_EXPORT Pass* CreateLoopPredicationPass()
 //
 DNA_EXPORT Pass* CreateLoopInterchangePass()
 {
-    return createLoopInterchangePass();
+    return CreateLoopInterchangePass();
 }
 
 //===----------------------------------------------------------------------===//
@@ -195,7 +196,7 @@ DNA_EXPORT Pass* CreateLoopInterchangePass()
 //
 DNA_EXPORT FunctionPass* CreateLoopFlattenPass()
 {
-    return createLoopFlattenPass();
+    return CreateLoopFlattenPass();
 }
 
 //===----------------------------------------------------------------------===//
@@ -230,7 +231,7 @@ DNA_EXPORT Pass* CreateLoopUnrollPass(int OptLevel, bool OnlyWhenForced, bool Fo
 // and also does peeling.
 DNA_EXPORT Pass* CreateSimpleLoopUnrollPass(int OptLevel, bool OnlyWhenForced, bool ForgetAllSCEV)
 {
-    return createSimpleLoopUnrollPass(OptLevel, OnlyWhenForced, ForgetAllSCEV);
+    return CreateSimpleLoopUnrollPass(OptLevel, OnlyWhenForced, ForgetAllSCEV);
 }
 
 //===----------------------------------------------------------------------===//
@@ -239,7 +240,7 @@ DNA_EXPORT Pass* CreateSimpleLoopUnrollPass(int OptLevel, bool OnlyWhenForced, b
 //
 DNA_EXPORT Pass* CreateLoopUnrollAndJamPass(int OptLevel)
 {
-    return createLoopUnrollAndJamPass(OptLevel);
+    return CreateLoopUnrollAndJamPass(OptLevel);
 }
 
 //===----------------------------------------------------------------------===//
@@ -248,7 +249,7 @@ DNA_EXPORT Pass* CreateLoopUnrollAndJamPass(int OptLevel)
 //
 DNA_EXPORT Pass* CreateLoopRerollPass()
 {
-    return createLoopRerollPass();
+    return CreateLoopRerollPass();
 }
 
 //===----------------------------------------------------------------------===//
@@ -266,7 +267,7 @@ DNA_EXPORT Pass* CreateLoopRotatePass(int MaxHeaderSize, bool PrepareForLTO)
 //
 DNA_EXPORT Pass* CreateLoopIdiomPass()
 {
-    return createLoopIdiomPass();
+    return CreateLoopIdiomPass();
 }
 
 //===----------------------------------------------------------------------===//
@@ -301,7 +302,7 @@ DNA_EXPORT FunctionPass* CreateReassociatePass()
 //
 DNA_EXPORT FunctionPass* CreateJumpThreadingPass(int Threshold)
 {
-    return createJumpThreadingPass(Threshold);
+    return CreateJumpThreadingPass(Threshold);
 }
 
 //===----------------------------------------------------------------------===//
@@ -312,7 +313,7 @@ DNA_EXPORT FunctionPass* CreateJumpThreadingPass(int Threshold)
 //
 DNA_EXPORT FunctionPass* CreateDFAJumpThreadingPass()
 {
-    return createDFAJumpThreadingPass();
+    return CreateDFAJumpThreadingPass();
 }
 
 //===----------------------------------------------------------------------===//
@@ -373,7 +374,7 @@ DNA_EXPORT FunctionPass* CreateEarlyCSEPass(bool UseMemorySSA)
 //
 DNA_EXPORT FunctionPass* CreateGVNHoistPass()
 {
-    return createGVNHoistPass();
+    return CreateGVNHoistPass();
 }
 
 //===----------------------------------------------------------------------===//
@@ -383,7 +384,7 @@ DNA_EXPORT FunctionPass* CreateGVNHoistPass()
 //
 DNA_EXPORT FunctionPass* CreateGVNSinkPass()
 {
-    return createGVNSinkPass();
+    return CreateGVNSinkPass();
 }
 
 //===----------------------------------------------------------------------===//
@@ -403,7 +404,7 @@ DNA_EXPORT FunctionPass* CreateMergedLoadStoreMotionPass(bool SplitFooterBB)
 //
 DNA_EXPORT FunctionPass* CreateNewGVNPass()
 {
-    return createNewGVNPass();
+    return CreateNewGVNPass();
 }
 
 //===----------------------------------------------------------------------===//
@@ -412,7 +413,7 @@ DNA_EXPORT FunctionPass* CreateNewGVNPass()
 //
 DNA_EXPORT FunctionPass* CreateDivRemPairsPass()
 {
-    return createDivRemPairsPass();
+    return CreateDivRemPairsPass();
 }
 
 //===----------------------------------------------------------------------===//
@@ -422,7 +423,7 @@ DNA_EXPORT FunctionPass* CreateDivRemPairsPass()
 //
 DNA_EXPORT FunctionPass* CreateMemCpyOptPass()
 {
-    return createMemCpyOptPass();
+    return CreateMemCpyOptPass();
 }
 
 //===----------------------------------------------------------------------===//
@@ -432,7 +433,7 @@ DNA_EXPORT FunctionPass* CreateMemCpyOptPass()
 //
 DNA_EXPORT Pass* CreateLoopDeletionPass()
 {
-    return createLoopDeletionPass();
+    return CreateLoopDeletionPass();
 }
 
 //===----------------------------------------------------------------------===//
@@ -451,7 +452,8 @@ DNA_EXPORT FunctionPass* CreateConstantHoistingPass()
 //
 DNA_EXPORT FunctionPass* CreateConstraintEliminationPass()
 {
-    return createConstraintEliminationPass();
+    return nullptr;
+    //return createConstraintEliminationPass();
 }
 
 //===----------------------------------------------------------------------===//
@@ -487,7 +489,7 @@ DNA_EXPORT Pass* CreateLowerGuardIntrinsicPass()
 //
 DNA_EXPORT Pass* CreateLowerMatrixIntrinsicsPass()
 {
-    return createLowerMatrixIntrinsicsPass();
+    return CreateLowerMatrixIntrinsicsPass();
 }
 
 //===----------------------------------------------------------------------===//
@@ -497,7 +499,7 @@ DNA_EXPORT Pass* CreateLowerMatrixIntrinsicsPass()
 //
 DNA_EXPORT Pass* CreateLowerMatrixIntrinsicsMinimalPass()
 {
-    return createLowerMatrixIntrinsicsMinimalPass();
+    return CreateLowerMatrixIntrinsicsMinimalPass();
 }
 
 //===----------------------------------------------------------------------===//
@@ -524,7 +526,7 @@ DNA_EXPORT Pass* CreateMergeICmpsLegacyPass()
 //
 DNA_EXPORT Pass* CreateCorrelatedValuePropagationPass()
 {
-    return createCorrelatedValuePropagationPass();
+    return CreateCorrelatedValuePropagationPass();
 }
 
 //===----------------------------------------------------------------------===//
@@ -624,7 +626,7 @@ DNA_EXPORT FunctionPass* CreateStraightLineStrengthReducePass()
 //
 DNA_EXPORT FunctionPass* CreatePlaceSafepointsPass()
 {
-    return createPlaceSafepointsPass();
+    return CreatePlaceSafepointsPass();
 }
 
 //===----------------------------------------------------------------------===//
@@ -634,7 +636,7 @@ DNA_EXPORT FunctionPass* CreatePlaceSafepointsPass()
 //
 DNA_EXPORT ModulePass* CreateRewriteStatepointsForGCLegacyPass()
 {
-    return createRewriteStatepointsForGCLegacyPass();
+    return CreateRewriteStatepointsForGCLegacyPass();
 }
 
 //===----------------------------------------------------------------------===//
@@ -643,7 +645,7 @@ DNA_EXPORT ModulePass* CreateRewriteStatepointsForGCLegacyPass()
 //
 DNA_EXPORT FunctionPass* CreateFloat2IntPass()
 {
-    return createFloat2IntPass();
+    return CreateFloat2IntPass();
 }
 
 //===----------------------------------------------------------------------===//
@@ -661,7 +663,7 @@ DNA_EXPORT FunctionPass* CreateNaryReassociatePass()
 //
 DNA_EXPORT FunctionPass* CreateLoopDistributePass()
 {
-    return createLoopDistributePass();
+    return CreateLoopDistributePass();
 }
 
 //===----------------------------------------------------------------------===//
@@ -670,7 +672,7 @@ DNA_EXPORT FunctionPass* CreateLoopDistributePass()
 //
 DNA_EXPORT FunctionPass* CreateLoopFusePass()
 {
-    return createLoopFusePass();
+    return CreateLoopFusePass();
 }
 
 //===----------------------------------------------------------------------===//
@@ -679,7 +681,7 @@ DNA_EXPORT FunctionPass* CreateLoopFusePass()
 //
 DNA_EXPORT FunctionPass* CreateLoopLoadEliminationPass()
 {
-    return createLoopLoadEliminationPass();
+    return CreateLoopLoadEliminationPass();
 }
 
 //===----------------------------------------------------------------------===//
@@ -698,7 +700,7 @@ DNA_EXPORT FunctionPass* CreateLoopDataPrefetchPass()
 //
 DNA_EXPORT FunctionPass* CreateLibCallsShrinkWrapPass()
 {
-    return createLibCallsShrinkWrapPass();
+    return CreateLibCallsShrinkWrapPass();
 }
 
 //===----------------------------------------------------------------------===//
@@ -717,7 +719,7 @@ DNA_EXPORT Pass* CreateLoopSimplifyCFGPass()
 //
 DNA_EXPORT Pass* CreateWarnMissedTransformationsPass()
 {
-    return createWarnMissedTransformationsPass();
+    return CreateWarnMissedTransformationsPass();
 }
 
 //===----------------------------------------------------------------------===//

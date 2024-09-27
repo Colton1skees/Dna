@@ -63,15 +63,13 @@ namespace Dna.ControlFlow.Analysis
             }
 
 
-            var idk = new Dictionary<Node, OrderedSet<Node>>();
+            var output = new Dictionary<Node, OrderedSet<Node>>();
             foreach(var pair in dominatorTree)
             {
-                idk.Add(pair.Key, new OrderedSet<Node>(pair.Value));
+                output.Add(pair.Key, new OrderedSet<Node>(pair.Value));
             }
 
-            return idk;
-
-           // return dominatorTree;
+            return output;
         }
     }
 }

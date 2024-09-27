@@ -24,6 +24,15 @@ namespace Dna.Binary
         public ulong BaseAddress { get; }
 
         /// <summary>
+        /// Gets a byte at the specified address.
+        /// </summary>
+        byte ReadByte(ulong address) => ReadBytes(address, 1)[0];
+
+        ushort ReadUint16(ulong address) => BitConverter.ToUInt16(new byte[] { ReadByte(address), ReadByte(address + 1) });
+
+        uint ReadUint32(ulong address) => BitConverter.ToUInt32(ReadBytes(address, 4));
+
+        /// <summary>
         /// Reads the specified number of bytes at the provided address.
         /// </summary>
         /// <param name="address"></param>
@@ -31,6 +40,10 @@ namespace Dna.Binary
         /// <returns></returns>
         byte[] ReadBytes(ulong address, int count = 15);
 
+        /// <summary>
+        /// Gets a ushort at the specified address.
+        /// </summary>
+        ushort ReadUShort(ulong address) => BitConverter.ToUInt16(ReadBytes(address, 2));
 
         /// <summary>
         /// Writes the provided bytes at the input address.
