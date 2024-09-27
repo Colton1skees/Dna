@@ -57,8 +57,6 @@ namespace Dna.BinaryTranslator.JmpTables.Precise
 
         public static IReadOnlyList<ulong> GetSolutions(AbstractNode expression, HashSet<AbstractNode> constraints)
         {
-            expression = new TemporaryNode(44545, 64);
-
             var z3Translator = new Z3AstBuilder(new Context());
             var z3IndexAst = z3Translator.GetZ3Ast(expression);
 
