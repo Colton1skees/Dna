@@ -140,7 +140,7 @@ namespace Dna.BinaryTranslator.Runtime
             // Here the arg allocation is okay i guess because we do need to allocate this crap for spills.
             assembler.sub(rsp, 32);
 
-            /*
+            
             // Spill r10 to the stack, calculate the image base, and then push a return address of [imageBase + ptrLiftedFunctionAddress].
             // Finally we restore r10 and RET.
             assembler.mov(__[rsp - 16], r10);
@@ -157,11 +157,12 @@ namespace Dna.BinaryTranslator.Runtime
             assembler.add(__qword_ptr[rsp], r10);
 
             assembler.mov(r10, __[rsp - 8]);
+			// Not CET compliant
             assembler.call(__qword_ptr[rsp]);
-            */
+            
             //assembler.ret();
 
-            assembler.call(0x014038E000);
+            //assembler.call(0x014038E000);
 
             //assembler.call(liftedFunctionAddress);
             // Int3 after this call finishes. This should never execute since the RET handler executes a ROP.
