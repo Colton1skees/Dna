@@ -1,8 +1,0 @@
-{
-  "profiles": {
-    "LLVMSharp.UnitTests": {
-      "commandName": "Project",
-      "nativeDebugging": true
-    }
-  }
-}
