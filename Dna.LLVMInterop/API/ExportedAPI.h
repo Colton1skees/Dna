@@ -73,6 +73,8 @@
 #include "souper/SouperCandidates.h"
 #include "souper/SouperExprBuilder.h"
 
+#include "LLVMC.hpp"
+
 using namespace llvm::sl;
 
 /*

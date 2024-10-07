@@ -115,6 +115,8 @@ namespace Dna.BinaryTranslator.Safe
         private void ImplementCSpecificHandler()
         {
             var handler = llvmFunction.GlobalParent.GetNamedFunction("__C_specific_handler");
+            if (handler.Handle == nint.Zero)
+                return;
 
             var block = handler.AppendBasicBlock("entry");
             var ctx = handler.GetFunctionCtx();

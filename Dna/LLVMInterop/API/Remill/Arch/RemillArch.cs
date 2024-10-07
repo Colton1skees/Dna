@@ -129,5 +129,11 @@ namespace Dna.LLVMInterop.API.Remill.Arch
         public unsafe static implicit operator RemillOpaqueArch*(RemillArch reg) => (RemillOpaqueArch*)reg.Handle;
 
         public unsafe static implicit operator RemillArch(RemillOpaqueArch* reg) => new RemillArch((nint)reg);
+
+        public static RemillArch CreateWin64()
+            => CreateWin64(LLVMContextRef.Global);
+
+        public static RemillArch CreateWin64(LLVMContextRef ctx)
+            => new RemillArch(ctx, RemillOsId.kOSWindows, RemillArchId.kArchAMD64_AVX512);
     }
 }

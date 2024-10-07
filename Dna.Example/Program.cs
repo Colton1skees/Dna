@@ -55,11 +55,46 @@ using Dna.BinaryTranslator;
 using Dna.BinaryTranslator.JmpTables.Slicing;
 using Dna.LLVMInterop.API.LLVMBindings.Analysis;
 using Dna.BinaryTranslator.JmpTables.Precise;
+using Dna.Reconstruction;
 
 // Regrettably, install some runtime hooks to fix some FFI issues w/ LLVMSharp
-LazyLLVMFixes.InstallModuleToStringBugFix(RemillUtils.LLVMModuleToString);
-LazyLLVMFixes.InstallModuleToFileBugFix();
-LazyLLVMFixes.InstallValueToStringBugFix(RemillUtils.LLVMValueToString);
+//LazyLLVMFixes.InstallModuleToStringBugFix(RemillUtils.LLVMModuleToString);
+//LazyLLVMFixes.InstallModuleToFileBugFix();
+//LazyLLVMFixes.InstallValueToStringBugFix(RemillUtils.LLVMValueToString);
+
+// Sample binaries sourced from: https://github.com/cnr-isti-vclab/meshlab/releases/download/MeshLab-2023.12/MeshLab2023.12-windows.exe
+bool newPipeline = true;
+if (newPipeline)
+{
+    // Load the meshlab binaries
+    var meshLabPath = @"C:\Users\colton\source\repos\MeshLab Binaries\meshlab.exe";
+    // meshLabPath = @"C:\Users\colton\Downloads\VmTarget\VMTarget.exe";
+    var meshLabBin = WindowsBinary.From(meshLabPath);
+    var meshLabDna = new Dna.Dna(meshLabBin);
+
+    // Parse all function bounds from the .pdata section
+    var allFunctions = FunctionDetector.Run(meshLabBin);
+
+    // Pick out and lift one of the larger functions.
+    ulong sAddr = 0x14002F480; // Well-behaved, very large functions
+    //sAddr = 0x1400227C0; // Not well-behaved(floating point), very large function. 
+    //ulong sAddr = 0x140001130; // Simple function from vmtarget.exe
+
+    // Use our iterative control flow graph exploration algorithm to recover the control flow graph
+    var targetFunc = allFunctions.Single(x => x.StartAddr == sAddr);
+    var ourCtx = LLVMContextRef.Global;
+    var remillArch = RemillArch.CreateWin64(ourCtx);
+    var explored = IterativeFunctionTranslator.Translate(meshLabDna, remillArch, ourCtx, targetFunc.StartAddr);
+
+    // Then finally recompile the control flow graph and reinsert it into the binary.
+    var safeBinaryFunction = SafeFunctionTranslator.Translate(meshLabDna, remillArch, ourCtx, explored);
+
+    FunctionGroupCompiler.Compile(meshLabDna, new List<SafelyTranslatedFunction>() { safeBinaryFunction });
+    Console.WriteLine("Successfully recompiled function...");
+    Debugger.Break();
+    Console.ReadLine();
+    return;
+}
 
 bool idk = true;
 if (idk)
@@ -69,14 +104,6 @@ var peImage = PEImage.FromFile(vmtPath);
 var exceptions = peImage.Exceptions.GetEntries().ToList();
 var target = exceptions.Single(x => (ulong)x.Begin.Rva + bin.BaseAddress == 0x140001C70) as X64RuntimeFunction;
 */
-
-    // Compile to a .exe using clang.
-    Console.WriteLine("Compiling to an exe.");
-    var compiledPath33 = ClangCompiler.Compile("canvm.ll");
-
-    Console.WriteLine("Loading into IDA.");
-    var exePath33 = IDALoader.Load(compiledPath33);
-
     // Load the binary into DNA.
     //var vmtPath = @"C:\Users\colton\Downloads\VMTarget.exe";
     var vmtPath = @"C:\Users\colton\source\repos\Devirtualizer\Devirtualizer\Assets\devirtualizeme64_vmp_3.0.9_v1.bin";
@@ -188,7 +215,7 @@ if(prototypeBounds)
 {
 
     // Compile to a .exe using clang.
-    Console.WriteLine("Compiling to an exe.");
+    Console.WriteLine("Compiling to an exe.........................");
     var compiledPath3 = ClangCompiler.Compile("Vectorized.ll");
 
     Console.WriteLine("Loading into IDA.");
@@ -343,7 +370,7 @@ ctx.TryGetBitcodeModule(LlvmUtilities.CreateMemoryBuffer(@"C:\Users\colton\Downl
 
 theModule.WriteToLlFile("remillModule.ll");
 
-Console.WriteLine("foobar");
+Console.WriteLine("foobar ");
 
 var arch = new RemillArch(ctx, RemillOsId.kOSWindows, RemillArchId.kArchAMD64);
 
@@ -413,6 +440,7 @@ var llvmLifter = new LLVMLifter(architecture);
 llvmLifter.Lift(liftedCfg);
 
 // Optimize the routine.
+/*
 bool optimize = false;
 if (optimize)
 {
@@ -439,6 +467,7 @@ if (optimize)
 
     passManager2.FinalizeFunctionPassManager();
 }
+*/
 
 // Create a function for reading bytes at an arbitrary rva.
 var readBytes = (ulong address, uint size) =>
@@ -492,7 +521,7 @@ llvmLifter.Module.WriteToLlFile(llPath);
 
 // Marshal LLVM's function CFG to Dna's control flow graph structure.
 ControlFlowGraph<LLVMValueRef> llvmGraph = new ControlFlowGraph<LLVMValueRef>(0);
-foreach (var llvmBlock in llvmLifter.llvmFunction.BasicBlocks)
+foreach (var llvmBlock in llvmLifter.llvmFunction.GetBasicBlocks())
 {
     // Allocate a new block.
     var blk = llvmGraph.CreateBlock((ulong)llvmBlock.Handle);

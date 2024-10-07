@@ -165,14 +165,14 @@ namespace Dna.BinaryTranslator.Unsafe
             // TODO: Make things `noalias`.
             if (addMemoryPtr)
             {
-                var memParam = newFunction.Params.Last();
+                var memParam = newFunction.GetParams().Last();
                 memParam.Name = "memory";
                 LLVMCloning.AddParamAttr(newFunction, newFunction.ParamsCount - 1, AttrKind.NoAlias);
             }
 
             foreach (var indexMapping in RegisterArgumentIndices)
             {
-                var regParam = newFunction.Params[indexMapping.Value];
+                var regParam = newFunction.GetParams()[indexMapping.Value];
                 regParam.Name = indexMapping.Key.Name;
             }
 
@@ -214,7 +214,7 @@ namespace Dna.BinaryTranslator.Unsafe
         {
             if (addMemoryPtr == false)
                 throw new InvalidOperationException($"Memory pointer was not requested.");
-            return function.Params.Last();
+            return function.GetParams().Last();
         }
 
         private LLVMValueRef CreateCallToOriginalFunction(LLVMValueRef originalFunc, LLVMValueRef newFunc, LLVMValueRef localStateStruct)

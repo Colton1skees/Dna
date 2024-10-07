@@ -47,6 +47,8 @@ namespace Dna.BinaryTranslator.Unsafe
     /// </summary>
     public class IterativeFunctionTranslator
     {
+        private const bool LIFT_SEH = false;
+
         private readonly IDna dna;
 
         private RemillArch arch;
@@ -74,8 +76,7 @@ namespace Dna.BinaryTranslator.Unsafe
             ControlFlowGraph<Instruction> cfg = null;
 
             // Parse the scope table of the function.
-            var scopeTable = BinaryScopeTable.TryGetFromFunctionAddress(dna.Binary, funcAddress);
-            scopeTable = new(0, new List<ScopeTableEntry>());
+            var scopeTable = GetScopeTable(dna.Binary, funcAddress);
             var scopeTableTree = new ScopeTableTree(scopeTable);
             var handlerAddresses = scopeTable.Entries.Select(x => x.HandlerAddr);
 
@@ -235,35 +236,15 @@ namespace Dna.BinaryTranslator.Unsafe
                 {
                     OptimizationApi.OptimizeModule(function.GlobalParent, function, false, false, 0, false, 0, false);
 
+                    if (!LIFT_SEH)
+                        continue;
+
                     // For some reason the set of passes in OptimizeModule optimizes away LLVM's
                     // `__C_specific_handler` personality function - even if it's being actively used as a personality function.
                     // As a short term fix we reinsert the personality function after each invocation.
                     var sehBuilder = new SehIntrinsicBuilder(function.GlobalParent, LLVMBuilderRef.Create(ctx));
                     sehBuilder.CreateMsvcPersonalityFunction();
-
-
-                    function.GlobalParent.WriteToLlFile("translatedFunction.ll");
-                    var fpm = new FunctionPassManager();
-                    var pmb = new PassManagerBuilder();
-                    var moduleManager = new PassManager();
-
-                    // Remove all switches. This simplifies analysis since we don't need to handle
-                    // cases where more than two case predecessors exist.
-                    fpm.Add(PassApi.CreateUnSwitchPass());
-                    // Remove irreducible control flow. Thus we only work with sane loops.
-                    fpm.Add(UtilsPasses.CreateFixIrreduciblePass());
-                    // Canonicalize the loop. Make sure all loops have dedicated exits(that is, no exit block for the loop has a predecessor
-                    // that is outside the loop. This implies that all exit blocks are dominated by the loop header.)
-                    fpm.Add(UtilsPasses.CreateLoopSimplifyPass());
-
-                    fpm.Add(UtilsPasses.CreateLCSSAPass());
-
-                    pmb.PopulateFunctionPassManager(fpm);
-                    pmb.PopulateModulePassManager(moduleManager);
-
-                    fpm.DoInitialization();
-                    fpm.Run(function);
-                    fpm.DoFinalization();
+                    
                 }
 
 
@@ -314,7 +295,7 @@ namespace Dna.BinaryTranslator.Unsafe
             };
 
             // Apply recursive descent to the cfg using the newly discovered jump table information.
-            var newCfg = dna.RecursiveDescent.ReconstructCfg(cfgAddress, getKnownIndirectEdgesCallback, BinaryScopeTable.TryGetFromFunctionAddress(dna.Binary, cfgAddress).Entries.Select(x => x.HandlerAddr));
+            var newCfg = dna.RecursiveDescent.ReconstructCfg(cfgAddress, getKnownIndirectEdgesCallback, GetScopeTable(dna.Binary, cfgAddress).Entries.Select(x => x.HandlerAddr));
 
             // Finally build a new list of jump tables.
             List<JmpTable> finalTables = new();
@@ -392,6 +373,19 @@ namespace Dna.BinaryTranslator.Unsafe
             }
 
             return seen;
+        }
+
+        // Helper utility for getting a function's scope table
+        // Note that we leave it disabled it for now, because there is some missing error handling logic we need to implement.
+        private static ScopeTable GetScopeTable(IBinary binary, ulong funcAddr)
+        {
+            if (LIFT_SEH)
+            {
+                return BinaryScopeTable.TryGetFromFunctionAddress(binary, funcAddr);
+            }
+
+            var scopeTable = new ScopeTable(0, new List<ScopeTableEntry>());
+            return scopeTable;
         }
     }
 }

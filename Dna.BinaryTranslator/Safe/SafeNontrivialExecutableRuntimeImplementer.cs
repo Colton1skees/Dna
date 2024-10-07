@@ -247,6 +247,8 @@ namespace Dna.BinaryTranslator.Safe
                 regValues.Add(regValues.Last());
                 regValues.Add(regValues.Last());
 
+
+
                 // Compute the vm call stub address.
                 //var i64Key = LLVMValueRef.CreateConstInt(LLVMTypeRef.Int64, callKeyToStubVmEnterGlobalPtrs[callKey]);
                 //var addr = builder.BuildAdd(caller.GetFunction().GetParam(ImageBaseArgIndex), i64Key);
@@ -326,11 +328,22 @@ namespace Dna.BinaryTranslator.Safe
                 regValues.Add(regValues.Last());
                 regValues.Add(regValues.Last());
 
+                /*
                 // Compute the vm call stub address.
                 //var max = callKeyToStubVmEnterGlobalPtrs.Values.Max();
                 //var i64Key = LLVMValueRef.CreateConstInt(LLVMTypeRef.Int64, max + 8);
                 var i64Key = builder.BuildLoad2(ctx.Int64Type, RetStubOffsetPtrGlobal);
                 var addr = builder.BuildAdd(caller.GetFunction().GetParam(ImageBaseArgIndex), i64Key);
+
+                // Dereference the function pointer from the binary section.
+                var funcPtr = builder.BuildIntToPtr(addr, ctx.GetPtrType());
+                //funcPtr = builder.BuildLoad2(ctx.GetInt64Ty(), funcPtr);
+                //funcPtr = builder.BuildAdd(funcPtr, caller.GetFunction().GetParam(ImageBaseArgIndex));
+
+                //funcPtr = builder.BuildIntToPtr(funcPtr, ctx.GetPtrType());
+                */
+
+                var addr = builder.BuildLoad2(ctx.Int64Type, RetStubOffsetPtrGlobal, "rsp");
 
                 // Dereference the function pointer from the binary section.
                 var funcPtr = builder.BuildIntToPtr(addr, ctx.GetPtrType());

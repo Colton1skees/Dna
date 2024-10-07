@@ -40,7 +40,7 @@ namespace Dna.BinaryTranslator.Safe
                 var inst = block.Instructions[instIndex];
                 var hasNext = instIndex < block.Instructions.Count - 1;
 
-                if (inst.Mnemonic == Mnemonic.Call && hasNext)
+                if (IsCall(inst) && hasNext)
                     return true;
 
                 return false;
@@ -78,8 +78,28 @@ namespace Dna.BinaryTranslator.Safe
                     // Get the current instruction.
                     var instruction = block.Instructions.ElementAt(i);
 
-                    if (!shouldSplit(block, i))
+                    bool isSplitting = shouldSplit(block, i);
+                    if (!isSplitting)
+                    {
+                        // If the basic block ends with a call, and there is no splitting to perform,
+                        // we want to still mark the end target as a split target.
+                        // TODO: We also add the CALL instruction to the fallthrough IP list, though I'm not 100% sure if this is correct
+                        if(IsCall(instruction))
+                        {
+                            var any = block.GetOutgoingEdges().Any();
+                            if (!any)
+                                continue;
+
+                            // Mark each target as a fallthrough edge.
+                            foreach(var outEdge in block.GetOutgoingEdges())
+                            {
+                                splitTargets.Add(outEdge.TargetBlock);
+                            }
+
+                            fallthroughFromIps.Add(instruction.IP);
+                        }
                         continue;
+                    }
 
                     fallthroughFromIps.Add(instruction.IP);
                     
@@ -136,5 +156,8 @@ namespace Dna.BinaryTranslator.Safe
             // Finally we can return knowing that this basic block has been split successfully.
             return (isNew, splitBlock);
         }
+
+        private static bool IsCall(Instruction inst)
+            => inst.Mnemonic == Mnemonic.Call;
     }
 }

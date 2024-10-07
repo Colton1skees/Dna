@@ -1,4 +1,5 @@
-﻿using LLVMSharp.Interop;
+﻿using Dna.LLVMInterop.API.LLVMBindings;
+using LLVMSharp.Interop;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -24,5 +25,11 @@ namespace Dna.LLVMInterop
             bool runStructuring,
             bool justGVN,
             nint ptrStructureFunction);
+
+        [DllImport("Dna.LLVMInterop", CallingConvention = CallingConvention.Cdecl)]
+        public unsafe static extern IntPtr RunCfgCanonicalizationPipeline(LLVMOpaqueValue* function);
+
+        [DllImport("Dna.LLVMInterop", CallingConvention = CallingConvention.Cdecl)]
+        public unsafe static extern void RunJumpTableSolvingPass(LLVMOpaqueValue* function, nint solveJumpTableBounds, nint trySolveConstant);
     }
 }

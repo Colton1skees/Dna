@@ -40,10 +40,10 @@ namespace Dna.BinaryTranslator.Runtime
         private readonly ulong imageBase;
 
         private readonly Func<ulong, bool> shouldAllocateStackFrame;
-
+        private readonly ulong callTargetAddr;
         private ulong localKey;
 
-        public VmStubBuilder(ulong initialEntryKey, Assembler assembler, ulong liftedFunctionAddress, int stackHeight, IReadOnlyList<RemillRegister> registerArguments, Label initialReferencePoint, ulong initialRva, ulong imageBase, Func<ulong, bool> shouldAllocateStackFrame)
+        public VmStubBuilder(ulong initialEntryKey, Assembler assembler, ulong liftedFunctionAddress, int stackHeight, IReadOnlyList<RemillRegister> registerArguments, Label initialReferencePoint, ulong initialRva, ulong imageBase, Func<ulong, bool> shouldAllocateStackFrame, ulong callTargetAddr)
         {
             this.initialEntryKey = initialEntryKey;
             this.assembler = assembler;
@@ -54,6 +54,7 @@ namespace Dna.BinaryTranslator.Runtime
             this.initialRva = initialRva;
             this.imageBase = imageBase;
             this.shouldAllocateStackFrame = shouldAllocateStackFrame;
+            this.callTargetAddr = callTargetAddr;
         }
 
         public List<RemillRegister> GetStackArguments()
@@ -88,12 +89,40 @@ namespace Dna.BinaryTranslator.Runtime
             // Restore rcx using the spilled value from the stack.
             assembler.mov(rcx, __[rsp - 8]);
 
+
+            // New logic: Make rcx,rdx,r8,r9 the first four arguments. Then dispatcher key, image base
+
             // Push each register argument on the stack.
             // Note that we skip the first four arguments, as the fastcall convention
             // requires that these are passed in registers.
             // Also stack arguments are passed from right to left using the fastcall convention.
             var stackArguments = GetStackArguments();
             stackArguments.Reverse();
+
+            // First push imagebase/dispatcher key
+            // Begin by pushing a constant zero onto the stack
+            //assembler.push(0);
+            //assembler.push(0);
+
+            /*
+            // Then push r10 and rsi for use as a scratch register
+            assembler.push(r10);
+            assembler.push(rsi);
+            // Push the image base
+            // Get the image base.
+
+            assembler.lea(r10, __[initialReferencePoint]);
+            assembler.sub(r10, (int)initialRva);
+            assembler.mov(__[rsp + 32], r10);
+            // Push the vm key
+            assembler.mov(rsi, vmKey);
+            assembler.mov(__[rsp+24], rsi);
+            // Pop the registers back
+            assembler.pop(rsi);
+            assembler.pop(r10);
+            */
+            //increase += 2;
+
             foreach (var inputReg in stackArguments)
             {
                 if (inputReg.Name == "RIP")
@@ -139,8 +168,7 @@ namespace Dna.BinaryTranslator.Runtime
 
             // Here the arg allocation is okay i guess because we do need to allocate this crap for spills.
             assembler.sub(rsp, 32);
-
-            
+            /*
             // Spill r10 to the stack, calculate the image base, and then push a return address of [imageBase + ptrLiftedFunctionAddress].
             // Finally we restore r10 and RET.
             assembler.mov(__[rsp - 16], r10);
@@ -157,12 +185,12 @@ namespace Dna.BinaryTranslator.Runtime
             assembler.add(__qword_ptr[rsp], r10);
 
             assembler.mov(r10, __[rsp - 8]);
-			// Not CET compliant
-            assembler.call(__qword_ptr[rsp]);
+            //assembler.call(__qword_ptr[rsp]);
+            */
             
             //assembler.ret();
 
-            //assembler.call(0x014038E000);
+            assembler.call(callTargetAddr);
 
             //assembler.call(liftedFunctionAddress);
             // Int3 after this call finishes. This should never execute since the RET handler executes a ROP.

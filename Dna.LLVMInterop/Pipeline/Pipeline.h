@@ -33,6 +33,10 @@
 #include "llvm/Transforms/Scalar/EarlyCSE.h"
 #include "llvm/Transforms/Scalar/SCCP.h"
 #include "llvm/Transforms/Utils/Mem2Reg.h"
+#include "llvm/Transforms/Utils/LowerSwitch.h"
+#include "llvm/Transforms/Utils/LoopSimplify.h"
+#include "llvm/Transforms/Utils/LCSSA.h"
+#include "llvm/Transforms/Utils/FixIrreducible.h"
 #include "llvm/Transforms/Scalar/InstSimplifyPass.h"
 #include "llvm/Transforms/Scalar/IndVarSimplify.h"
 #include "llvm/Transforms/Scalar/SimpleLoopUnswitch.h"
@@ -62,6 +66,7 @@
 #include <souper/Infer/Z3Driver.h>
 #include <souper/Infer/Z3Expr.h>
 
+#include "llvm/Passes/PassBuilder.h"
 #include "Passes/ClassifyingAliasAnalysisPass.h"
 #include "Passes/ConstantConcretizationPass.h"
 #include "Passes/ControlledNodeSplittingPass.h"
@@ -701,6 +706,155 @@ namespace Dna::Pipeline
 		while (true);
 	}
 
+
+	void InitializePasses()
+	{
+		// Initialize passes.
+		llvm::PassRegistry& Registry = *llvm::PassRegistry::getPassRegistry();
+		llvm::initializeCore(Registry);
+		llvm::initializeCodeGen(Registry);
+		initializeLoopStrengthReducePass(Registry);
+		initializeLowerIntrinsicsPass(Registry);
+		initializeUnreachableBlockElimLegacyPassPass(Registry);
+		initializeConstantHoistingLegacyPassPass(Registry);
+		llvm::initializeScalarOpts(Registry);
+		llvm::initializeVectorization(Registry);
+		llvm::initializeIPO(Registry);
+		llvm::initializeAnalysis(Registry);
+		llvm::initializeTransformUtils(Registry);
+		llvm::initializeInstCombine(Registry);
+		llvm::initializeTargetLibraryInfoWrapperPassPass(Registry);
+		llvm::initializeGlobalsAAWrapperPassPass(Registry);
+		llvm::initializeGVNLegacyPassPass(Registry);
+		llvm::initializeDependenceAnalysisWrapperPassPass(Registry);
+
+		llvm::initializeLoopInfoWrapperPassPass(Registry);
+
+		// For codegen passes, only passes that do IR to IR transformation are
+		// supported.
+		initializeExpandLargeDivRemLegacyPassPass(Registry);
+		initializeExpandLargeFpConvertLegacyPassPass(Registry);
+		initializeScalarizeMaskedMemIntrinLegacyPassPass(Registry);
+		initializeSelectOptimizePass(Registry);
+		initializeCallBrPreparePass(Registry);
+		initializeWinEHPreparePass(Registry);
+		initializeDwarfEHPrepareLegacyPassPass(Registry);
+		initializeSafeStackLegacyPassPass(Registry);
+		initializeSjLjEHPreparePass(Registry);
+		initializePreISelIntrinsicLoweringLegacyPassPass(Registry);
+		initializeGlobalMergePass(Registry);
+		initializeInterleavedLoadCombinePass(Registry);
+		initializeInterleavedAccessPass(Registry);
+		initializeUnreachableBlockElimLegacyPassPass(Registry);
+		initializeExpandReductionsPass(Registry);
+		initializeWasmEHPreparePass(Registry);
+		initializeWriteBitcodePassPass(Registry);
+		initializeReplaceWithVeclibLegacyPass(Registry);
+		initializeJMCInstrumenterPass(Registry);
+
+
+		initializeTarget(Registry);
+	}
+
+	void OptimizeModuleNew(llvm::Function* f)
+	{
+		InitializePasses();
+
+
+		// Create pass managers.
+		llvm::FunctionPassManager FPM;
+		llvm::legacy::PassManager module_manager;
+		llvm::LoopAnalysisManager LAM;
+		llvm::FunctionAnalysisManager FAM;
+		llvm::CGSCCAnalysisManager CGAM;
+		llvm::ModulePassManager MPM;
+		llvm::ModuleAnalysisManager MAM;
+		llvm::LoopPassManager LPM;
+		llvm::PassBuilder PB;
+
+		FPM.addPass(llvm::SROAPass({}));
+		FPM.addPass(llvm::SCCPPass());
+		FPM.addPass(llvm::ADCEPass());
+		FPM.addPass(llvm::BDCEPass());
+		FPM.addPass(llvm::SimplifyCFGPass());
+		FPM.addPass(llvm::ReassociatePass());
+
+		FPM.addPass(llvm::EarlyCSEPass(true));
+		FPM.addPass(llvm::SpeculativeExecutionPass());
+		FPM.addPass(llvm::JumpThreadingPass(99999));
+		FPM.addPass(llvm::CorrelatedValuePropagationPass());
+		FPM.addPass(llvm::SimplifyCFGPass());
+
+		FPM.addPass(llvm::PromotePass());
+		//FPM.addPass(llvm::InstCombinePass());
+		FPM.addPass(llvm::SpeculativeExecutionPass());
+
+		FPM.addPass(llvm::JumpThreadingPass(999999));
+		FPM.addPass(llvm::JumpThreadingPass(-1));
+		FPM.addPass(llvm::CorrelatedValuePropagationPass());
+		LPM.addPass(llvm::LoopSimplifyCFGPass());
+
+		FPM.addPass(llvm::InstCombinePass());
+		FPM.addPass(llvm::GVNPass(llvm::GVNOptions()));
+		FPM.addPass(llvm::SCCPPass());
+		FPM.addPass(llvm::ADCEPass());
+		FPM.addPass(llvm::BDCEPass());
+
+		MPM.addPass(llvm::ModuleInlinerPass());
+
+		// Add various optimization passes.
+		//FPM.addPass(llvm::InstCombinePass());
+		FPM.addPass(llvm::JumpThreadingPass());
+		FPM.addPass(llvm::CorrelatedValuePropagationPass());
+		FPM.addPass(llvm::SimplifyCFGPass());
+		//FPM.addPass(llvm::createAggressiveInstCombinerPass());
+		//FPM.addPass(llvm::InstCombinePass());
+		FPM.addPass(llvm::ReassociatePass());
+		FPM.addPass(llvm::SROAPass({}));
+		//FPM.addPass(llvm::createMergedLoadStoreMotionPass());
+		FPM.addPass(llvm::NewGVNPass());
+		FPM.addPass(llvm::SCCPPass());
+		FPM.addPass(llvm::BDCEPass());
+
+		FPM.addPass(llvm::SCCPPass());
+		FPM.addPass(llvm::BDCEPass());
+		// TODO: Insert custom passes for stack var elimination and load/store propagation
+		FPM.addPass(llvm::SCCPPass());
+		FPM.addPass(llvm::BDCEPass());
+		// TODO: Adhoc instruction combining
+
+		FPM.addPass(llvm::ADCEPass());
+		FPM.addPass(llvm::SCCPPass());
+		//FPM.addPass(llvm::InstCombinePass());
+		FPM.addPass(llvm::DSEPass());
+
+		FPM.addPass(llvm::GVNHoistPass());
+
+		FPM.addPass(llvm::ADCEPass());
+		FPM.addPass(llvm::SimplifyCFGPass());
+
+		FPM.addPass(llvm::SimplifyCFGPass());
+
+		LPM.addPass(llvm::IndVarSimplifyPass());
+
+		FPM.addPass(llvm::SROAPass({}));
+		FPM.addPass(llvm::EarlyCSEPass());
+		//FPM.addPass(llvm::DSEPass()); // added
+		FPM.addPass(llvm::SCCPPass());
+		FPM.addPass(llvm::ADCEPass());
+
+		FAM.registerPass([&] { return PB.buildDefaultAAPipeline(); });
+		PB.registerModuleAnalyses(MAM);
+		PB.registerCGSCCAnalyses(CGAM);
+		PB.registerFunctionAnalyses(FAM);
+		PB.registerLoopAnalyses(LAM);
+		PB.crossRegisterProxies(LAM, FAM, CGAM, MAM);
+
+		//MPM.addPass(createModuleToFunctionPassAdaptor(std::move(FPM)));
+
+		FPM.run(*f, FAM);
+	}
+
 	void OptimizeModule(llvm::Module* module,
 		llvm::Function* f,
 		bool aggressiveUnroll,
@@ -712,6 +866,11 @@ namespace Dna::Pipeline
 		bool justGVN,
 		Dna::Passes::tStructureFunction structureFunction)
 	{
+		// Run the "new" pipeline. The new pipeline is substantially more efficient, with a better order / selection of passes.
+		// Though it is missing the passes intended for binary deobfuscation(namely binary load propagation, heuristic alias analysis, and enhanced store to load propagation).
+		// Also note that the some of the passes are incorrectly named... (structure function is no longer a control flow structuring pass!, though it once was)
+		OptimizeModuleNew(f);
+		return;
 
 		count++;
 		/*
@@ -878,10 +1037,6 @@ namespace Dna::Pipeline
 			// TODO: Properly pass the alias analysis func ptr.
 			Dna::Passes::ClassifyingAAResult::gGetAliasResult = getAliasResult;
 
-			for (int i = 0; i < 100; i++)
-			{
-				printf("TODO: Upgrade SegmentsExternalAAWrapperPass to LLVM16.");
-			}
 			//MPM.addPass(Dna::Passes::createSegmentsAAWrapperPass());
 
 			//MPM.addPass(new Dna::Passes::SegmentsExternalAAWrapperPass());
@@ -1108,5 +1263,73 @@ namespace Dna::Pipeline
 		}
 
 		//module_manager.run(*f->getParent());
+	}
+
+	DNA_EXPORT void RunCfgCanonicalizationPipeline(llvm::Function* f)
+	{
+		// Run static pass initializers.
+		InitializePasses();
+
+		// Create pass managers.
+		llvm::FunctionPassManager FPM;
+		llvm::legacy::PassManager module_manager;
+		llvm::LoopAnalysisManager LAM;
+		llvm::FunctionAnalysisManager FAM;
+		llvm::CGSCCAnalysisManager CGAM;
+		llvm::ModulePassManager MPM;
+		llvm::ModuleAnalysisManager MAM;
+		llvm::LoopPassManager LPM;
+		llvm::PassBuilder PB;
+
+		// Remove all switches. This simplifies analysis since we don't need to handle
+		// cases where more than two case predecessors exist.
+		FPM.addPass(llvm::LowerSwitchPass());
+		// Remove irreducible control flow. Thus we only work with sane loops.
+		// NOTE: It may be preferable to do controlled node splitting instead of FixIrreducible(which uses runtime indirection instead of node splitting).
+		// The constraints would likely be easier to solve.
+		FPM.addPass(llvm::FixIrreduciblePass());
+		// Canonicalize the loop. Make sure all loops have dedicated exits(that is, no exit block for the loop has a predecessor
+		// that is outside the loop. This implies that all exit blocks are dominated by the loop header.)
+		FPM.addPass(llvm::LoopSimplifyPass());
+		FPM.addPass(llvm::LCSSAPass());
+
+		FAM.registerPass([&] { return PB.buildDefaultAAPipeline(); });
+		PB.registerModuleAnalyses(MAM);
+		PB.registerCGSCCAnalyses(CGAM);
+		PB.registerFunctionAnalyses(FAM);
+		PB.registerLoopAnalyses(LAM);
+		PB.crossRegisterProxies(LAM, FAM, CGAM, MAM);
+
+		//MPM.addPass(createModuleToFunctionPassAdaptor(std::move(FPM))); // Not needed anymore? 
+		FPM.run(*f, FAM);
+	}
+
+	DNA_EXPORT void RunJumpTableSolvingPass(llvm::Function* f, Dna::Passes::tAnalyzeJumpTableBounds analyzeJumpTableBounds, Dna::Passes::tTrySolveConstant trySolveConstant)
+	{
+		// Run static pass initializers.
+		InitializePasses();
+
+		// Create pass managers.
+		llvm::FunctionPassManager FPM;
+		llvm::legacy::PassManager module_manager;
+		llvm::LoopAnalysisManager LAM;
+		llvm::FunctionAnalysisManager FAM;
+		llvm::CGSCCAnalysisManager CGAM;
+		llvm::ModulePassManager MPM;
+		llvm::ModuleAnalysisManager MAM;
+		llvm::LoopPassManager LPM;
+		llvm::PassBuilder PB;
+
+		// Queue up the jump table solving pass.
+		FPM.addPass(Dna::Passes::JumpTableAnalysisPass(analyzeJumpTableBounds, trySolveConstant));
+
+		FAM.registerPass([&] { return PB.buildDefaultAAPipeline(); });
+		PB.registerModuleAnalyses(MAM);
+		PB.registerCGSCCAnalyses(CGAM);
+		PB.registerFunctionAnalyses(FAM);
+		PB.registerLoopAnalyses(LAM);
+		PB.crossRegisterProxies(LAM, FAM, CGAM, MAM);
+
+		FPM.run(*f, FAM);
 	}
 }

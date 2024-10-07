@@ -1,7 +1,7 @@
 ﻿<Project Sdk="Microsoft.NET.Sdk">
 
   <PropertyGroup>
-    <TargetFramework>net7.0</TargetFramework>
+    <TargetFramework>net8.0</TargetFramework>
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
     <Platforms>AnyCPU;x64</Platforms>
@@ -49,8 +49,6 @@
     <PackageReference Include="AutomaticGraphLayout" Version="1.1.12" />
     <PackageReference Include="ELFSharp" Version="2.16.1" />
     <PackageReference Include="Iced" Version="1.17.0" />
-    <PackageReference Include="LLVMSharp" Version="16.0.0" />
-    <PackageReference Include="LLVMSharp.Interop" Version="16.0.0" />
     <PackageReference Include="Microsoft.Z3" Version="4.11.2" />
     <PackageReference Include="Rivers" Version="0.1.0" />
     <PackageReference Include="WebAssembly" Version="1.2.1" />
@@ -64,6 +62,8 @@
       <Private>True</Private>
       <CopyLocalSatelliteAssemblies>True</CopyLocalSatelliteAssemblies>
     </ProjectReference>
+    <ProjectReference Include="..\LLVMSharp\sources\LLVMSharp.Interop\LLVMSharp.Interop.csproj" />
+    <ProjectReference Include="..\LLVMSharp\sources\LLVMSharp\LLVMSharp.csproj" />
     <ProjectReference Include="..\TritonTranslator\TritonTranslator\TritonTranslator.csproj" />
     <ProjectReference Include="..\unicorn-net\src\Unicorn.Net\Unicorn.Net.csproj" />
   </ItemGroup>

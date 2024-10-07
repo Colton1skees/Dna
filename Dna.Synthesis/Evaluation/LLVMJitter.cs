@@ -45,7 +45,7 @@ namespace Dna.Synthesis.Jit
 
             // Maintain a mapping of <inputVariable, llvmParam>.
             argumentMapping.Clear();
-            var arguments = function.Params;
+            var arguments = function.GetParams();
             int i = 0;
             foreach (var inputVariable in inputVariables)
             {

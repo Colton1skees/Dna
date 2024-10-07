@@ -25,7 +25,7 @@ namespace Dna.BinaryTranslator.Runtime
                 // Thus we just add a single block which returns the first argument.
                 var block = function.AppendBasicBlock("entry");
                 builder.PositionAtEnd(block);
-                builder.BuildRet(function.Params.First());
+                builder.BuildRet(function.GetParams().First());
 
                 // Mark the intrinsic function for inlining.
                 LLVM.SetLinkage(function, LLVMLinkage.LLVMInternalLinkage);

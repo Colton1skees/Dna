@@ -1,7 +1,7 @@
 <Project Sdk="Microsoft.NET.Sdk">
 
   <PropertyGroup>
-    <TargetFramework>net7.0</TargetFramework>
+    <TargetFramework>net8.0</TargetFramework>
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
     <Platforms>AnyCPU;x64</Platforms>
@@ -17,8 +17,6 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <PackageReference Include="LLVMSharp" Version="16.0.0" />
-    <PackageReference Include="LLVMSharp.Interop" Version="16.0.0" />
     <PackageReference Include="Microsoft.FASTER.Core" Version="2.6.0" />
     <PackageReference Include="Newtonsoft.Json" Version="9.0.1" />
     <PackageReference Include="OneOf" Version="3.0.255" />
@@ -28,6 +26,8 @@
     <ProjectReference Include="..\Dna.ControlFlow\Dna.ControlFlow.csproj" />
     <ProjectReference Include="..\Dna.DataStructures\Dna.DataStructures.csproj" />
     <ProjectReference Include="..\Dna\Dna.csproj" />
+    <ProjectReference Include="..\LLVMSharp\sources\LLVMSharp.Interop\LLVMSharp.Interop.csproj" />
+    <ProjectReference Include="..\LLVMSharp\sources\LLVMSharp\LLVMSharp.csproj" />
     <ProjectReference Include="..\TritonTranslator\TritonTranslator\TritonTranslator.csproj" />
   </ItemGroup>
 

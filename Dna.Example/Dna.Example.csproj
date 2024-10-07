@@ -2,7 +2,7 @@
 
   <PropertyGroup>
     <OutputType>Exe</OutputType>
-    <TargetFramework>net7.0-windows</TargetFramework>
+    <TargetFramework>net8.0-windows7.0</TargetFramework>
 	<UseWPF>true</UseWPF>
     <UseWindowsForms>true</UseWindowsForms>
     <ImplicitUsings>enable</ImplicitUsings>
@@ -26,6 +26,8 @@
     </ProjectReference>
     <ProjectReference Include="..\Dna.Synthesis\Dna.Synthesis.csproj" />
     <ProjectReference Include="..\Dna\Dna.csproj" />
+    <ProjectReference Include="..\LLVMSharp\sources\LLVMSharp.Interop\LLVMSharp.Interop.csproj" />
+    <ProjectReference Include="..\LLVMSharp\sources\LLVMSharp\LLVMSharp.csproj" />
     <ProjectReference Include="..\RuntimePatches\RuntimePatches.csproj" />
   </ItemGroup>
 

@@ -39,6 +39,7 @@
 #include <unordered_set>
 #include <tuple>
 #include "llvm/Analysis/ValueTracking.h"
+#include "llvm/Passes/PassBuilder.h"
 
 static llvm::cl::opt<bool> ExploitBPCs(
     "souper-exploit-blockpcs",
@@ -1055,6 +1056,8 @@ void ExtractExprCandidates(Function &F, const LoopInfo *LI, DemandedBits *DB,
   }
 }
 
+
+/*
 class ExtractExprCandidatesPass : public FunctionPass {
   static char ID;
   const ExprBuilderOptions &Opts;
@@ -1101,6 +1104,33 @@ public:
 char ExtractExprCandidatesPass::ID = 0;
 
 }
+*/
+
+struct ExtractExprCandidatesPass : PassInfoMixin<ExtractExprCandidatesPass> {
+    const ExprBuilderOptions& Opts;
+    InstContext& IC;
+    ExprBuilderContext& EBC;
+    FunctionCandidateSet& Result;
+
+public:
+    ExtractExprCandidatesPass(const ExprBuilderOptions& Opts, InstContext& IC,
+        ExprBuilderContext& EBC,
+        FunctionCandidateSet& Result)
+        : Opts(Opts), IC(IC), EBC(EBC), Result(Result) {}
+
+    PreservedAnalyses run(Function& F, FunctionAnalysisManager& FAM) {
+        TargetLibraryInfo& TLI = FAM.getResult<TargetLibraryAnalysis>(F);
+        LoopInfo& LI = FAM.getResult<LoopAnalysis>(F);
+        DemandedBits& DB = FAM.getResult<DemandedBitsAnalysis>(F);
+        LazyValueInfo& LVI = FAM.getResult<LazyValueAnalysis>(F);
+        ScalarEvolution& SE = FAM.getResult<ScalarEvolutionAnalysis>(F);
+        ExtractExprCandidates(F, &LI, &DB, &LVI, &SE, &TLI, Opts, IC, EBC, Result);
+        return PreservedAnalyses::none();
+    }
+};
+
+}
+
 
 FunctionCandidateSet souper::ExtractCandidatesFromPass(
     Function *F, const LoopInfo *LI, DemandedBits *DB, LazyValueInfo *LVI,
@@ -1114,14 +1144,36 @@ FunctionCandidateSet souper::ExtractCandidatesFromPass(
 FunctionCandidateSet souper::ExtractCandidates(Function *F, InstContext &IC,
                                                ExprBuilderContext &EBC,
                                                const ExprBuilderOptions &Opts) {
+    /*
   FunctionCandidateSet Result;
 
   PassRegistry &Registry = *PassRegistry::getPassRegistry();
+  initializeCore(Registry);
+  initializeScalarOpts(Registry);
+  initializeVectorization(Registry);
+  initializeIPO(Registry);
   initializeAnalysis(Registry);
+  initializeTransformUtils(Registry);
+  initializeInstCombine(Registry);
 
-  legacy::FunctionPassManager FPM(F->getParent());
+  initializeTarget(Registry);
+
+  
+
+  FunctionPassManager FPM(F->getParent());
+
   FPM.add(new ExtractExprCandidatesPass(Opts, IC, EBC, Result));
   FPM.run(*F);
+  */
+
+    llvm::PassBuilder PB;
+    FunctionAnalysisManager FAM;
+    PB.registerFunctionAnalyses(FAM);
+    FunctionCandidateSet Result;
+    FunctionPassManager FPM;
+    FPM.addPass(ExtractExprCandidatesPass(Opts, IC, EBC, Result));
+    FPM.run(*F, FAM);
+    return Result;
 
   return Result;
 }

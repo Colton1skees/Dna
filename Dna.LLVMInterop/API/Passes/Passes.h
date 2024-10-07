@@ -26,9 +26,4 @@ namespace Dna::API {
 	{
 		return new Dna::Passes::ControlFlowStructuringPass(structureFunction);
 	}
-
-	DNA_EXPORT llvm::FunctionPass* CreateJumpTableAnalysisPass(Dna::Passes::tAnalyzeJumpTableBounds analyzeJumpTableBounds, Dna::Passes::tTrySolveConstant trySolveConstant)
-	{
-		return new Dna::Passes::JumpTableAnalysisPass(analyzeJumpTableBounds, trySolveConstant);
-	}
 }

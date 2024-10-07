@@ -11,6 +11,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
+using Dna.LLVMInterop.API.Optimization;
 
 namespace Dna.BinaryTranslator.Unsafe
 {
@@ -27,6 +28,7 @@ namespace Dna.BinaryTranslator.Unsafe
             // Make the CFG reducible, remove switch statements, enforce that all loops have dedicated exits.
             CanonicalizeCFG(function);
 
+            /*
             var fpm = new FunctionPassManager();
             var pmb = new PassManagerBuilder();
             var moduleManager = new PassManager();
@@ -43,6 +45,11 @@ namespace Dna.BinaryTranslator.Unsafe
             fpm.DoFinalization();
 
             return jmpTablePass.SolvedTables;
+            */
+
+            var jmpTablePass = new PreciseJumpTableSolvingPass(binary);
+            OptimizationApi.RunJumpTableSolvingPass(function, jmpTablePass.PtrSolveBounds, jmpTablePass.PtrTrySolveConstant);
+            return jmpTablePass.SolvedTables;
         }
 
         /// <summary>
@@ -52,6 +59,9 @@ namespace Dna.BinaryTranslator.Unsafe
         /// <param name="function"></param>
         private static void CanonicalizeCFG(LLVMValueRef function)
         {
+            OptimizationApi.RunCfgCanonicalizationPipeline(function);
+
+            /*
             var fpm = new FunctionPassManager();
             var pmb = new PassManagerBuilder();
             var moduleManager = new PassManager();
@@ -74,6 +84,7 @@ namespace Dna.BinaryTranslator.Unsafe
             fpm.DoInitialization();
             fpm.Run(function);
             fpm.DoFinalization();
+            */
         }
     }
 }

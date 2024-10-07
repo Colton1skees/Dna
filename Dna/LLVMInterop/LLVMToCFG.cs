@@ -21,7 +21,7 @@ namespace Dna.LLVMInterop
         public static ControlFlowGraph<LLVMValueRef> GetCFG(LLVMValueRef function)
         {
             ControlFlowGraph<LLVMValueRef> llvmGraph = new ControlFlowGraph<LLVMValueRef>(0);
-            foreach (var llvmBlock in function.BasicBlocks)
+            foreach (var llvmBlock in function.GetBasicBlocks())
             {
                 // Allocate a new block.
                 var blk = llvmGraph.CreateBlock((ulong)llvmBlock.Handle);

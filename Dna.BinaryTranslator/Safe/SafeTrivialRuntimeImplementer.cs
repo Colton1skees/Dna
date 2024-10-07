@@ -79,11 +79,11 @@ namespace Dna.BinaryTranslator.Safe
         private void ImplementMemWrite(LLVMValueRef function)
         {
             // Use GEP to create an i8* pointer to memory[address].
-            var storeAddr = function.Params[1];
+            var storeAddr = function.GetParams()[1];
             var storePointer = builder.BuildIntToPtr(storeAddr, module.GetPtrType());
 
             // Bitcast the i8* pointer to the type of the value being stored.
-            var storeValue = function.Params[2];
+            var storeValue = function.GetParams()[2];
 
             // Store the value to memory.
          //   EmitMemoryReorderBarrier(builder);

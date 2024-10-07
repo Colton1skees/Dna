@@ -75,7 +75,7 @@ namespace Dna::Passes {
 
 	typedef void(__cdecl* tAnalyzeJumpTableBounds)(llvm::Function* func, llvm::LoopInfo* loopInfo, llvm::MemorySSA* memSsa, llvm::LazyValueInfo* lvi, tTrySolveConstant trySolveConstant);
 
-	struct JumpTableAnalysisPass : public llvm::FunctionPass
+	struct JumpTableAnalysisPass : public llvm::PassInfoMixin<JumpTableAnalysisPass>
 	{
 		static char ID;
 
@@ -83,36 +83,27 @@ namespace Dna::Passes {
 
 		tTrySolveConstant trySolveConstant;
 
-		JumpTableAnalysisPass(tAnalyzeJumpTableBounds structureFunction, tTrySolveConstant trySolveConstant) : FunctionPass(ID)
+		JumpTableAnalysisPass(tAnalyzeJumpTableBounds structureFunction, tTrySolveConstant trySolveConstant)
 		{
 			this->analyzeBounds = structureFunction;
 			this->trySolveConstant = trySolveConstant;
 		}
 
-		JumpTableAnalysisPass() : FunctionPass(ID)
-		{
 
-		}
-
-		void getAnalysisUsage(llvm::AnalysisUsage& AU) const
+		llvm::PreservedAnalyses run(llvm::Function& F, llvm::FunctionAnalysisManager& fam)
 		{
-			AU.addRequired<llvm::LoopInfoWrapperPass>();
-			AU.addRequired<llvm::MemorySSAWrapperPass>();
-			AU.addRequired<llvm::LazyValueInfoWrapperPass>();
-			AU.setPreservesAll();
-		}
-
-		virtual bool runOnFunction(llvm::Function& F)
-		{
-			llvm::LoopInfo& LI = getAnalysis<llvm::LoopInfoWrapperPass>().getLoopInfo();
-			llvm::MemorySSA& mssa = getAnalysis<llvm::MemorySSAWrapperPass>().getMSSA();
-			llvm::LazyValueInfo& lvi = getAnalysis<llvm::LazyValueInfoWrapperPass>().getLVI();
+			llvm::LoopInfo& LI = fam.getResult<llvm::LoopAnalysis>(F);
+			llvm::MemorySSA& mssa = fam.getResult<llvm::MemorySSAAnalysis>(F).getMSSA();
+			llvm::LazyValueInfo& lvi = fam.getResult<llvm::LazyValueAnalysis>(F);
 			mssa.ensureOptimizedUses();
 			analyzeBounds(&F, &LI, &mssa, &lvi, trySolveConstant);
-			return false;
+
+			// This pass does not mutate the control flow graph, so all analyses should be preserved.
+			return llvm::PreservedAnalyses::all();
 		}
 	};
 
 	char JumpTableAnalysisPass::ID = 0;
+
 	static llvm::RegisterPass<JumpTableAnalysisPass> JumpTableAnalysis("JumpTableAnalysisPass", "Recover accurate jump table bounds from a function slice.");
 }

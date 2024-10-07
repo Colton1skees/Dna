@@ -106,7 +106,8 @@ namespace Dna.SEH
                     throw new InvalidOperationException("TODO: Handle deprecated UwOpSpareCode");
                 case UnwindOpType.UwOpSaveXmm128:
                 {
-                    throw new InvalidOperationException($"TODO: {unwindOp}");
+                    var frameOffset = binary.ReadUint16(offset + 2);
+                    return (new UwOpSaveXmm128(codeOffset, opInfo, registers[opInfo], frameOffset), 2);
                 }
                 case UnwindOpType.UwOpSaveXmm128Far:
                 {

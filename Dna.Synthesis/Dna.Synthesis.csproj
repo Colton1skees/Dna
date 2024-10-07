@@ -1,7 +1,7 @@
 ﻿<Project Sdk="Microsoft.NET.Sdk">
 
   <PropertyGroup>
-    <TargetFramework>net7.0</TargetFramework>
+    <TargetFramework>net8.0</TargetFramework>
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
     <Platforms>AnyCPU;x64</Platforms>
@@ -17,8 +17,12 @@
       <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
     </PackageReference>
     <PackageReference Include="Antlr4.Runtime" Version="4.6.6" />
-    <PackageReference Include="LLVMSharp" Version="15.0.0-beta1" />
     <PackageReference Include="Microsoft.Z3" Version="4.12.0" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\LLVMSharp\sources\LLVMSharp.Interop\LLVMSharp.Interop.csproj" />
+    <ProjectReference Include="..\LLVMSharp\sources\LLVMSharp\LLVMSharp.csproj" />
   </ItemGroup>
 
 </Project>

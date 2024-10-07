@@ -226,6 +226,9 @@
     <ClInclude Include="API\LLVM\Analysis\LoopInfo.h">
       <Filter>API\LLVM</Filter>
     </ClInclude>
+    <ClInclude Include="API\LLVMC.hpp">
+      <Filter>API</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="dllmain.cpp" />

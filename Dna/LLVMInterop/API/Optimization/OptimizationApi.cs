@@ -1,9 +1,12 @@
-﻿using LLVMSharp.Interop;
+﻿using Dna.LLVMInterop.API.LLVMBindings;
+using LLVMSharp.Interop;
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Runtime.InteropServices;
 using System.Text;
 using System.Threading.Tasks;
+using static Dna.LLVMInterop.NativePassApi;
 
 namespace Dna.LLVMInterop.API.Optimization
 {
@@ -30,6 +33,16 @@ namespace Dna.LLVMInterop.API.Optimization
                 runStructuring,
                 justGVN,
                 ptrStructureFunction);
+        }
+
+        public static unsafe void RunCfgCanonicalizationPipeline(LLVMValueRef function)
+        {
+            NativeOptimizationApi.RunCfgCanonicalizationPipeline(function);
+        }
+
+        public unsafe static void RunJumpTableSolvingPass(LLVMValueRef function, dgSolveJumpTableBounds structureFunction, dgTrySolveConstant trySolveConstant)
+        {
+            NativeOptimizationApi.RunJumpTableSolvingPass(function, Marshal.GetFunctionPointerForDelegate(structureFunction), Marshal.GetFunctionPointerForDelegate(trySolveConstant));
         }
     }
 }
