@@ -18,18 +18,22 @@ namespace Dna.LLVMInterop.API.LLVMBindings
         public unsafe static extern void AddPass(LLVMOpaquePassManagerBase* passManager, LLVMOpaquePass* pass);
 
         [DllImport("Dna.LLVMInterop", CallingConvention = CallingConvention.Cdecl, EntryPoint = "PassManager_Run")]
+        [return: MarshalAs(UnmanagedType.U1)] 
         public unsafe static extern bool RunOnModule(LLVMOpaquePassManager* passManager, LLVMOpaqueModule* module);
 
         [DllImport("Dna.LLVMInterop", CallingConvention = CallingConvention.Cdecl, EntryPoint = "FunctionPassManager_Constructor")]
         public unsafe static extern LLVMOpaqueFunctionPassManager* FunctionPassManagerConstructor();
 
         [DllImport("Dna.LLVMInterop", CallingConvention = CallingConvention.Cdecl, EntryPoint = "FunctionPassManager_Run")]
+        [return: MarshalAs(UnmanagedType.U1)] 
         public unsafe static extern bool RunOnFunction(LLVMOpaqueFunctionPassManager* passManager, LLVMOpaqueValue* func);
 
         [DllImport("Dna.LLVMInterop", CallingConvention = CallingConvention.Cdecl, EntryPoint = "FunctionPassManager_DoInitialization")]
+        [return: MarshalAs(UnmanagedType.U1)] 
         public unsafe static extern bool FunctionPassManagerDoInitialization(LLVMOpaqueFunctionPassManager* passManager);
 
         [DllImport("Dna.LLVMInterop", CallingConvention = CallingConvention.Cdecl, EntryPoint = "FunctionPassManager_DoFinalization")]
+        [return: MarshalAs(UnmanagedType.U1)] 
         public unsafe static extern bool FunctionPassManagerDoFinalization(LLVMOpaqueFunctionPassManager* passManager);
     }
 }

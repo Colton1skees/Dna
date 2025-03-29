@@ -229,6 +229,21 @@
     <ClInclude Include="API\LLVMC.hpp">
       <Filter>API</Filter>
     </ClInclude>
+    <ClInclude Include="API\LLVM\Analysis\ConstantFolding.h">
+      <Filter>API\LLVM\Analysis</Filter>
+    </ClInclude>
+    <ClInclude Include="API\LLVM\Analysis\KnownBits.h">
+      <Filter>API\LLVM\Analysis</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Devirtualizer\Dna.LLVMInterop\Passes\OpaqueStackVarEliminationPass.h">
+      <Filter>Passes</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Devirtualizer\Dna.LLVMInterop\Passes\AdhocInstCombinePass.h">
+      <Filter>Passes</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Devirtualizer\Dna.LLVMInterop\Passes\MultiUseCloningPass.h">
+      <Filter>Passes</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="dllmain.cpp" />
@@ -307,16 +322,16 @@
     <ClCompile Include="souper\lib\Codegen\MachineCost.cpp">
       <Filter>souper</Filter>
     </ClCompile>
-    <ClCompile Include="..\..\klee\lib\Expr\Expr.cpp">
+    <ClCompile Include="..\..\..\klee\lib\Expr\Expr.cpp">
       <Filter>klee</Filter>
     </ClCompile>
-    <ClCompile Include="..\..\klee\lib\Expr\ExprPPrinter.cpp">
+    <ClCompile Include="..\..\..\klee\lib\Expr\ExprPPrinter.cpp">
       <Filter>klee</Filter>
     </ClCompile>
-    <ClCompile Include="..\..\klee\lib\Expr\ExprSMTLIBPrinter.cpp">
+    <ClCompile Include="..\..\..\klee\lib\Expr\ExprSMTLIBPrinter.cpp">
       <Filter>klee</Filter>
     </ClCompile>
-    <ClCompile Include="..\..\klee\lib\Expr\Updates.cpp">
+    <ClCompile Include="..\..\..\klee\lib\Expr\Updates.cpp">
       <Filter>klee</Filter>
     </ClCompile>
     <ClCompile Include="souper\lib\Infer\Z3Driver.cpp">

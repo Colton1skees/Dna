@@ -124,11 +124,19 @@ namespace Dna.BinaryTranslator.Safe
             foreach(var (block, enterRva) in blockToEnterRva)
             {
                 var glob = executableRuntime.CallKeyToStubVmEnterGlobalPtrs[block.Address];
+
                 var newValue = LLVMValueRef.CreateConstInt(LLVMTypeRef.Int64, enterRva);
 
+                /*
+                glob.Initializer = newValue;
+                //glob.ReplaceAllUsesWith(newValue);
+                glob.Linkage = LLVMLinkage.LLVMPrivateLinkage;
+                //glob.DeleteGlobal();
+                */
                 foreach (var user in glob.GetUsers())
                 {
                     Debug.Assert(user.Kind == LLVMValueKind.LLVMInstructionValueKind && user.InstructionOpcode == LLVMOpcode.LLVMLoad);
+                    Console.WriteLine($"User: {user}");
                     builder.PositionBefore(user);
                     var sum = builder.BuildAdd(imgBasePtr, newValue);
 

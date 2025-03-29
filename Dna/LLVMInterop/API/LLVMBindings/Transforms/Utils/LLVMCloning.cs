@@ -9,6 +9,11 @@ namespace Dna.LLVMInterop.API.LLVMBindings.Transforms.Utils
 {
     public static class LLVMCloning
     {
+        public unsafe static LLVMTypeRef GetFunctionPrototype(LLVMValueRef function)
+        {
+            return NativeCloningApi.GetFunctionType(function);
+        }
+
         public static unsafe void InlineFunction(LLVMValueRef callInst)
         {
             var ptr = NativeCloningApi.InlineFunction(callInst);
@@ -30,6 +35,21 @@ namespace Dna.LLVMInterop.API.LLVMBindings.Transforms.Utils
         public static unsafe void MakeDsoLocal(LLVMValueRef function, bool dsoLocal)
         {
             NativeCloningApi.MakeDsoLocal(function, dsoLocal);
+        }
+
+        public static unsafe void PrepareForCloning(LLVMValueRef function, bool jumpThreading)
+        {
+            NativeCloningApi.PrepareForCloning(function, jumpThreading);
+        }
+
+        public static unsafe LLVMBasicBlockRef CloneBasicBlock(LLVMBasicBlockRef block)
+        {
+            return NativeCloningApi.CloneBasicBlock(block);
+        }
+
+        public static unsafe bool MergeBlockIntoPredecessor(LLVMBasicBlockRef block)
+        {
+            return NativeCloningApi.MergeBlockIntoPredecessor(block);
         }
     }
 }

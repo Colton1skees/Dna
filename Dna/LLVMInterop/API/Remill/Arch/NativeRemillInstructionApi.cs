@@ -71,15 +71,19 @@ namespace Dna.LLVMInterop.API.Remill.Arch
         public unsafe static extern RemillOpaqueArch* Instruction_GetArch(RemillOpaqueInstruction* inst);
 
         [DllImport("Dna.LLVMInterop", CallingConvention = CallingConvention.Cdecl)]
+        [return: MarshalAs(UnmanagedType.U1)] 
         public unsafe static extern bool Instruction_GetIsAtomicReadModifyWrite(RemillOpaqueInstruction* inst);
 
         [DllImport("Dna.LLVMInterop", CallingConvention = CallingConvention.Cdecl)]
+        [return: MarshalAs(UnmanagedType.U1)] 
         public unsafe static extern bool Instruction_GetHasBranchTakenDelaySlot(RemillOpaqueInstruction* inst);
 
         [DllImport("Dna.LLVMInterop", CallingConvention = CallingConvention.Cdecl)]
+        [return: MarshalAs(UnmanagedType.U1)] 
         public unsafe static extern bool Instruction_GetHasBranchNotTakenDelaySlot(RemillOpaqueInstruction* inst);
 
         [DllImport("Dna.LLVMInterop", CallingConvention = CallingConvention.Cdecl)]
+        [return: MarshalAs(UnmanagedType.U1)] 
         public unsafe static extern bool Instruction_GetInDelaySlot(RemillOpaqueInstruction* inst);
 
         [DllImport("Dna.LLVMInterop", CallingConvention = CallingConvention.Cdecl)]
@@ -95,30 +99,39 @@ namespace Dna.LLVMInterop.API.Remill.Arch
         public unsafe static extern sbyte* Instruction_Serialize(RemillOpaqueInstruction* inst);
 
         [DllImport("Dna.LLVMInterop", CallingConvention = CallingConvention.Cdecl)]
+        [return: MarshalAs(UnmanagedType.U1)] 
         public unsafe static extern bool Instruction_IsControlFlow(RemillOpaqueInstruction* inst);
 
         [DllImport("Dna.LLVMInterop", CallingConvention = CallingConvention.Cdecl)]
+        [return: MarshalAs(UnmanagedType.U1)] 
         public unsafe static extern bool Instruction_IsDirectControlFlow(RemillOpaqueInstruction* inst);
 
         [DllImport("Dna.LLVMInterop", CallingConvention = CallingConvention.Cdecl)]
+        [return: MarshalAs(UnmanagedType.U1)] 
         public unsafe static extern bool Instruction_IsIndirectControlFlow(RemillOpaqueInstruction* inst);
 
         [DllImport("Dna.LLVMInterop", CallingConvention = CallingConvention.Cdecl)]
+        [return: MarshalAs(UnmanagedType.U1)] 
         public unsafe static extern bool Instruction_IsConditionalBranch(RemillOpaqueInstruction* inst);
 
         [DllImport("Dna.LLVMInterop", CallingConvention = CallingConvention.Cdecl)]
+        [return: MarshalAs(UnmanagedType.U1)] 
         public unsafe static extern bool Instruction_IsFunctionCall(RemillOpaqueInstruction* inst);
 
         [DllImport("Dna.LLVMInterop", CallingConvention = CallingConvention.Cdecl)]
+        [return: MarshalAs(UnmanagedType.U1)] 
         public unsafe static extern bool Instruction_IsFunctionReturn(RemillOpaqueInstruction* inst);
 
         [DllImport("Dna.LLVMInterop", CallingConvention = CallingConvention.Cdecl)]
+        [return: MarshalAs(UnmanagedType.U1)] 
         public unsafe static extern bool Instruction_IsValid(RemillOpaqueInstruction* inst);
 
         [DllImport("Dna.LLVMInterop", CallingConvention = CallingConvention.Cdecl)]
+        [return: MarshalAs(UnmanagedType.U1)] 
         public unsafe static extern bool Instruction_IsError(RemillOpaqueInstruction* inst);
 
         [DllImport("Dna.LLVMInterop", CallingConvention = CallingConvention.Cdecl)]
+        [return: MarshalAs(UnmanagedType.U1)] 
         public unsafe static extern bool Instruction_IsNoOp(RemillOpaqueInstruction* inst);
 
         [DllImport("Dna.LLVMInterop", CallingConvention = CallingConvention.Cdecl)]

@@ -7,3 +7,6 @@
 [submodule "LLVMSharp"]
 	path = LLVMSharp
 	url = https://github.com/Colton1skees/LLVMSharp.git
+[submodule "Simplifier"]
+	path = Simplifier
+	url = https://github.com/mazeworks-security/Simplifier.git

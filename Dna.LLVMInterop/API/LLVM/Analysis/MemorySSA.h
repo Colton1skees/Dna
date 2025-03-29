@@ -1,7 +1,10 @@
- 
+
+#pragma once
+
 #include <API/ExportDef.h>
 #include <API/ImmutableManagedVector.h>
 #include <llvm/Analysis/MemorySSA.h>
+#include <llvm/Analysis/MemorySSAUpdater.h>
 #include <llvm/Analysis/MemoryLocation.h>
 // MemoryAccess. TODO: Expose iterators for defs / uses.
 namespace Dna::API {
@@ -250,5 +253,48 @@ namespace Dna::API {
 	DNA_EXPORT bool MemorySSA_DominatesUse(llvm::MemorySSA* memSsa, llvm::MemoryAccess* a, llvm::Use* b)
 	{
 		return memSsa->dominates(a, *b);
+	}
+
+	DNA_EXPORT bool MemorySSA_MayAlias(llvm::MemorySSA* memSsa, llvm::MemoryUseOrDef* use, llvm::MemoryUseOrDef* def)
+	{
+		auto& AA = memSsa->getAA();
+
+		auto* UseInst = use->getMemoryInst();
+		auto* DefInst = def->getMemoryInst();
+
+		// copypaste from memoryssa
+
+		if (auto* CB = llvm::dyn_cast_or_null<llvm::CallBase>(UseInst)) {
+			llvm::ModRefInfo I = AA.getModRefInfo(DefInst, CB);
+			return llvm::isModOrRefSet(I);
+		}
+
+		llvm::ModRefInfo I = AA.getModRefInfo(DefInst, llvm::MemoryLocation::get(UseInst));
+		return llvm::isModSet(I);
+	}
+
+	DNA_EXPORT llvm::MemorySSAUpdater* MemorySSAUpdater_Get(llvm::MemorySSA* memSsa)
+	{
+		return new llvm::MemorySSAUpdater(memSsa);
+	}
+
+	DNA_EXPORT llvm::MemoryUseOrDef* MemorySsaUpdater_CreateMemoryAccessBefore(llvm::MemorySSAUpdater* updater, llvm::Instruction* inst, llvm::MemoryAccess* definition, llvm::MemoryUseOrDef* insertPoint)
+	{
+		return updater->createMemoryAccessBefore(inst, definition, insertPoint);
+	}
+
+	DNA_EXPORT void MemorySsaUpdater_InsertUse(llvm::MemorySSAUpdater* updater, llvm::MemoryUse* use, bool renameUses)
+	{
+		return updater->insertUse(use, renameUses);
+	}
+
+	DNA_EXPORT void MemorySSAUpdater_RemoveMemAccess(llvm::MemorySSAUpdater* updater, llvm::Instruction* store)
+	{
+		updater->removeMemoryAccess(store);
+	}
+
+	DNA_EXPORT void MemorySSAUpdater_Delete(llvm::MemorySSAUpdater* updater)
+	{
+		delete updater;
 	}
 }

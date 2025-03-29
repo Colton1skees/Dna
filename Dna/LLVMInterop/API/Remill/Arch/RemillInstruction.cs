@@ -1,7 +1,6 @@
 ﻿using Dna.LLVMInterop.API.LLVMBindings.Analysis;
 using Dna.LLVMInterop.API.Remill.BC;
 using Dna.LLVMInterop.API.Remill.Manual;
-using Dna.Optimization.Passes;
 using LLVMSharp.Interop;
 using System;
 using System.Collections.Generic;

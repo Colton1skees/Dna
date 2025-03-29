@@ -72,7 +72,7 @@
   <PropertyGroup Label="UserMacros" />
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
     <LinkIncremental>true</LinkIncremental>
-    <IncludePath>C:\Users\colton\source\repos\klee\include;C:\Users\colton\source\repos\Dna\Dna.LLVMInterop\souper\include;C:\Users\colton\source\repos\cxx-common-cmake-win\cxx-common-cmake\build\remill-prefix\src\remill\include;C:\Users\colton\source\repos\Dna\Dna.LLVMInterop;C:\Users\colton\source\repos\cxx-common-cmake-win\cxx-common-cmake\build\install\include;$(IncludePath)</IncludePath>
+    <IncludePath>C:\Users\colton\source\repos\klee\include;C:\Users\colton\source\repos\DnaOld\Dna\Dna.LLVMInterop\souper\include;C:\Users\colton\source\repos\cxx-common-cmake-win\cxx-common-cmake\build\remill-prefix\src\remill\include;C:\Users\colton\source\repos\DnaOld\Dna\Dna.LLVMInterop;C:\Users\colton\source\repos\cxx-common-cmake-win\cxx-common-cmake\build\install\include;$(IncludePath)</IncludePath>
     <LibraryPath>C:\Users\colton\source\repos\cxx-common-cmake-win\cxx-common-cmake\build\install\lib;$(LibraryPath)</LibraryPath>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
@@ -159,10 +159,15 @@
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
+    <ClInclude Include="..\..\Devirtualizer\Dna.LLVMInterop\Passes\AdhocInstCombinePass.h" />
+    <ClInclude Include="..\..\Devirtualizer\Dna.LLVMInterop\Passes\MultiUseCloningPass.h" />
+    <ClInclude Include="..\..\Devirtualizer\Dna.LLVMInterop\Passes\OpaqueStackVarEliminationPass.h" />
     <ClInclude Include="API\ExportDef.h" />
     <ClInclude Include="API\ExportedAPI.h" />
     <ClInclude Include="API\ImmutableManagedPair.h" />
     <ClInclude Include="API\LLVMC.hpp" />
+    <ClInclude Include="API\LLVM\Analysis\ConstantFolding.h" />
+    <ClInclude Include="API\LLVM\Analysis\KnownBits.h" />
     <ClInclude Include="API\LLVM\Analysis\LoopInfo.h" />
     <ClInclude Include="API\LLVM\Analysis\MemorySSA.h" />
     <ClInclude Include="API\LLVM\IR\CFG.h" />
@@ -237,10 +242,10 @@
     <ClInclude Include="Utilities\magic_enum_switch.hpp" />
   </ItemGroup>
   <ItemGroup>
-    <ClCompile Include="..\..\klee\lib\Expr\Expr.cpp" />
-    <ClCompile Include="..\..\klee\lib\Expr\ExprPPrinter.cpp" />
-    <ClCompile Include="..\..\klee\lib\Expr\ExprSMTLIBPrinter.cpp" />
-    <ClCompile Include="..\..\klee\lib\Expr\Updates.cpp" />
+    <ClCompile Include="..\..\..\klee\lib\Expr\Expr.cpp" />
+    <ClCompile Include="..\..\..\klee\lib\Expr\ExprPPrinter.cpp" />
+    <ClCompile Include="..\..\..\klee\lib\Expr\ExprSMTLIBPrinter.cpp" />
+    <ClCompile Include="..\..\..\klee\lib\Expr\Updates.cpp" />
     <ClCompile Include="dllmain.cpp" />
     <ClCompile Include="Passes\ClassifyingAliasAnalysisPass.cpp" />
     <ClCompile Include="Passes\compilercore_assert.cpp" />

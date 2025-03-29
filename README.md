@@ -28,4 +28,4 @@ Some caveats:
 Note that `Dna` is currently based on LLVM 17.
 
 # Building
-`Dna` will not build out of the box. Custom patches to remill and souper were needed for this to build on windows. If you would like to work on Dna, open an issue or email me `colton1skees@gmail.com`. At some point I may publish proper build steps, but I make no guarantees.
+`Dna` will not build out of the box. Custom patches to remill and souper were needed for this to build on windows. If you would like to work on Dna, open an issue or email me `colton1skees@gmail.com`. At some point I may publish proper build steps, but I make no guarantees. 

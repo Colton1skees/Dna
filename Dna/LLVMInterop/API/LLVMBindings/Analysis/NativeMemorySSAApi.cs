@@ -24,9 +24,11 @@ namespace Dna.LLVMInterop.API.LLVMBindings.Analysis
         public unsafe static extern LLVMOpaqueMemoryPhi* GetMemoryAccessFromBlock(LLVMOpaqueMemorySSA* memSsa, LLVMOpaqueBasicBlock* block);
 
         [DllImport("Dna.LLVMInterop", CallingConvention = CallingConvention.Cdecl, EntryPoint = "MemorySSA_IsLiveOnEntryDef")]
+        [return: MarshalAs(UnmanagedType.U1)] 
         public unsafe static extern bool IsLiveOnEntryDef(LLVMOpaqueMemorySSA* memSsa, LLVMOpaqueMemoryAccess* memAccess);
 
         [DllImport("Dna.LLVMInterop", CallingConvention = CallingConvention.Cdecl, EntryPoint = "MemorySSA_GetLiveOnEntryDef")]
+        [return: MarshalAs(UnmanagedType.U1)] 
         public unsafe static extern bool GetLiveOnEntryDef(LLVMOpaqueMemorySSA* memSsa);
 
         [DllImport("Dna.LLVMInterop", CallingConvention = CallingConvention.Cdecl, EntryPoint = "MemorySSA_GetBlockAccesses")]
@@ -36,12 +38,19 @@ namespace Dna.LLVMInterop.API.LLVMBindings.Analysis
         public unsafe static extern OpaqueManagedVector<LLVMOpaqueMemoryAccess>* GetBlockDefs(LLVMOpaqueMemorySSA* memSsa, LLVMOpaqueBasicBlock* block);
 
         [DllImport("Dna.LLVMInterop", CallingConvention = CallingConvention.Cdecl, EntryPoint = "MemorySSA_LocallyDominates")]
+        [return: MarshalAs(UnmanagedType.U1)] 
         public unsafe static extern bool LocallyDominates(LLVMOpaqueMemorySSA* memSsa, LLVMOpaqueMemoryAccess* a, LLVMOpaqueMemoryAccess* b);
 
         [DllImport("Dna.LLVMInterop", CallingConvention = CallingConvention.Cdecl, EntryPoint = "MemorySSA_Dominates")]
+        [return: MarshalAs(UnmanagedType.U1)] 
         public unsafe static extern bool Dominates(LLVMOpaqueMemorySSA* memSsa, LLVMOpaqueMemoryAccess* a, LLVMOpaqueMemoryAccess* b);
 
         [DllImport("Dna.LLVMInterop", CallingConvention = CallingConvention.Cdecl, EntryPoint = "MemorySSA_DominatesUse")]
+        [return: MarshalAs(UnmanagedType.U1)] 
         public unsafe static extern bool Dominates(LLVMOpaqueMemorySSA* memSsa, LLVMOpaqueMemoryAccess* a, LLVMOpaqueUse* b);
+
+        [DllImport("Dna.LLVMInterop", CallingConvention = CallingConvention.Cdecl, EntryPoint = "MemorySSA_MayAlias")]
+        [return: MarshalAs(UnmanagedType.U1)]
+        public unsafe static extern bool MayAlias(LLVMOpaqueMemorySSA* memSsa, LLVMOpaqueMemoryUseOrDef* use, LLVMOpaqueMemoryUseOrDef* def);
     }
 }

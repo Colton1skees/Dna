@@ -9,8 +9,6 @@ using Dna.Extensions;
 using Dna.LLVMInterop.API.LLVMBindings.Analysis;
 using Dna.LLVMInterop.API.Optimization;
 using Dna.LLVMInterop.API.Remill.BC;
-using Dna.LLVMInterop.Passes;
-using Dna.LLVMInterop.Passes.Matchers;
 using Dna.Symbolic;
 using Dna.Utilities;
 using LLVMSharp;

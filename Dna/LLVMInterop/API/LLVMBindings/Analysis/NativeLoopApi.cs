@@ -27,27 +27,33 @@ namespace Dna.LLVMInterop.API.LLVMBindings.Analysis
         public unsafe static extern LLVMOpaqueLoop* GetOutermostLoop(LLVMOpaqueLoop* loop);
 
         [DllImport("Dna.LLVMInterop", CallingConvention = CallingConvention.Cdecl, EntryPoint = "Loop_ContainsLoop")]
+        [return: MarshalAs(UnmanagedType.U1)] 
         public unsafe static extern bool ContainsLoop(LLVMOpaqueLoop* loop, LLVMOpaqueLoop* l);
 
         [DllImport("Dna.LLVMInterop", CallingConvention = CallingConvention.Cdecl, EntryPoint = "Loop_ContainsBlock")]
+        [return: MarshalAs(UnmanagedType.U1)]
         public unsafe static extern bool ContainsBlock(LLVMOpaqueLoop* loop, LLVMOpaqueBasicBlock* block);
 
         [DllImport("Dna.LLVMInterop", CallingConvention = CallingConvention.Cdecl, EntryPoint = "Loop_ContainsInstruction")]
+        [return: MarshalAs(UnmanagedType.U1)] 
         public unsafe static extern bool ContainsInstruction(LLVMOpaqueLoop* loop, LLVMOpaqueValue* instruction);
 
         [DllImport("Dna.LLVMInterop", CallingConvention = CallingConvention.Cdecl, EntryPoint = "Loop_GetSubLoops")]
         public unsafe static extern OpaqueManagedVector<LLVMOpaqueLoop>* GetSubLoops(LLVMOpaqueLoop* loop);
 
         [DllImport("Dna.LLVMInterop", CallingConvention = CallingConvention.Cdecl, EntryPoint = "Loop_IsInnermost")]
+        [return: MarshalAs(UnmanagedType.U1)] 
         public unsafe static extern bool IsInnermost(LLVMOpaqueLoop* loop);
 
         [DllImport("Dna.LLVMInterop", CallingConvention = CallingConvention.Cdecl, EntryPoint = "Loop_IsOutermost")]
+        [return: MarshalAs(UnmanagedType.U1)] 
         public unsafe static extern bool IsOutermost(LLVMOpaqueLoop* loop);
 
         [DllImport("Dna.LLVMInterop", CallingConvention = CallingConvention.Cdecl, EntryPoint = "Loop_GetBlocks")]
         public unsafe static extern OpaqueManagedVector<LLVMOpaqueBasicBlock>* GetBlocks(LLVMOpaqueLoop* loop);
 
         [DllImport("Dna.LLVMInterop", CallingConvention = CallingConvention.Cdecl, EntryPoint = "Loop_IsLoopExiting")]
+        [return: MarshalAs(UnmanagedType.U1)] 
         public unsafe static extern bool IsLoopExiting(LLVMOpaqueLoop* loop, LLVMOpaqueBasicBlock* block);
 
         [DllImport("Dna.LLVMInterop", CallingConvention = CallingConvention.Cdecl, EntryPoint = "Loop_GetNumBackEdges")]

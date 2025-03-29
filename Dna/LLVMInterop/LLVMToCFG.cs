@@ -1,6 +1,5 @@
 ﻿using Dna.ControlFlow;
 using Dna.Extensions;
-using Dna.Lifting;
 using LLVMSharp.Interop;
 using System;
 using System.Collections.Generic;

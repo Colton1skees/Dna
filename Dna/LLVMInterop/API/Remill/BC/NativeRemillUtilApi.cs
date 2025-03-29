@@ -84,6 +84,7 @@ namespace Dna.LLVMInterop.API.Remill.BC
         public unsafe static extern LLVMOpaqueValue* FindGlobalVariable(LLVMOpaqueModule* module, sbyte* name);
 
         [DllImport("Dna.LLVMInterop", CallingConvention = CallingConvention.Cdecl)]
+        [return: MarshalAs(UnmanagedType.U1)] 
         public unsafe static extern bool VerifyModule(LLVMOpaqueModule* module);
 
         [DllImport("Dna.LLVMInterop", CallingConvention = CallingConvention.Cdecl)]
@@ -93,9 +94,11 @@ namespace Dna.LLVMInterop.API.Remill.BC
         public unsafe static extern LLVMOpaqueModule* LoadArchSemantics(RemillOpaqueArch* arch, sbyte* path);
 
         [DllImport("Dna.LLVMInterop", CallingConvention = CallingConvention.Cdecl)]
+        [return: MarshalAs(UnmanagedType.U1)] 
         public unsafe static extern bool StoreModuleToFile(LLVMOpaqueModule* module, sbyte* fileName, bool allowFailure);
 
         [DllImport("Dna.LLVMInterop", CallingConvention = CallingConvention.Cdecl)]
+        [return: MarshalAs(UnmanagedType.U1)] 
         public unsafe static extern bool StoreModuleIRToFile(LLVMOpaqueModule* module, sbyte* fileName, bool allowFailure);
 
         [DllImport("Dna.LLVMInterop", CallingConvention = CallingConvention.Cdecl)]

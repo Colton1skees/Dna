@@ -14,12 +14,15 @@ namespace Dna.LLVMInterop.API.LLVMBindings.IR
         public unsafe static extern OpaqueManagedVector<LLVMOpaqueBasicBlock>* DominatorTreeBase_GetDescendants(LLVMOpaqueDominatorTreeBase* treeBase, LLVMOpaqueBasicBlock* block);
 
         [DllImport("Dna.LLVMInterop", CallingConvention = CallingConvention.Cdecl)]
+        [return: MarshalAs(UnmanagedType.U1)] 
         public unsafe static extern bool DominatorTreeBase_ProperlyDominates(LLVMOpaqueDominatorTreeBase* treeBase, LLVMOpaqueBasicBlock* blockA, LLVMOpaqueBasicBlock* blockB);
 
         [DllImport("Dna.LLVMInterop", CallingConvention = CallingConvention.Cdecl)]
+        [return: MarshalAs(UnmanagedType.U1)] 
         public unsafe static extern bool DominatorTreeBase_IsReachableFromEntry(LLVMOpaqueDominatorTreeBase* treeBase, LLVMOpaqueBasicBlock* block);
 
         [DllImport("Dna.LLVMInterop", CallingConvention = CallingConvention.Cdecl)]
+        [return: MarshalAs(UnmanagedType.U1)] 
         public unsafe static extern bool DominatorTreeBase_Dominates(LLVMOpaqueDominatorTreeBase* treeBase, LLVMOpaqueBasicBlock* blockA, LLVMOpaqueBasicBlock* blockB);
 
         [DllImport("Dna.LLVMInterop", CallingConvention = CallingConvention.Cdecl)]
@@ -29,15 +32,19 @@ namespace Dna.LLVMInterop.API.LLVMBindings.IR
     public static class NativeDominatorTreeApi
     {
         [DllImport("Dna.LLVMInterop", CallingConvention = CallingConvention.Cdecl)]
+        [return: MarshalAs(UnmanagedType.U1)] 
         public unsafe static extern bool DominatorTree_BlockDominatesUse(LLVMOpaqueDominatorTree* treeBase, LLVMOpaqueBasicBlock* block, LLVMOpaqueUse* use);
 
         [DllImport("Dna.LLVMInterop", CallingConvention = CallingConvention.Cdecl)]
+        [return: MarshalAs(UnmanagedType.U1)] 
         public unsafe static extern bool DominatorTree_DefDominatesUse(LLVMOpaqueDominatorTree* treeBase, LLVMOpaqueValue* def, LLVMOpaqueUse* use);
 
         [DllImport("Dna.LLVMInterop", CallingConvention = CallingConvention.Cdecl)]
+        [return: MarshalAs(UnmanagedType.U1)] 
         public unsafe static extern bool DominatorTree_DefDominatesUser(LLVMOpaqueDominatorTree* treeBase, LLVMOpaqueValue* def, LLVMOpaqueValue* userInst);
 
         [DllImport("Dna.LLVMInterop", CallingConvention = CallingConvention.Cdecl)]
+        [return: MarshalAs(UnmanagedType.U1)] 
         public unsafe static extern bool DominatorTree_InstDominatesBlock(LLVMOpaqueDominatorTree* treeBase, LLVMOpaqueValue* def, LLVMOpaqueBasicBlock* block);
 
         [DllImport("Dna.LLVMInterop", CallingConvention = CallingConvention.Cdecl)]
