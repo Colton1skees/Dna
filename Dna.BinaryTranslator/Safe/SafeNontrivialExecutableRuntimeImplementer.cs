@@ -145,7 +145,7 @@ namespace Dna.BinaryTranslator.Safe
         private LLVMValueRef CreateCallToOriginalFunction(LLVMValueRef originalFunc, LLVMValueRef newFunc)
         {
             // Create the list of arguments, which is just all registers passed by value here.
-            var callArgs = parameterizedStateStructure.OrderedRegisterArguments.Select(x => parameterizedStateStructure.GetRegParam(x, newFunc));
+            var callArgs = parameterizedStateStructure.OrderedRegisterArguments.Select(x => parameterizedStateStructure.GetRegInputParam(x, newFunc));
 
             // Call the original function.
             return builder.BuildCall2(parameterizedStateStructure.ParameterizedFunctionPrototype, originalFunc, callArgs.ToArray(), "");

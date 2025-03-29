@@ -106,6 +106,9 @@ namespace Dna.LLVMInterop.API.LLVMBindings.Transforms.Utils
 
     public static class NativeCloningApi
     {
+        [DllImport("Dna.LLVMInterop")]
+        public unsafe static extern LLVMOpaqueType* GetFunctionType(LLVMOpaqueValue* value);
+
         [DllImport("Dna.LLVMInterop", CallingConvention = CallingConvention.Cdecl)]
         public unsafe static extern sbyte* InlineFunction(LLVMOpaqueValue* callInst);
 
@@ -117,5 +120,15 @@ namespace Dna.LLVMInterop.API.LLVMBindings.Transforms.Utils
 
         [DllImport("Dna.LLVMInterop", CallingConvention = CallingConvention.Cdecl)]
         public unsafe static extern void MakeDsoLocal(LLVMOpaqueValue* function, bool dsoLocal);
+
+        [DllImport("Dna.LLVMInterop", CallingConvention = CallingConvention.Cdecl)]
+        public unsafe static extern void PrepareForCloning(LLVMOpaqueValue* function, bool jumpThreading);
+
+        [DllImport("Dna.LLVMInterop", CallingConvention = CallingConvention.Cdecl)]
+        public unsafe static extern LLVMOpaqueBasicBlock* CloneBasicBlock(LLVMOpaqueBasicBlock* block);
+
+        [DllImport("Dna.LLVMInterop", CallingConvention = CallingConvention.Cdecl)]
+        [return: MarshalAs(UnmanagedType.U1)]
+        public unsafe static extern bool MergeBlockIntoPredecessor(LLVMOpaqueBasicBlock* block);
     }
 }

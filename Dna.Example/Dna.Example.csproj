@@ -29,9 +29,24 @@
     <ProjectReference Include="..\LLVMSharp\sources\LLVMSharp.Interop\LLVMSharp.Interop.csproj" />
     <ProjectReference Include="..\LLVMSharp\sources\LLVMSharp\LLVMSharp.csproj" />
     <ProjectReference Include="..\RuntimePatches\RuntimePatches.csproj" />
+    <ProjectReference Include="..\Simplifier\Mba.Simplifier\Mba.Simplifier.csproj" />
+    <ProjectReference Include="..\Simplifier\MSiMBA\Mba.Common\Mba.Common.csproj" />
+    <ProjectReference Include="..\Simplifier\MSiMBA\Mba.FFI\Mba.FFI.vcxproj" />
   </ItemGroup>
 
   <ItemGroup>
+	<None Include="..\x64\Release\Mba.FFI.dll" Link="Mba.FFI.dll">
+      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+    </None>
+	<None Include="..\x64\Release\Mba.FFI.pdb" Link="Mba.FFI.pdb">
+      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+    </None>
+	<None Include="..\Simplifier\EqSat\target\release\eq_sat.dll" Link="eq_sat.dll">
+      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+    </None>
+	    <None Include="..\Simplifier\EqSat\target\release\eq_sat.pdb" Link="eq_sat.pdb">
+      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+    </None>
     <None Update="ProtectedExecutable.bin">
       <CopyToOutputDirectory>Always</CopyToOutputDirectory>
     </None>

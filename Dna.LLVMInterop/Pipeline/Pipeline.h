@@ -1037,6 +1037,10 @@ namespace Dna::Pipeline
 			// TODO: Properly pass the alias analysis func ptr.
 			Dna::Passes::ClassifyingAAResult::gGetAliasResult = getAliasResult;
 
+			for (int i = 0; i < 100; i++)
+			{
+				printf("TODO: Upgrade SegmentsExternalAAWrapperPass to LLVM16.");
+			}
 			//MPM.addPass(Dna::Passes::createSegmentsAAWrapperPass());
 
 			//MPM.addPass(new Dna::Passes::SegmentsExternalAAWrapperPass());
@@ -1308,6 +1312,9 @@ namespace Dna::Pipeline
 	{
 		// Run static pass initializers.
 		InitializePasses();
+		llvm::PassRegistry& Registry = *llvm::PassRegistry::getPassRegistry();
+		//Registry.registerPass(Dna::Passes::JumpTableAnalysisPass);
+
 
 		// Create pass managers.
 		llvm::FunctionPassManager FPM;
@@ -1320,9 +1327,11 @@ namespace Dna::Pipeline
 		llvm::LoopPassManager LPM;
 		llvm::PassBuilder PB;
 
-		// Queue up the jump table solving pass.
+		// Remove all switches. This simplifies analysis since we don't need to handle
+		// cases where more than two case predecessors exist.
 		FPM.addPass(Dna::Passes::JumpTableAnalysisPass(analyzeJumpTableBounds, trySolveConstant));
 
+		//FAM.registerPass([analyzeJumpTableBounds, trySolveConstant] {return Dna::Passes::JumpTableAnalysisPass(analyzeJumpTableBounds, trySolveConstant); });
 		FAM.registerPass([&] { return PB.buildDefaultAAPipeline(); });
 		PB.registerModuleAnalyses(MAM);
 		PB.registerCGSCCAnalyses(CGAM);
@@ -1330,6 +1339,411 @@ namespace Dna::Pipeline
 		PB.registerLoopAnalyses(LAM);
 		PB.crossRegisterProxies(LAM, FAM, CGAM, MAM);
 
+		//MPM.addPass(createModuleToFunctionPassAdaptor(std::move(FPM))); // Not needed anymore? 
 		FPM.run(*f, FAM);
 	}
+}
+
+void OptimizeVmpModule(llvm::Module* module,
+	llvm::Function* f,
+	bool aggressiveUnroll,
+	bool runClassifyingAliasAnalysis,
+	Dna::Passes::tGetAliasResult getAliasResult,
+	bool runConstantConcretization,
+	Dna::Passes::tReadBinaryContents readBinaryContents,
+	bool runStructuring,
+	bool justGVN,
+	Dna::Passes::tStructureFunction structureFunction,
+	Dna::Passes::tEliminateStackVars eliminateStackVars,
+	Dna::Passes::tEliminateStackVars adhocInstCombine,
+	Dna::Passes::tEliminateStackVars multiUseCloning)
+{
+	/*
+	const char* argv[7] = { "mesa", "-simplifycfg-sink-common=false",
+	"-memdep-block-number-limit=10000000",
+	"-dse-memoryssa-defs-per-block-limit=10000000",
+	"-dse-memoryssa-scanlimit=10000000",
+	"-dse-memoryssa-partial-store-limit=10000000",
+	"-memdep-block-scan-limit=500"
+	};
+	llvm::cl::ParseCommandLineOptions(7, argv);
+	*/
+
+	justGVN = false;
+	if (justGVN)
+	{
+		const char* argv[13] = { "mesa", "-simplifycfg-sink-common=false",
+				"-memdep-block-number-limit=10000000",
+				"-dse-memoryssa-defs-per-block-limit=10000000",
+				"-gvn-max-num-deps=100000000",
+				"-dse-memoryssa-scanlimit=10000000",
+				"-dse-memoryssa-partial-store-limit=10000000",
+				"-gvn-max-block-speculations=10000000",
+				"-memdep-block-scan-limit=28000",
+				"-unroll-count=1500",
+				"-unroll-threshold=100000000",
+				"-enable-store-refinement=1"
+		};
+		llvm::cl::ParseCommandLineOptions(12, argv);
+	}
+
+	else
+
+	{
+		const char* argv[14] = { "mesa", "-simplifycfg-sink-common=false",
+	"-memdep-block-number-limit=10000000",
+	"-dse-memoryssa-defs-per-block-limit=10000000",
+	"-gvn-max-num-deps=25000000",
+	"-dse-memoryssa-scanlimit=900000000",
+	"-dse-memoryssa-partial-store-limit=90000000",
+	"-gvn-max-block-speculations=90000000",
+	"-memdep-block-scan-limit=1000000000",
+	"-unroll-count=3",
+	"-unroll-threshold=100000000",
+	"-enable-store-refinement=0",
+	"-memssa-check-limit=99999999",
+	"-memssa-check-limit=99999999"
+		};
+		llvm::cl::ParseCommandLineOptions(14, argv);
+	}
+
+
+	// Initialize passes.
+	llvm::PassRegistry& Registry = *llvm::PassRegistry::getPassRegistry();
+	llvm::initializeCore(Registry);
+	llvm::initializeScalarOpts(Registry);
+	llvm::initializeIPO(Registry);
+	llvm::initializeAnalysis(Registry);
+	llvm::initializeTransformUtils(Registry);
+	llvm::initializeInstCombine(Registry);
+	llvm::initializeTargetLibraryInfoWrapperPassPass(Registry);
+	llvm::initializeGlobalsAAWrapperPassPass(Registry);
+	llvm::initializeGVNLegacyPassPass(Registry);
+	llvm::initializeDependenceAnalysisWrapperPassPass(Registry);
+	//llvm::initializeIPSCCPLegacyPassPass(Registry);
+	initializeTarget(Registry);
+
+	// Create pass managers.
+	llvm::FunctionPassManager FPM;
+	//llvm::PassManagerBuilder PMB;
+	llvm::legacy::PassManager module_manager;
+	llvm::LoopAnalysisManager LAM;
+	llvm::FunctionAnalysisManager FAM;
+	llvm::CGSCCAnalysisManager CGAM;
+	llvm::ModulePassManager MPM;
+	llvm::ModuleAnalysisManager MAM;
+	llvm::LoopPassManager LPM;
+	llvm::PassBuilder PB;
+	// Configure pipeline.
+//	PMB.OptLevel = 3;
+//	PMB.SizeLevel = 2;
+//	PMB.DisableUnrollLoops = true; //!Guide.RunLoopPasses;
+//	PMB.SLPVectorize = false;
+//	PMB.LoopVectorize = false;
+
+
+	/*
+	const char* args[2] = { "-dse-memoryssa-defs-per-block-limit=1000000", "-earlycse-mssa-optimization-cap=1000000" };
+	llvm::cl::ParseCommandLineOptions(2, args);
+
+	const char* args4[2] = { "test4", "-dse-memoryssa-defs-per-block-limit=1000000" };
+	llvm::cl::ParseCommandLineOptions(2, args4);
+
+	const char* args5[2] = { "test5", "-dse-memoryssa-partial-store-limit=1000000" };
+	llvm::cl::ParseCommandLineOptions(2, args5);
+
+	const char* args6[2] = { "test6", "-dse-memoryssa-path-check-limit=1000000" };
+	llvm::cl::ParseCommandLineOptions(2, args6);
+
+	const char* args7[2] = { "test7", "-dse-memoryssa-scanlimit=1000000" };
+	llvm::cl::ParseCommandLineOptions(2, args7);
+
+	const char* args8[2] = { "test8", "-dse-memoryssa-walklimit=1000000" };
+	llvm::cl::ParseCommandLineOptions(2, args8);
+
+	const char* args9[2] = { "test9", "-dse-memoryssa-otherbb-cost=2" };
+	llvm::cl::ParseCommandLineOptions(2, args9);
+
+	const char* args13[2] = { "test13", "-gvn-max-num-deps=100000000" };
+	llvm::cl::ParseCommandLineOptions(2, args13);
+
+	const char* args14[2] = { "test14", "-gvn-max-block-speculations=10000000" };
+	llvm::cl::ParseCommandLineOptions(2, args14);
+
+	const char* args15[2] = { "test15", "-gvn-max-num-visited-insts=1000000" };
+	llvm::cl::ParseCommandLineOptions(2, args15);
+	*/
+	//const char* args10[2] = { "test10", "memdep-block-number-limit=10000" };
+	//llvm::cl::ParseCommandLineOptions(2, args10);
+
+
+	/*
+	const char* args99999[11] = {
+		"foo"
+		"-memdep-block-number-limit=10000",
+		"-dse-memoryssa-defs-per-block-limit=1000000",
+		"-gvn-max-num-deps=100000000",
+		"-dse-memoryssa-scanlimit=1000000",
+		"-dse-memoryssa-otherbb-cost=2",
+		"-dse-memoryssa-partial-store-limit=1000000",
+		"-gvn-max-block-speculations=1000000",
+		"-memdep-block-scan-limit=1000000",
+		"-unroll-count=1500",
+		"-unroll-threshold=100000000"
+	};
+	llvm::cl::ParseCommandLineOptions(11, args99999);
+	*/
+
+
+	const char* argv67[12] = { "mesa", "-simplifycfg-sink-common=false",
+			"-memdep-block-number-limit=10000000",
+			"-dse-memoryssa-defs-per-block-limit=10000000",
+			"-gvn-max-num-deps=100000000",
+			"-dse-memoryssa-scanlimit=10000000",
+			"-dse-memoryssa-partial-store-limit=10000000",
+			"-gvn-max-block-speculations=10000000",
+			"-memdep-block-scan-limit=10000000",
+			"-unroll-count=1500",
+			"-unroll-threshold=100000000",
+			"-enable-store-refinement=1"
+	};
+
+	llvm::cl::ParseCommandLineOptions(12, argv67);
+
+
+	FPM.addPass(llvm::SROAPass({}));
+	FPM.addPass(llvm::SCCPPass());
+	FPM.addPass(llvm::ADCEPass());
+	FPM.addPass(llvm::BDCEPass());
+	FPM.addPass(llvm::SimplifyCFGPass());
+	//FPM.addPass(llvm::EarlyCSEPass(true));
+	FPM.addPass(llvm::ReassociatePass());
+	//FPM.addPass(llvm::EarlyCSEPass(true));
+
+	if (structureFunction != nullptr)
+	{
+		FPM.addPass(Dna::Passes::ControlFlowStructuringPass(structureFunction));
+		FPM.addPass(llvm::ADCEPass());
+		FPM.addPass(llvm::BDCEPass());
+	}
+
+	if (runClassifyingAliasAnalysis)
+	{
+		for (int i = 0; i < 10; i++)
+		{
+			printf("TODO: Upgrade SegmentsExternalAAWrapperPass to LLVM16.");
+		}
+		// TODO: Properly pass the alias analysis func ptr.
+		//Dna::Passes::ClassifyingAAResult::gGetAliasResult = getAliasResult;
+		//MPM.addPass(Dna::Passes::createSegmentsAAWrapperPass());
+		//MPM.addPass(Dna::Passes::SegmentsExternalAAWrapperPass());
+	}
+	FPM.addPass(llvm::EarlyCSEPass(true));
+	FPM.addPass(llvm::SpeculativeExecutionPass());
+	FPM.addPass(llvm::JumpThreadingPass(99999));
+	FPM.addPass(llvm::CorrelatedValuePropagationPass());
+	FPM.addPass(llvm::SimplifyCFGPass());
+	FPM.addPass(llvm::ReassociatePass());
+
+	FPM.addPass(llvm::LoopSimplifyPass());
+	LPM.addPass(llvm::LoopSimplifyCFGPass());
+	LPM.addPass(llvm::LICMPass(500, 500, true)); // TODO: LICM
+	LPM.addPass(llvm::LoopRotatePass());
+
+	FPM.addPass(llvm::InstCombinePass());
+	FPM.addPass(llvm::LCSSAPass());
+	LPM.addPass(llvm::IndVarSimplifyPass());
+	LPM.addPass(llvm::LoopDeletionPass());
+
+	FPM.addPass(llvm::PromotePass());
+	//FPM.addPass(llvm::InstCombinePass());
+	FPM.addPass(llvm::SpeculativeExecutionPass());
+
+	//FPM.addPass(llvm::LazyValueInfo());
+	FPM.addPass(llvm::JumpThreadingPass(999999));
+	FPM.addPass(llvm::JumpThreadingPass(-1));
+	FPM.addPass(llvm::CorrelatedValuePropagationPass());
+
+	if (multiUseCloning != nullptr)
+	{
+		FPM.addPass(Dna::Passes::MultiUseCloningPass(multiUseCloning));
+		FPM.addPass(llvm::ADCEPass());
+		FPM.addPass(llvm::SROAPass({}));
+		FPM.addPass(llvm::BDCEPass());
+	}
+
+	//FPM.addPass(FunctionDumpPass("test.ll"));
+	FPM.addPass(llvm::GVNPass(llvm::GVNOptions()));
+	FPM.addPass(llvm::SCCPPass());
+	FPM.addPass(llvm::ADCEPass());
+	FPM.addPass(llvm::BDCEPass());
+
+
+
+	MPM.addPass(llvm::ModuleInlinerPass());
+
+
+	// Add various optimization passes.
+	//FPM.addPass(llvm::InstCombinePass());
+	FPM.addPass(llvm::JumpThreadingPass());
+	FPM.addPass(llvm::CorrelatedValuePropagationPass());
+	FPM.addPass(llvm::SimplifyCFGPass());
+	//FPM.addPass(llvm::createAggressiveInstCombinerPass());
+	//FPM.addPass(llvm::InstCombinePass());
+	FPM.addPass(llvm::ReassociatePass());
+	FPM.addPass(llvm::SROAPass({}));
+	FPM.addPass(llvm::NewGVNPass());
+	FPM.addPass(llvm::SCCPPass());
+	FPM.addPass(llvm::BDCEPass());
+
+	if (structureFunction != nullptr)
+	{
+		FPM.addPass(Dna::Passes::ControlFlowStructuringPass(structureFunction));
+		FPM.addPass(llvm::ADCEPass());
+	}
+
+	FPM.addPass(llvm::SCCPPass());
+	FPM.addPass(llvm::BDCEPass());
+	if (eliminateStackVars != nullptr)
+	{
+		FPM.addPass(Dna::Passes::OpaqueStackVarEliminationPass(eliminateStackVars));
+		FPM.addPass(llvm::ADCEPass());
+	}
+
+	FPM.addPass(llvm::SCCPPass());
+	FPM.addPass(llvm::BDCEPass());
+	if (adhocInstCombine != nullptr)
+	{
+		FPM.addPass(Dna::Passes::AdhocInstCombinePass(adhocInstCombine));
+	}
+
+	FPM.addPass(llvm::ADCEPass());
+	FPM.addPass(llvm::SCCPPass());
+	//FPM.addPass(llvm::InstCombinePass());
+	FPM.addPass(llvm::DSEPass());
+
+	FPM.addPass(llvm::GVNHoistPass());
+	//FPM.addPass(llvm::NewGVNPass());
+	//FPM.addPass(llvm::GVNPass(llvm::GVNOptions()));
+	// Note: This legacy GVN pass is necessary for DSE to work properly.
+
+
+	FPM.addPass(llvm::ADCEPass());
+	FPM.addPass(llvm::SimplifyCFGPass());
+
+	if (adhocInstCombine != nullptr)
+	{
+		FPM.addPass(Dna::Passes::AdhocInstCombinePass(adhocInstCombine));
+	}
+
+	//FPM.addPass(llvm::DSEPass()); // added
+	FPM.addPass(llvm::SimplifyCFGPass());    // added
+	//FPM.addPass(llvm::InstCombinePass()); // added
+	//FPM.addPass(llvm::SimplifyCFGPass());    // added
+	//FPM.addPass(llvm::DSEPass()); // added
+	//FPM.addPass(llvm::GVNPass(llvm::GVNOptions()));
+	//if (runConstantConcretization)
+	//	FPM.addPass(Dna::Passes::getConstantConcretizationPassPass(readBinaryContents)); // added
+	//FPM.addPass(llvm::DSEPass()); // added
+	//FPM.addPass(llvm::GVNPass(llvm::GVNOptions()));
+
+
+	LPM.addPass(llvm::IndVarSimplifyPass());
+	//FPM.addPass(llvm::CreateConstraintEliminationPass());
+
+	FPM.addPass(llvm::SROAPass({}));
+	FPM.addPass(llvm::EarlyCSEPass());
+	//FPM.addPass(llvm::DSEPass()); // added
+	FPM.addPass(llvm::SCCPPass());
+	FPM.addPass(llvm::ADCEPass());
+	//FPM.addPass(llvm::createReassociatePass());
+
+	// Note: We should avoid pointer PHIs here.
+	if (false)
+	{
+		FPM.addPass(llvm::SimplifyCFGPass());
+		//FPM.addPass(new llvm::sl::ControlledNodeSplittingPass());
+		FPM.addPass(llvm::SimplifyCFGPass());
+		//	FPM.addPass(llvm::sl::createUnswitchPass());
+	}
+
+	//FPM.addPass(llvm::createLoopRotatePass());
+	//FPM.addPass(llvm::GVNPass(llvm::GVNOptions()));
+	//FPM.addPass(llvm::createFixIrreduciblePass());
+	//FPM.addPass(llvm::createFixIrreduciblePass());
+	//FPM.addPass(llvm::createGVNPass(false));
+	//FPM.addPass(llvm::createNewGVNPass());
+	//FPM.addPass(llvm::createStructurizeCFGPass());
+
+	if (structureFunction != nullptr)
+	{
+		//llvm::FunctionPass* fp = new Dna::Passes::ControlFlowStructuringPass(structureFunction);
+		FPM.addPass(Dna::Passes::ControlFlowStructuringPass(structureFunction));
+
+		FPM.addPass(llvm::SCCPPass());
+		FPM.addPass(llvm::ADCEPass());
+		FPM.addPass(llvm::BDCEPass());
+	}
+
+	if (eliminateStackVars != nullptr)
+	{
+		//llvm::FunctionPass* fp = new Dna::Passes::ControlFlowStructuringPass(structureFunction);
+		FPM.addPass(Dna::Passes::OpaqueStackVarEliminationPass(eliminateStackVars));
+
+		FPM.addPass(llvm::SCCPPass());
+		FPM.addPass(llvm::ADCEPass());
+		FPM.addPass(llvm::BDCEPass());
+	}
+
+	if (adhocInstCombine != nullptr)
+	{
+		//llvm::FunctionPass* fp = new Dna::Passes::ControlFlowStructuringPass(structureFunction);
+		FPM.addPass(Dna::Passes::AdhocInstCombinePass(adhocInstCombine));
+		FPM.addPass(llvm::ADCEPass());
+	}
+
+
+	try
+	{
+		FAM.registerPass([&] { return PB.buildDefaultAAPipeline(); });
+		PB.registerModuleAnalyses(MAM);
+		PB.registerCGSCCAnalyses(CGAM);
+		PB.registerFunctionAnalyses(FAM);
+		PB.registerLoopAnalyses(LAM);
+		PB.crossRegisterProxies(LAM, FAM, CGAM, MAM);
+
+		//MPM.addPass(createModuleToFunctionPassAdaptor(std::move(FPM)));
+
+		FPM.addPass(createFunctionToLoopPassAdaptor<LoopPassManager>(
+			std::move(LPM), /*UseMemorySSA=*/true,
+			/*UseBlockFrequencyInfo=*/true));
+
+
+		FPM.run(*f, FAM);
+	}
+
+	catch (...)
+	{
+		printf("Exception in pass pipeline!\n");
+
+	}
+
+	//module_manager.run(*f->getParent());
+}
+
+DNA_EXPORT void OptimizeModuleVmp(llvm::Module* module,
+	llvm::Function* f,
+	bool aggressiveUnroll,
+	bool runClassifyingAliasAnalysis,
+	Dna::Passes::tGetAliasResult getAliasResult,
+	bool runConstantConcretization,
+	Dna::Passes::tReadBinaryContents readBinaryContents,
+	bool runStructuring,
+	bool justGVN,
+	Dna::Passes::tStructureFunction structureFunction,
+	Dna::Passes::tEliminateStackVars eliminateStackVars,
+	Dna::Passes::tEliminateStackVars adhocInstCombine,
+	Dna::Passes::tEliminateStackVars multiUseCloning)
+{
+	OptimizeVmpModule(module, f, aggressiveUnroll, runClassifyingAliasAnalysis, getAliasResult, runConstantConcretization, readBinaryContents, runStructuring, justGVN, structureFunction, eliminateStackVars, adhocInstCombine, multiUseCloning);
 }

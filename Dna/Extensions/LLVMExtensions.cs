@@ -1,4 +1,5 @@
 ﻿using Dna.LLVMInterop.API.LLVMBindings.IR;
+using Dna.LLVMInterop.API.LLVMBindings.Transforms.Utils;
 using Dna.LLVMInterop.API.Remill.BC;
 using LLVMSharp.Interop;
 using System;
@@ -153,6 +154,8 @@ namespace Dna.Extensions
 
             }
         }
+
+        public static LLVMTypeRef GetFunctionPrototype(this LLVMValueRef func) => LLVMCloning.GetFunctionPrototype(func);
 
         private static unsafe LLVMUseRef GetNextUse(this LLVMUseRef use) => LLVM.GetNextUse(use);
 

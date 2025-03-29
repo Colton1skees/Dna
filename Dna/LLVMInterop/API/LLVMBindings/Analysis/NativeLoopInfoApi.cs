@@ -27,6 +27,7 @@ namespace Dna.LLVMInterop.API.LLVMBindings.Analysis
         public unsafe static extern uint GetLoopDepth(LLVMOpaqueLoopInfo* loopInfo, LLVMOpaqueBasicBlock* block);
 
         [DllImport("Dna.LLVMInterop", CallingConvention = CallingConvention.Cdecl, EntryPoint = "LoopInfo_IsLoopheader")]
+        [return: MarshalAs(UnmanagedType.U1)] 
         public unsafe static extern bool IsLoopHeader(LLVMOpaqueLoopInfo* loopInfo, LLVMOpaqueBasicBlock* block);
 
         [DllImport("Dna.LLVMInterop", CallingConvention = CallingConvention.Cdecl, EntryPoint = "LoopInfo_GetTopLevelLoops")]

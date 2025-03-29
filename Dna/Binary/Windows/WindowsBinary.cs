@@ -20,6 +20,8 @@ namespace Dna.Binary.Windows
 
         public PEFile PEFile { get; }
 
+        private List<(ulong Start, ulong End)> ConstantData { get; } = new();
+
         /// <summary>
         /// Initializes a new instance of the <see cref="WindowsBinary"/> class.
         /// </summary>
@@ -35,6 +37,9 @@ namespace Dna.Binary.Windows
             Bytes = binaryBytes;
             PEFile = PEFile.FromBytes(binaryBytes);
             BaseAddress = baseAddress.HasValue ? baseAddress.Value : PEFile.OptionalHeader.ImageBase;
+            ConstantData = PEFile.Sections
+                .Where(sec => !sec.Characteristics.HasFlag(SectionFlags.MemoryWrite)) // TODO: check whether MemoryRead is necessary?
+                .Select(sec => (BaseAddress + sec.Rva, BaseAddress + sec.Rva + sec.GetVirtualSize())).ToList();
         }
 
         /// <inheritdoc cref="IBinary.ReadBytes(ulong, int)"/>
@@ -80,6 +85,15 @@ namespace Dna.Binary.Windows
             {
                 WriteMutableByte(address + (ulong)i, input[i]);
             }
+        }
+
+        public bool IsConstantData(ulong address)
+        {
+            foreach (var tuple in ConstantData)
+            {
+                if (address >= tuple.Start && address < tuple.End) return true;
+            }
+            return false;
         }
 
         public static WindowsBinary From(string filePath, ulong? baseAddress = null)

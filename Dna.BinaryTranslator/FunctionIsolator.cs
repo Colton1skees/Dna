@@ -34,6 +34,13 @@ namespace Dna.BinaryTranslator
             return outModule.GetNamedFunction(function.Name);
         }
 
+        public static unsafe LLVMValueRef IsolateFunctionInto(LLVMModuleRef destModule, LLVMValueRef srcFunction)
+        {
+            // Move the lifted function into the new module.
+            RemillUtils.MoveFunctionIntoModule(srcFunction, destModule);
+            return destModule.GetNamedFunction(srcFunction.Name);
+        }
+
         // Implementation of `IsolateFunctionIntoNewModule` that also copies over SEH related functions(both SEH filters and C personality functions).
         public static unsafe (LLVMValueRef function, IReadOnlyList<LiftedFilterFunction> filterFunctions) IsolateFunctionIntoNewModuleWithSehSupport(RemillArch arch, LLVMValueRef function, IReadOnlyList<LiftedFilterFunction> filterFunctions)
         {

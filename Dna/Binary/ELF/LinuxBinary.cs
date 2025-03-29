@@ -64,5 +64,10 @@ namespace Dna.Binary.Windows
         {
             throw new NotImplementedException();
         }
+
+        public bool IsConstantData(ulong address)
+        {
+            throw new NotImplementedException();
+        }
     }
 }

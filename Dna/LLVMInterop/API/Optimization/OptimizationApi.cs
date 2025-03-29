@@ -12,6 +12,35 @@ namespace Dna.LLVMInterop.API.Optimization
 {
     public static class OptimizationApi
     {
+        public static unsafe void OptimizeModuleVmp(LLVMModuleRef module,
+            LLVMValueRef function,
+            bool aggressiveUnroll,
+            bool runClassifyingAliasAnalysis,
+            nint ptrGetAliasResult,
+            bool runConstantConcretization,
+            nint ptrReadBinaryContents,
+            bool runStructuring,
+            bool justGVN = false,
+            nint ptrStructureFunction = 0,
+            nint ptrEliminateStackVars = 0,
+            nint adhocInstCombine = 0,
+            nint multiUseCloning = 0)
+        {
+            NativeOptimizationApi.OptimizeModuleVmp(module,
+                function,
+                aggressiveUnroll,
+                runClassifyingAliasAnalysis,
+                ptrGetAliasResult,
+                runConstantConcretization,
+                ptrReadBinaryContents,
+                runStructuring,
+                justGVN,
+                ptrStructureFunction,
+                ptrEliminateStackVars,
+                adhocInstCombine,
+                multiUseCloning);
+        }
+
         public static unsafe void OptimizeModule(LLVMModuleRef module,
             LLVMValueRef function,
             bool aggressiveUnroll,

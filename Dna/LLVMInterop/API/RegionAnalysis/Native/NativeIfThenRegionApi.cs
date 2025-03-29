@@ -14,6 +14,7 @@ namespace Dna.LLVMInterop.API.RegionAnalysis.Native
         public unsafe static extern nint IfThenRegionGetThen(nint region);
 
         [DllImport("Dna.LLVMInterop", CallingConvention = CallingConvention.Cdecl, EntryPoint = "IfThenRegionGetIsNegated")]
+        [return: MarshalAs(UnmanagedType.U1)] 
         public unsafe static extern bool IfThenRegionGetIsNegated(nint region);
 
         [DllImport("Dna.LLVMInterop", CallingConvention = CallingConvention.Cdecl, EntryPoint = "IfThenRegionGetLLVMTerminatorInstruction")]

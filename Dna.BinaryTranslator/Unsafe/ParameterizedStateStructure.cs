@@ -23,7 +23,11 @@ namespace Dna.BinaryTranslator.Unsafe
     {
         private readonly RemillArch arch;
 
-        private readonly bool addMemoryPtr;
+        public readonly bool addMemoryPtr;
+
+        public bool hasOutputRegisters;
+
+        private readonly bool justRAX;
 
         private readonly LLVMBuilderRef builder;
 
@@ -33,6 +37,11 @@ namespace Dna.BinaryTranslator.Unsafe
         /// A mapping of (remill register, zero based index of the position in the prototype argument list).
         /// </summary>
         public IReadOnlyDictionary<RemillRegister, int> RegisterArgumentIndices { get; }
+
+        /// <summary>
+        /// A mapping of (remill output register, zero based index of the position in the prototype argument list).
+        /// </summary>
+        public IReadOnlyDictionary<RemillRegister, int> RegisterOutputArgumentIndices { get; }
 
         public IReadOnlyList<RemillRegister> OrderedRegisterArguments => RegisterArgumentIndices.OrderBy(x => x.Value).Select(x => x.Key).ToList().AsReadOnly();
 
@@ -49,25 +58,36 @@ namespace Dna.BinaryTranslator.Unsafe
         /// </summary>
         public LLVMValueRef OutputFunction { get; private set; }
 
-        public static ParameterizedStateStructure CreateFromFunction(RemillArch arch, LLVMValueRef function, bool addMemoryPtr = true)
+        public static ParameterizedStateStructure CreateFromFunction(RemillArch arch, LLVMValueRef function, bool addMemoryPtr = true, bool hasOutputRegisters = false, bool justRAX = false)
         {
-            var output = new ParameterizedStateStructure(arch, function, addMemoryPtr);
+            var output = new ParameterizedStateStructure(arch, function, addMemoryPtr, hasOutputRegisters, justRAX);
             output.Create(function);
             return output;
         }
 
-        public ParameterizedStateStructure(RemillArch arch, LLVMValueRef function, bool addMemoryPtr)
+        public ParameterizedStateStructure(RemillArch arch, LLVMValueRef function, bool addMemoryPtr, bool hasOutputRegisters, bool justRAX)
         {
             this.arch = arch;
             this.addMemoryPtr = addMemoryPtr;
+            this.hasOutputRegisters = hasOutputRegisters;
+            this.justRAX = justRAX;
             builder = LLVMBuilderRef.Create(function.GetFunctionCtx());
             rootRegisters = ArchRegisters.GetRootGprs(arch);
             RegisterArgumentIndices = ApplyParameterOrderingToRegisters(rootRegisters);
 
+            var outputRegs = new Dictionary<RemillRegister, int>();
+            RegisterOutputArgumentIndices = outputRegs;
+            uint baseOffset = (uint)(OrderedRegisterArguments.Count + (addMemoryPtr ? 1 : 0));
+            for (int i = 0; i < OrderedRegisterArguments.Count; i++)
+            {
+                var reg = OrderedRegisterArguments[i];
+                outputRegs[reg] = (int)(i + baseOffset);
+            }
+
             // Create a prototype for the new function we are creating.
             // This takes all registers as integers, aswell as an optional
             // single ptr(last argument) for the remill memory pointer.
-            ParameterizedFunctionPrototype = CreateParameterizedPrototype(function.GetFunctionCtx(), RegisterArgumentIndices, addMemoryPtr);
+            ParameterizedFunctionPrototype = CreateParameterizedPrototype(function.GetFunctionCtx(), RegisterArgumentIndices, addMemoryPtr, hasOutputRegisters);
         }
 
         private static IReadOnlyDictionary<RemillRegister, int> ApplyParameterOrderingToRegisters(IReadOnlySet<RemillRegister> unorderedRegisters)
@@ -116,6 +136,10 @@ namespace Dna.BinaryTranslator.Unsafe
             // Insert a call to the original function. This takes the local state structure 
             // we created as an argument.
             var call = CreateCallToOriginalFunction(inputFunction, newFunc, localStateStruct);
+
+            if (hasOutputRegisters)
+                UpdateOutputRegisters(newFunc, builder, localStateStruct);
+
             builder.BuildRetVoid();
 
             // Inline the call to the original function.
@@ -130,7 +154,7 @@ namespace Dna.BinaryTranslator.Unsafe
             OutputFunction = newFunc;
         }
 
-        public static LLVMTypeRef CreateParameterizedPrototype(LLVMContextRef ctx, IReadOnlyDictionary<RemillRegister, int> registerArgumentIndices, bool addMemoryPtr)
+        public static LLVMTypeRef CreateParameterizedPrototype(LLVMContextRef ctx, IReadOnlyDictionary<RemillRegister, int> registerArgumentIndices, bool addMemoryPtr, bool hasOutputRegisters)
         {
             // Create a list of function argument types.
             // The last index is the remill memory ptr.
@@ -150,6 +174,16 @@ namespace Dna.BinaryTranslator.Unsafe
             // Add the last argument: the remill memory ptr.
             if(addMemoryPtr)
                 paramTypes.Add(ptrTy);
+
+            if(hasOutputRegisters)
+            {
+                // For each register, add an additional i64* argument.
+                for (int i = 0; i < orderedRegisters.Count; i++)
+                {
+                    var reg = orderedRegisters[i];
+                    paramTypes.Add(ctx.GetPtrType((uint)(reg.Size * 8)));
+                }
+            }
 
             // Create the LLVM prototype for our new function.
             var prototype = LLVMTypeRef.CreateFunction(ctx.VoidType, paramTypes.ToArray());
@@ -176,6 +210,16 @@ namespace Dna.BinaryTranslator.Unsafe
                 regParam.Name = indexMapping.Key.Name;
             }
 
+            if (hasOutputRegisters)
+            {
+                var baseOffset = RegisterArgumentIndices.Count + (addMemoryPtr ? 1 : 0);
+                foreach (var indexMapping in RegisterArgumentIndices)
+                {
+                    var regParam = newFunction.GetParams()[indexMapping.Value + baseOffset];
+                    regParam.Name = $"out_{indexMapping.Key.Name}";
+                }
+            }
+
             return newFunction;
         }
 
@@ -199,7 +243,7 @@ namespace Dna.BinaryTranslator.Unsafe
             foreach(var (reg, argIndex) in RegisterArgumentIndices.OrderBy(x => x.Value))
             {
                 // Get the register value.
-                var regValue = GetRegParam(reg, function);
+                var regValue = GetRegInputParam(reg, function);
 
                 // Copy the register value to the corresponding position in our newly allocated state structure.
                 builder.BuildStore(regValue, reg.GetAddressOf(statePtr, builder));
@@ -208,7 +252,8 @@ namespace Dna.BinaryTranslator.Unsafe
 
         public uint GetRegisterArgumentIndex(RemillRegister reg) => (uint)RegisterArgumentIndices[reg];
 
-        public LLVMValueRef GetRegParam(RemillRegister reg, LLVMValueRef func) => func.GetParam((uint)RegisterArgumentIndices[reg]);
+        public LLVMValueRef GetRegInputParam(RemillRegister reg, LLVMValueRef func) => func.GetParam((uint)RegisterArgumentIndices[reg]);
+        public LLVMValueRef GetRegOutputParam(RemillRegister reg, LLVMValueRef func) => func.GetParam((uint)RegisterOutputArgumentIndices[reg]);
 
         private LLVMValueRef GetMemoryParamPtr(LLVMValueRef function)
         {
@@ -224,11 +269,25 @@ namespace Dna.BinaryTranslator.Unsafe
 
             // Create the list of arguments: %local_state_struct, %program_counter, and %memory.
             callArgs.Add(localStateStruct);
-            callArgs.Add(GetRegParam(rootRegisters.Single(x => x.Name == "RIP"), newFunc));
+            callArgs.Add(GetRegInputParam(rootRegisters.Single(x => x.Name == "RIP"), newFunc));
             callArgs.Add(addMemoryPtr ? GetMemoryParamPtr(newFunc) : LLVMValueRef.CreateConstPointerNull(newFunc.GetPtrType()));
 
             // Call the original function.
             return builder.BuildCall2(arch.LiftedFunctionType, originalFunc, callArgs.ToArray(), "call_original");
+        }
+
+        private void UpdateOutputRegisters(LLVMValueRef function, LLVMBuilderRef builder, LLVMValueRef localStateStruct)
+        {
+            foreach(var reg in OrderedRegisterArguments)
+            {
+                if (justRAX && reg.Name.ToLower() != "rax")
+                    continue;
+                // Load the value of the register from the state structure.
+                var regValue = builder.BuildLoad2(function.GetFunctionCtx().GetIntTy((uint)(reg.Size * 8)), reg.GetAddressOf(localStateStruct, builder));
+
+                var outPtr = GetRegOutputParam(reg, function);
+                builder.BuildStore(regValue, outPtr);
+            }
         }
 
     }

@@ -8,6 +8,11 @@
 #include <API/ExportDef.h>
 
 namespace Dna::API {
+	DNA_EXPORT llvm::Type* GetFunctionType(llvm::Function* func)
+	{
+		return func->getFunctionType();
+	}
+
 	// Invokes llvm::InlineFunction().
 	// Returns nullptr if successful, error message ptr otherwise.
 	DNA_EXPORT char* InlineFunction(llvm::Function* call)
@@ -54,5 +59,6 @@ namespace Dna::API {
 	{
 		function->setDSOLocal(dsoLocal);
 	}
-	
+
+
 }

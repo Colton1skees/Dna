@@ -112,9 +112,11 @@ namespace Dna.LLVMInterop.API.Remill.Arch
         public unsafe static extern RemillOpaqueOperandLifter* Arch_DefaultLifter(RemillOpaqueArch* arch, RemillOpaqueIntrinsicTable* intrinsics);
 
         [DllImport("Dna.LLVMInterop", CallingConvention = CallingConvention.Cdecl)]
+        [return: MarshalAs(UnmanagedType.U1)] 
         public unsafe static extern bool Arch_DecodeInstruction(RemillOpaqueArch* arch, ulong address, byte* instrBytes, int byteCount, RemillOpaqueInstruction* inst, RemillOpaqueDecodingContext* decodingContext);
 
         [DllImport("Dna.LLVMInterop", CallingConvention = CallingConvention.Cdecl)]
+        [return: MarshalAs(UnmanagedType.U1)] 
         public unsafe static extern bool Arch_DecodeDelayedInstruction(RemillOpaqueArch* arch, ulong address, sbyte* instrBytes, RemillOpaqueInstruction* inst, RemillOpaqueDecodingContext* decodingContexth);
 
         [DllImport("Dna.LLVMInterop", CallingConvention = CallingConvention.Cdecl)]

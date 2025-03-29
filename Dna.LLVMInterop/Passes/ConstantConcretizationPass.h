@@ -23,11 +23,7 @@ namespace Dna::Passes {
 
 		ConstantConcretizationPass() : FunctionPass(ID)
 		{
-			printf("llvm sucks.");
-			while (true)
-			{
 
-			}
 		}
 
 		ConstantConcretizationPass(tReadBinaryContents readBinaryContents) : FunctionPass(ID) 

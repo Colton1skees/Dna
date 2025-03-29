@@ -29,9 +29,11 @@ namespace Dna.LLVMInterop.API.LLVMBindings
         public unsafe static extern sbyte* GetPassName(LLVMOpaquePass* pass);
 
         [DllImport("Dna.LLVMInterop", CallingConvention = CallingConvention.Cdecl, EntryPoint = "ModulePass_RunOnModule")]
+        [return: MarshalAs(UnmanagedType.U1)] 
         public unsafe static extern bool RunOnModule(LLVMOpaqueModulePass* pass, LLVMOpaqueModule* module);
 
         [DllImport("Dna.LLVMInterop", CallingConvention = CallingConvention.Cdecl, EntryPoint = "FunctionPass_RunOnFunction")]
+        [return: MarshalAs(UnmanagedType.U1)] 
         public unsafe static extern bool RunOnFunction(LLVMOpaqueFunctionPass* pass, LLVMOpaqueValue* function);
     }
 }

@@ -24,6 +24,13 @@ namespace Dna.Binary
         public ulong BaseAddress { get; }
 
         /// <summary>
+        /// Returns whether the data at the specified address is constant.
+        /// </summary>
+        /// <param name="address"></param>
+        /// <returns></returns>
+        bool IsConstantData(ulong address);
+
+        /// <summary>
         /// Gets a byte at the specified address.
         /// </summary>
         byte ReadByte(ulong address) => ReadBytes(address, 1)[0];

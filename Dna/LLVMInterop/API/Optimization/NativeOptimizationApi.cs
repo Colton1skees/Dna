@@ -15,6 +15,21 @@ namespace Dna.LLVMInterop
         public delegate ulong dgReadBinaryContents(ulong rva, uint size);
 
         [DllImport("Dna.LLVMInterop", CallingConvention = CallingConvention.Cdecl)]
+        public unsafe static extern IntPtr OptimizeModuleVmp(LLVMOpaqueModule* module,
+            LLVMOpaqueValue* function,
+            bool aggressiveUnroll,
+            bool runClassifyingAliasAnalysis,
+            nint ptrGetAliasResult,
+            bool runConstantConcretization,
+            nint ptrReadBinaryContents,
+            bool runStructuring,
+            bool justGVN,
+            nint ptrStructureFunction,
+            nint ptrEliminateStackVars,
+            nint adhocInstCombine,
+            nint multiUseCloning);
+
+        [DllImport("Dna.LLVMInterop", CallingConvention = CallingConvention.Cdecl)]
         public unsafe static extern IntPtr OptimizeLLVMModule(LLVMOpaqueModule* module,
             LLVMOpaqueValue* function,
             bool aggressiveUnroll,

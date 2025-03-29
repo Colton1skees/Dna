@@ -17,7 +17,6 @@ using System.Linq;
 using System.Net.WebSockets;
 using System.Text;
 using System.Threading.Tasks;
-using Dna.LLVMInterop.Passes;
 using JumpTableMapping = System.Collections.Generic.Dictionary<ulong, Dna.BinaryTranslator.JmpTables.JmpTable>;
 using X86Block = Dna.ControlFlow.BasicBlock<Iced.Intel.Instruction>;
 using Dna.BinaryTranslator.X86;
@@ -30,6 +29,8 @@ using Dna.BinaryTranslator.Safe;
 using Dna.ControlFlow.Extensions;
 using Dna.BinaryTranslator.Lifting;
 using Unicorn.X86;
+using Dna.BinaryTranslator.VMProtect;
+using Dna.Passes;
 
 namespace Dna.BinaryTranslator.Unsafe
 {
@@ -103,6 +104,7 @@ namespace Dna.BinaryTranslator.Unsafe
 
                 liftedFunction.GlobalParent.PrintToFile("translatedFunction.ll");
 
+
                 // Strip away as much of the remill runtime as possible.
                 // This includes replacing intrinsics with concrete implementations,
                 // as well as things like assuming that all calls are fastcall.
@@ -112,6 +114,13 @@ namespace Dna.BinaryTranslator.Unsafe
                 Console.WriteLine("Compiling to an exe.");
                 var compiledPath = ClangCompiler.Compile("translatedFunction.ll");
                 var loaded = IDALoader.Load(compiledPath);
+
+
+                if(!liftedFunction.GetInstructions().Any(x => x.ToString().Contains("_remill_jump")))
+                {
+                    finalLiftedFunction = liftedFunction;
+                    goto done;
+                }
 
                 // Solve for any indirect jumps in the control flow graph.
                 var newTables = JmpTableSolver.SolveJumpTables(dna.Binary, liftedFunction);
@@ -132,6 +141,19 @@ namespace Dna.BinaryTranslator.Unsafe
                 Console.WriteLine("foobar.");
             }
 
+            /*
+            // We succeeded. Now undo CFF
+            for(int i = 0; i < 0; i++)
+            {
+                for(int _ = 0; _ < 5; _++)
+                    PassPipeline.Run(dna.Binary, finalLiftedFunction.Value, false, false);
+                CFGUnflattenPass.Run(finalLiftedFunction.Value);
+            }
+            */
+
+            done:
+
+            PassPipeline.Run(dna.Binary, finalLiftedFunction.Value, false, false);
             finalLiftedFunction.Value.GlobalParent.WriteToLlFile("translatedFunction.ll");
             Console.WriteLine("Compiling to an exe.");
             var compiledPath2 = ClangCompiler.Compile("translatedFunction.ll");
@@ -149,13 +171,34 @@ namespace Dna.BinaryTranslator.Unsafe
             // code where we de-duplicate fallthrough edges.
             cfg = dna.RecursiveDescent.ReconstructCfg(funcAddress, GetKnownIndirectEdgesCallback, handlerAddresses);
             var encoded = X86CfgEncoder.EncodeCfg(dna.Binary, cfg);
+
+            //FinalCfg(cfg, scopeTable, scopeTableTree);
             return new BinaryFunction(encoded, scopeTableTree, solvedTables.AsReadOnly());
+        }
+
+        private void FinalCfg(ControlFlowGraph<Instruction> cfg, ScopeTable scopeTable, ScopeTableTree scopeTableTree)
+        {
+            (cfg, var fallthroughFromIps) = PreprocessCfg(cfg, scopeTable);
+
+            // Lift the function using remill.
+            var encodedCfg = X86CfgEncoder.EncodeCfg(dna.Binary, cfg);
+
+
+            (var liftedFunction, var blockMapping, var filterFunctions) = CfgTranslator.Translate(dna.Binary.BaseAddress, arch, "C:\\Users\\colton\\Downloads\\remill-17-semantics", ctx, new BinaryFunction(encodedCfg, scopeTableTree, solvedTables.AsReadOnly()), fallthroughFromIps, CallHandlingKind.Normal);
+            liftedFunction = FunctionIsolator.IsolateFunctionIntoNewModuleWithSehSupport(arch, liftedFunction, filterFunctions.Select(x => x.LiftedFilterFunction).ToList().AsReadOnly()).function;
+            liftedFunction = StripRuntime(liftedFunction);
+
+            liftedFunction.GlobalParent.WriteToLlFile("translatedFunction.ll");
+            Console.WriteLine("Compiling to an exe.");
+            var compiledPath2 = ClangCompiler.Compile("translatedFunction.ll");
+
+            Debugger.Break();
         }
 
         private IEnumerable<ulong> GetKnownIndirectEdgesCallback(BasicBlock<Instruction> block) 
             => solvedTables.SingleOrDefault(x => x.JmpFromAddr == block.ExitInstruction.IP)?.KnownOutgoingAddresses?.ToList();
 
-        private (ControlFlowGraph<Instruction> cfg, HashSet<ulong> fallthroughFromIps) PreprocessCfg(ControlFlowGraph<Instruction> cfg, ScopeTable scopeTable)
+        public static (ControlFlowGraph<Instruction> cfg, HashSet<ulong> fallthroughFromIps) PreprocessCfg(ControlFlowGraph<Instruction> cfg, ScopeTable scopeTable)
         {
             // Deduplicate all fallthrough edges to remove all duplicated indirect jumps.
             // Since our control flow graph structure has no concept of fallthrough edges, this returns a list of ulongs
@@ -179,6 +222,10 @@ namespace Dna.BinaryTranslator.Unsafe
             // E.g. __remill_memory_read() and __remill_memory_write().
             var runtime = UnsafeRuntimeImplementer.Implement(function.GlobalParent);
             function.GlobalParent.WriteToLlFile("translatedFunction.ll");
+
+
+            //var compiledPath3 = ClangCompiler.Compile("translatedFunction.ll");
+            //var loaded3 = IDALoader.Load(compiledPath3);
 
             // Create a new function which doesn't take a state structure pointer.
             // Instead it takes all root registers as `noalias ptr` arguments.
@@ -232,8 +279,27 @@ namespace Dna.BinaryTranslator.Unsafe
                 function.GlobalParent.WriteToLlFile("translatedFunction.ll");
 
                 // Optimize the routine.
-                for (int i = 0; i < 2; i++)
+                for (int i = 0; i < 5; i++)
                 {
+                    if (i > 2)
+                    {
+                        function.GlobalParent.WriteToLlFile("translatedFunction.ll");
+
+                        /*
+                        var tgts = function.GetInstructions()
+                            .Where(x => x.InstructionOpcode == LLVMOpcode.LLVMICmp && x.GetOperand(1).Kind == LLVMValueKind.LLVMConstantIntValueKind && x.GetOperand(1).ConstIntZExt == 1234)
+                            .Select(x => x.GetOperand(0)).ToList();
+                        */
+
+                        var tgts = function.GetInstructions().Where(x => x.InstructionOpcode == LLVMOpcode.LLVMAdd && x.ToString().Contains("add i64 %1, %or.i.i.i")).ToList();
+
+                        foreach (var tgt in tgts)
+                            tgt.ReplaceAllUsesWith(LLVMValueRef.CreateConstInt(tgt.TypeOf, 0));
+
+                        PassPipeline.Run(dna.Binary, function, false, false);
+                    }
+
+
                     OptimizationApi.OptimizeModule(function.GlobalParent, function, false, false, 0, false, 0, false);
 
                     if (!LIFT_SEH)
@@ -377,7 +443,7 @@ namespace Dna.BinaryTranslator.Unsafe
 
         // Helper utility for getting a function's scope table
         // Note that we leave it disabled it for now, because there is some missing error handling logic we need to implement.
-        private static ScopeTable GetScopeTable(IBinary binary, ulong funcAddr)
+        public static ScopeTable GetScopeTable(IBinary binary, ulong funcAddr)
         {
             if (LIFT_SEH)
             {

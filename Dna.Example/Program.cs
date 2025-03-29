@@ -2,9 +2,6 @@
 using Dna.ControlFlow;
 using Dna.ControlFlow.Analysis;
 using Dna.Emulation;
-using Dna.Lifting;
-using Dna.Optimization;
-using Dna.Optimization.Passes;
 using Dna.Relocation;
 using Dna.Synthesis.Jit;
 using Dna.Synthesis.Miasm;
@@ -30,7 +27,6 @@ using System.Runtime.InteropServices;
 using Dna.LLVMInterop.API.RegionAnalysis.Wrapper;
 using static Dna.LLVMInterop.NativeOptimizationApi;
 using Dna.LLVMInterop.API.Optimization;
-using Dna.LLVMInterop.Passes;
 using Dna.Utilities;
 using Dna.Extensions;
 using Dna.LLVMInterop.API.LLVMBindings.Transforms;
@@ -38,7 +34,7 @@ using Dna.LLVMInterop.API.LLVMBindings.IR;
 using Dna.LLVMInterop.API.LLVMBindings.Transforms.IPO;
 using static Dna.LLVMInterop.NativePassApi;
 using System.Text;
-using System.Numerics; 
+using System.Numerics;
 using Iced.Intel;
 using Dna.LLVMInterop.API.Remill.Arch;
 using System.Net.Http.Headers;
@@ -56,19 +52,22 @@ using Dna.BinaryTranslator.JmpTables.Slicing;
 using Dna.LLVMInterop.API.LLVMBindings.Analysis;
 using Dna.BinaryTranslator.JmpTables.Precise;
 using Dna.Reconstruction;
+using Dna.Passes;
 
 // Regrettably, install some runtime hooks to fix some FFI issues w/ LLVMSharp
 //LazyLLVMFixes.InstallModuleToStringBugFix(RemillUtils.LLVMModuleToString);
 //LazyLLVMFixes.InstallModuleToFileBugFix();
 //LazyLLVMFixes.InstallValueToStringBugFix(RemillUtils.LLVMValueToString);
 
-// Sample binaries sourced from: https://github.com/cnr-isti-vclab/meshlab/releases/download/MeshLab-2023.12/MeshLab2023.12-windows.exe
+// TODO: https://github.com/cnr-isti-vclab/meshlab/releases/download/MeshLab-2023.12/MeshLab2023.12-windows.exe
+// Lift N functions from MeshLab
 bool newPipeline = true;
 if (newPipeline)
 {
     // Load the meshlab binaries
     var meshLabPath = @"C:\Users\colton\source\repos\MeshLab Binaries\meshlab.exe";
-    // meshLabPath = @"C:\Users\colton\Downloads\VmTarget\VMTarget.exe";
+    meshLabPath = @"C:\Users\colton\Downloads\VmTarget\VMTarget.exe";
+    meshLabPath = @"C:\Users\colton\source\repos\obfuscateme\x64\Release\obfuscateme.exe";
     var meshLabBin = WindowsBinary.From(meshLabPath);
     var meshLabDna = new Dna.Dna(meshLabBin);
 
@@ -76,24 +75,25 @@ if (newPipeline)
     var allFunctions = FunctionDetector.Run(meshLabBin);
 
     // Pick out and lift one of the larger functions.
-    ulong sAddr = 0x14002F480; // Well-behaved, very large functions
+    //ulong sAddr = 0x14002F480; // Well-behaved, very large functions
     //sAddr = 0x1400227C0; // Not well-behaved(floating point), very large function. 
     //ulong sAddr = 0x140001130; // Simple function from vmtarget.exe
+    ulong sAddr = 0x140001000;
 
     // Use our iterative control flow graph exploration algorithm to recover the control flow graph
-    var targetFunc = allFunctions.Single(x => x.StartAddr == sAddr);
+    //var targetFunc = allFunctions.Single(x => x.StartAddr == sAddr);
     var ourCtx = LLVMContextRef.Global;
     var remillArch = RemillArch.CreateWin64(ourCtx);
-    var explored = IterativeFunctionTranslator.Translate(meshLabDna, remillArch, ourCtx, targetFunc.StartAddr);
+    var explored = IterativeFunctionTranslator.Translate(meshLabDna, remillArch, ourCtx, sAddr);
+
+    // Translate the cfg to a human readable representation
+    BrighteningTranslator.Run(meshLabDna, remillArch, ourCtx, explored);
 
     // Then finally recompile the control flow graph and reinsert it into the binary.
     var safeBinaryFunction = SafeFunctionTranslator.Translate(meshLabDna, remillArch, ourCtx, explored);
 
     FunctionGroupCompiler.Compile(meshLabDna, new List<SafelyTranslatedFunction>() { safeBinaryFunction });
-    Console.WriteLine("Successfully recompiled function...");
     Debugger.Break();
-    Console.ReadLine();
-    return;
 }
 
 bool idk = true;
@@ -167,10 +167,10 @@ var target = exceptions.Single(x => (ulong)x.Begin.Rva + bin.BaseAddress == 0x14
         Console.WriteLine("Entry: 0x" + (bin.BaseAddress + scopeTable.Rva).ToString("X"));
         foreach (var entry in scopeTable.Entries)
         {
-            Console.WriteLine($"{tab} Begin: 0x{(bin.BaseAddress + entry.Begin.Rva).ToString("X")}");
+            Console.WriteLine($"{tab} Begin: 0x{(bin.BaseAddress + entry.Begin.Rva).ToString("X")} ");
             Console.WriteLine($"{tab} End: 0x{(bin.BaseAddress + entry.End.Rva).ToString("X")}");
             Console.WriteLine($"{tab} Handler 0x{(bin.BaseAddress + entry.Filter.Rva).ToString("X")}");
-            Console.WriteLine($"{tab} Target 0x{(bin.BaseAddress + entry.ExceptionHandler.Rva).ToString("X")}");
+            Console.WriteLine($"{tab} Target 0x{(bin.BaseAddress + entry.ExceptionHandler.Rva).ToString("X")} ");
             Console.WriteLine("");
         }
 
@@ -194,7 +194,7 @@ var target = exceptions.Single(x => (ulong)x.Begin.Rva + bin.BaseAddress == 0x14
     var codes = UnwindCodeParser.ParseUnwindCode(bin, uwcAddr, uwRef.UnwindCodes.Length * 2, uwRef.Version);
 
     var height = StackHeightCalculator.Get(codes);
-    Console.WriteLine($"Stack height: 0x{height.ToString("X")}");
+    Console.WriteLine($"Stack height: 0x{height.ToString("X")} ");
     //Console.WriteLine(height);
     // Iteratively explore and lift the functiom until no new edges can be discovered.
     var remillArch = new RemillArch(LLVMContextRef.Global, RemillOsId.kOSWindows, RemillArchId.kArchAMD64_AVX512);
@@ -422,170 +422,3 @@ Console.ReadLine();
 // Parse a (virtualized) control flow graph from the binary.
 ulong funcAddr = 0x1400012E4;
  cfg = dna.RecursiveDescent.ReconstructCfg(funcAddr);
-
-// Instantiate the cpu architecture.
-var architecture = new X86CpuArchitecture(ArchitectureId.ARCH_X86_64);
-
-// Instantiate a class for lifting control flow graphs to our intermediate language.
-var cfgLifter = new CfgLifter(architecture);
-
-// Lift the control flow graph to TTIR.
-var liftedCfg = cfgLifter.LiftCfg(cfg);
-
-for (int i = 0; i < 3; i++)
-    Console.WriteLine("");
-
-var llvmLifter = new LLVMLifter(architecture);
-
-llvmLifter.Lift(liftedCfg);
-
-// Optimize the routine.
-/*
-bool optimize = false;
-if (optimize)
-{
-    var passManager2 = llvmLifter.Module.CreateFunctionPassManager();
-    passManager2.AddBasicAliasAnalysisPass();
-    passManager2.AddTypeBasedAliasAnalysisPass();
-    passManager2.AddScopedNoAliasAAPass();
-    passManager2.AddLowerExpectIntrinsicPass();
-    passManager2.AddCFGSimplificationPass();
-    passManager2.AddPromoteMemoryToRegisterPass();
-    passManager2.AddEarlyCSEPass();
-    passManager2.AddDCEPass();
-    passManager2.AddAggressiveDCEPass();
-    passManager2.AddDeadStoreEliminationPass();
-    passManager2.AddInstructionCombiningPass();
-    passManager2.AddCFGSimplificationPass();
-    passManager2.AddDeadStoreEliminationPass();
-    passManager2.AddAggressiveDCEPass();
-    passManager2.InitializeFunctionPassManager();
-    for (int i = 0; i < 5; i++)
-    {
-        passManager2.RunFunctionPassManager(llvmLifter.llvmFunction);
-    }
-
-    passManager2.FinalizeFunctionPassManager();
-}
-*/
-
-// Create a function for reading bytes at an arbitrary rva.
-var readBytes = (ulong address, uint size) =>
-{
-    var bytes = binary.ReadBytes(address, (int)size);
-    var value = size switch
-    {
-        1 => bytes[0],
-        2 => BitConverter.ToUInt16(bytes),
-        4 => BitConverter.ToUInt32(bytes),
-        8 => BitConverter.ToUInt64(bytes),
-        _ => throw new InvalidOperationException()
-    };
-    return (ulong)value;
-};
-
-// Create an unmanaged function pointer for the read memory function.
-var dgReadBytes = new dgReadBinaryContents(readBytes);
-var ptrReadBinaryContents = Marshal.GetFunctionPointerForDelegate(dgReadBytes);
-
-var ptrAlias = ClassifyingAliasAnalysisPass.PtrGetAliasResult;
-
-var llPath = @"optimized_vm_entry2.ll";
-
-// Run the standard O3 pipeline.
-for (int i = 0; i < 5; i++)
-{
-    OptimizationApi.OptimizeModule(llvmLifter.Module, llvmLifter.llvmFunction, false, false, 0, false, 0, false);
-}
-
-// Run the O3 pipeline with custom alias analysis.
-OptimizationApi.OptimizeModule(llvmLifter.Module, llvmLifter.llvmFunction, false, true, ptrAlias, false, 0, false);
-
-// Run the O3 pipeline with ptr alias analysis AND aggressive loop unrolling enabled.
-OptimizationApi.OptimizeModule(llvmLifter.Module, llvmLifter.llvmFunction, true, true, ptrAlias, false, 0, false);
-
-// Run the O3 pipeline one last time with custom alias analysis.
-OptimizationApi.OptimizeModule(llvmLifter.Module, llvmLifter.llvmFunction, false, true, ptrAlias, false, 0, false);
-
-// Run the O3 pipeline one last time with custom alias analysis.
-PointerClassifier.Seen.Clear();
-PointerClassifier.print = true;
-for (int i = 0; i < 10; i++)
-{
-    OptimizationApi.OptimizeModule(llvmLifter.Module, llvmLifter.llvmFunction, false, true, ptrAlias, false, 0, false);
-    OptimizationApi.OptimizeModule(llvmLifter.Module, llvmLifter.llvmFunction, false, true, ptrAlias, false, 0, false, false);
-}
-
-
-llvmLifter.Module.WriteToLlFile(llPath);
-
-// Marshal LLVM's function CFG to Dna's control flow graph structure.
-ControlFlowGraph<LLVMValueRef> llvmGraph = new ControlFlowGraph<LLVMValueRef>(0);
-foreach (var llvmBlock in llvmLifter.llvmFunction.GetBasicBlocks())
-{
-    // Allocate a new block.
-    var blk = llvmGraph.CreateBlock((ulong)llvmBlock.Handle);
-
-    // Copy the instructions.
-    blk.Instructions.AddRange(llvmBlock.GetInstructions());
-}
-
-// Update block edges.
-foreach (var block in llvmGraph.GetBlocks())
-{
-    var exitInstruction = block.ExitInstruction;
-
-    var operands = exitInstruction.GetOperands().ToList();
-    foreach (var operand in operands)
-    {
-        if (operand.Kind != LLVMValueKind.LLVMBasicBlockValueKind)
-            continue;
-
-        var outgoingBlk = llvmGraph.GetBlocks().Single(x => x.Address == (ulong)operand.Handle);
-        block.AddOutgoingEdge(new BlockEdge<LLVMValueRef>(block, outgoingBlk));
-    }
-}
-
-// Print the llvm CFG to a .dot file.
-var dotGraph = GraphVisualizer.GetDotGraph(llvmGraph);
-var dot = dotGraph.Compile();
-File.WriteAllText("llvmGraph.dot", dot);
-
-var fpm2 = new FunctionPassManager();
-var pmb2 = new PassManagerBuilder();
-var moduleManager2 = new PassManager();
-
-// Create a reducible control flow graph.
-fpm2.Add(ScalarPasses.CreateCFGSimplificationPass());
-fpm2.Add(PassApi.CreateControlledNodeSplittingPass());
-fpm2.Add(ScalarPasses.CreateCFGSimplificationPass());
-fpm2.Add(PassApi.CreateUnSwitchPass());
-fpm2.Add(ScalarPasses.CreateLoopSimplifyCFGPass());
-fpm2.Add(PassApi.CreateLoopExitEnumerationPass());
-fpm2.Add(PassApi.CreateUnSwitchPass());
-
-// Structure the CFG.
-var cfPass = new ControlFlowStructuringPass();
-var nativeCfPass = PassApi.CreateControlFlowStructuringPass(cfPass.PtrStructureFunction);
-fpm2.Add(nativeCfPass);
-pmb2.PopulateFunctionPassManager(fpm2);
-pmb2.PopulateModulePassManager(moduleManager2);
-
-fpm2.DoInitialization();
-fpm2.Run(llvmLifter.llvmFunction);
-fpm2.DoFinalization();
-
-// Optionally compile the LLVM IR to an executable.
-bool compile = true;
-if (compile)
-{
-    // Compile to a .exe using clang.
-    Console.WriteLine("Compiling to an exe.");
-    var compiledPath = ClangCompiler.Compile(llPath);
-
-    Console.WriteLine("Loading into IDA.");
-    var exePath = IDALoader.Load(compiledPath);
-    Console.WriteLine("Loaded executable into IDA.");
-}
-
-Debugger.Break();
