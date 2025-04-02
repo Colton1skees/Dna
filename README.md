@@ -29,7 +29,7 @@ Note that `Dna` is currently based on LLVM 17.
 
 # VMProtect
 
-`Dna` contains a VMProtect devirtualization plugin located in `Dna.BinaryTranslator/VMProtect'. See [this PR](https://github.com/Colton1skees/Dna/pull/8) for more info.
+`Dna` contains a VMProtect devirtualization plugin located in `Dna.BinaryTranslator/VMProtect`. See [this PR](https://github.com/Colton1skees/Dna/pull/8) for more info.
 
 # Building
 `Dna` will not build out of the box. Custom patches to remill and souper were needed for this to build on windows. If you would like to work on Dna, open an issue or email me `colton1skees@gmail.com`. At some point I may publish proper build steps, but I make no guarantees. 
