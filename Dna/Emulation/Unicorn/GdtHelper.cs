@@ -87,7 +87,7 @@ namespace Dna.Emulation.Unicorn
             var gdtEntry = CreateGdtEntry(segAddr, segSize, access, F_PROT_32);
 
             var bytes = BitConverter.GetBytes(gdtEntry);
-            emu.Memory.Write(gdtAddress + 8 * gdtIdx, bytes, (ulong)bytes.Length);
+            emu.Memory.Write(gdtAddress + 8 * gdtIdx, bytes, bytes.Length);
 
             var selector = CreateSelector(gdtIdx, S_GDT | S_PRIV_0);
 

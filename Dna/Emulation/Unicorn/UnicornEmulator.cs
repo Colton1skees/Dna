@@ -105,7 +105,7 @@ namespace Dna.Emulation.Unicorn
 
         public void WriteMemory(ulong addr, byte[] buffer)
         {
-            Emulator.Memory.Write(addr, buffer, (ulong)buffer.Length);
+            Emulator.Memory.Write(addr, buffer, buffer.Length);
         }
 
         public void Start(ulong addr, ulong untilAddr = long.MaxValue)
