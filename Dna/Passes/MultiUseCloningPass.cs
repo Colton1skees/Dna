@@ -57,7 +57,6 @@ namespace Dna.Passes
                 var ast = llvmToTriton.GetAst(inst);
 
                 // TODO: Re-enable size check when the ast size change is pushed up to master
-                Debugger.Break();
                 /*
                 if (ast.astSize > 2000)
                     continue;
@@ -170,6 +169,8 @@ namespace Dna.Passes
                 BvultNode ultNode => builder.BuildICmp(LLVMIntPredicate.LLVMIntULT, op1(), op2()),
                 BvsltNode sltNode => builder.BuildICmp(LLVMIntPredicate.LLVMIntSLT, op1(), op2()),
                 BvugtNode bvugtNode => builder.BuildICmp(LLVMIntPredicate.LLVMIntUGT, op1(), op2()),
+                BvuleNode uleNode => builder.BuildICmp(LLVMIntPredicate.LLVMIntULE, op1(), op2()),
+                BvugeNode ugeNode => builder.BuildICmp(LLVMIntPredicate.LLVMIntUGE, op1(), op2()),
                 ExtractNode extractNode => LowerExtract(cache, substitutionMapping, builder, extractNode),
                 BvuremNode uremNode => builder.BuildURem(op1(), op2()),
                 BvudivNode uremNode => builder.BuildUDiv(op1(), op2()),

@@ -61,9 +61,12 @@ namespace Dna.BinaryTranslator.Unsafe
         {
             var writePrefix = "__remill_write_memory_";
             var readPrefix = "__remill_read_memory";
+            var atomicBeginPrefix = "__remill_atomic_begin";
+            var atomicEndPrefix = "__remill_atomic_end";
+            var atomicBarrierPrefix = "__remill_barrier_store_load";
 
             var memFunctions = module.GetFunctions()
-                .Where(x => x.Name.Contains(writePrefix) || x.Name.Contains(readPrefix))
+                .Where(x => x.Name.Contains(writePrefix) || x.Name.Contains(readPrefix) || x.Name.Contains(atomicBeginPrefix) || x.Name.Contains(atomicEndPrefix) || x.Name.Contains(atomicBarrierPrefix))
                 .ToList();
 
             foreach (var function in memFunctions)
@@ -85,7 +88,7 @@ namespace Dna.BinaryTranslator.Unsafe
                 else if (function.Name.Contains(readPrefix))
                     ImplementMemRead(function, localMemPtr);
                 else
-                    throw new InvalidOperationException($"Cannot implement memory intrinsic: {function}");
+                    ImplementAtomic(function);
 
                 // Mark the function for inlining.
                 LLVMCloning.InlineFunction(function);
@@ -129,6 +132,11 @@ namespace Dna.BinaryTranslator.Unsafe
             // Dereference the pointer and return the value.
             var loadValue = builder.BuildLoad2(valueType, loadPointer);
             builder.BuildRet(loadValue);
+        }
+
+        private void ImplementAtomic(LLVMValueRef function)
+        {
+            builder.BuildRet(function.GetParam(0));
         }
     }
 }

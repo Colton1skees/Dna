@@ -53,6 +53,8 @@ namespace Dna.LLVMInterop.API.LLVMBindings.Analysis
 
         public unsafe static implicit operator LLVMOpaqueMemoryAccess*(MemoryAccess memAccess)
         {
+            if (memAccess == null)
+                return null;
             return (LLVMOpaqueMemoryAccess*)memAccess.Handle;
         }
 

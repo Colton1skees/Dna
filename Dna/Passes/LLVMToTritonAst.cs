@@ -203,7 +203,7 @@ namespace Dna.Passes
                         CondType.Uge => astCtx.bvuge(op1(), op2()),
                         CondType.Ugt => astCtx.bvugt(op1(), op2()),
                         CondType.Ule => astCtx.bvule(op1(), op2()),
-                        //CondType.Ult => astCtx.bvult(op1(), op2()),
+                        CondType.Ult => astCtx.bvnot(astCtx.bvuge(op1(), op2())),
                         _ => throw new InvalidOperationException(string.Format("CondType {0} is not valid.", predicate))
                     };
 
@@ -264,7 +264,7 @@ namespace Dna.Passes
                 case LLVMOpcode.LLVMZExt:
                     var zxTy = inst.TypeOf;
                     var srcZxTy = inst.GetOperand(0).TypeOf;
-                    emit(astCtx.zx(astCtx.bv(zxTy.IntWidth - srcZxTy.IntWidth, zxTy.IntWidth), op1()));
+                    emit(astCtx.zx(astCtx.bv(zxTy.IntWidth - srcZxTy.IntWidth, srcZxTy.IntWidth), op1()));
                     break;
                 // If the value is a load inst, create a substitution variable to represent it.
                 // Do the same thing with phi nodes and function calls.
