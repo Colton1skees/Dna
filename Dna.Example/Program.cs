@@ -236,7 +236,7 @@ if(prototypeBounds)
 
     var l = LowerLshr.LowerLshrToLlvm(toSlice, bld);
     toSlice.ReplaceAllUsesWith(l);
-    fromFile.PrintToFile("nolshr.ll");
+    fromFile.PrintToFile(ArtifactPaths.Resolve("nolshr.ll"));
 
 
     var loopInfo = new LoopInfo();

@@ -97,7 +97,7 @@ namespace Dna.BinaryTranslator.VMProtect
                 // Clear the to-lift worklists.
                 handlersRipsToLift.Clear();
 
-                outModule.PrintToFile("translatedFunction.ll");
+                outModule.PrintToFile(ArtifactPaths.Resolve("translatedFunction.ll"));
 
                 // Create a control flow graph out of the current partial CFG.
                 // Create a "true" CFG by inlining direct jumps to targets with only one predecessor.
@@ -141,7 +141,7 @@ namespace Dna.BinaryTranslator.VMProtect
 
                 // Isolate the lifted function into it's own module.
                 liftedFunction = FunctionIsolator.IsolateFunctionInto(outModule, liftedFunction);
-                outModule.PrintToFile("translatedFunction.ll");
+                outModule.PrintToFile(ArtifactPaths.Resolve("translatedFunction.ll"));
 
                 var callTargets = outModule.GetFunctions().Where(x => x.Name.Contains("TranslatedFrom"));
                 foreach(var caller in callTargets)
@@ -206,8 +206,8 @@ namespace Dna.BinaryTranslator.VMProtect
 
                     output = liftedFunction;
 
-                    outModule.WriteBitcodeToFile("translatedFunction.bc");
-                    outModule.PrintToFile("translatedFunction.ll");
+                    outModule.WriteBitcodeToFile(ArtifactPaths.Resolve("translatedFunction.bc"));
+                    outModule.PrintToFile(ArtifactPaths.Resolve("translatedFunction.ll"));
                     outModule.Verify(LLVMVerifierFailureAction.LLVMPrintMessageAction);
                     Debugger.Break();
                     break;
@@ -228,7 +228,7 @@ namespace Dna.BinaryTranslator.VMProtect
                 // Convert the cfg to binja IR
                 var viewer = new BinjaVmCfgViewer(newCfg);
                 var compiled = viewer.Run();
-                File.WriteAllText("vmcfg.py", compiled);
+                File.WriteAllText(ArtifactPaths.Resolve("vmcfg.py"), compiled);
 
                 // Now we need to figure out which basic blocks we can cache.
                 // IF a partial block remains unchanged, we ca

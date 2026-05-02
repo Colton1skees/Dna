@@ -53,11 +53,11 @@ namespace Dna.BinaryTranslator.Unsafe
             liftedFunction = FunctionIsolator.IsolateFunctionIntoNewModuleWithSehSupport(arch, liftedFunction, filterFunctions.Select(x => x.LiftedFilterFunction).ToList().AsReadOnly()).function;
 
 
-            liftedFunction.GlobalParent.PrintToFile("translatedFunction.ll");
+            liftedFunction.GlobalParent.PrintToFile(ArtifactPaths.Resolve("translatedFunction.ll"));
 
 
             liftedFunction = StripRuntime(liftedFunction);
-            liftedFunction.GlobalParent.PrintToFile("translatedFunction.ll");
+            liftedFunction.GlobalParent.PrintToFile(ArtifactPaths.Resolve("translatedFunction.ll"));
 
 
 
@@ -142,7 +142,7 @@ namespace Dna.BinaryTranslator.Unsafe
                 OptimizationApi.OptimizeModule(function.GlobalParent, function, false, false, 0, false, 0, false);
                 PassPipeline.Run(dna.Binary, function, false, false);
 
-                function.GlobalParent.PrintToFile("translatedFunction.ll");
+                function.GlobalParent.PrintToFile(ArtifactPaths.Resolve("translatedFunction.ll"));
 
                 MbaDeobfuscationPass.Run(function);
 

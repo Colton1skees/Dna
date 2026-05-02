@@ -102,7 +102,7 @@ namespace Dna.BinaryTranslator.Unsafe
                 (var liftedFunction, var blockMapping, var filterFunctions) = CfgTranslator.Translate(dna.Binary.BaseAddress, arch, "C:\\Users\\colton\\Downloads\\remill-17-semantics", ctx, new BinaryFunction(encodedCfg, scopeTableTree, solvedTables.AsReadOnly()), fallthroughFromIps, CallHandlingKind.Normal);
                 liftedFunction = FunctionIsolator.IsolateFunctionIntoNewModuleWithSehSupport(arch, liftedFunction, filterFunctions.Select(x => x.LiftedFilterFunction).ToList().AsReadOnly()).function;
 
-                liftedFunction.GlobalParent.PrintToFile("translatedFunction.ll");
+                liftedFunction.GlobalParent.PrintToFile(ArtifactPaths.Resolve("translatedFunction.ll"));
 
 
                 // Strip away as much of the remill runtime as possible.

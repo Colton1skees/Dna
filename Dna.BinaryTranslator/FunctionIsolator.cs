@@ -1,5 +1,6 @@
 ﻿using Dna.BinaryTranslator.Lifting;
 using Dna.Extensions;
+using Dna.Utilities;
 using Dna.LLVMInterop.API.Remill.Arch;
 using Dna.LLVMInterop.API.Remill.BC;
 using LLVMSharp.Interop;
@@ -15,7 +16,7 @@ namespace Dna.BinaryTranslator
     {
         public static unsafe LLVMValueRef IsolateFunctionIntoNewModule(RemillArch arch, LLVMValueRef function)
         {
-            File.WriteAllText("translatedFunction.ll", function.PrintToString());
+            File.WriteAllText(ArtifactPaths.Resolve("translatedFunction.ll"), function.PrintToString());
             // Console.WriteLine("");
             //Console.WriteLine(function);
             // Optimize the lifted function(mainly to inline intrinsics).
@@ -67,7 +68,7 @@ namespace Dna.BinaryTranslator
                 builder.CreateMsvcPersonalityFunction();
             }
 
-            isolatedFunction.GlobalParent.PrintToFile("translatedFunction.ll");
+            isolatedFunction.GlobalParent.PrintToFile(ArtifactPaths.Resolve("translatedFunction.ll"));
             return (isolatedFunction, newFilters);
         }
     }

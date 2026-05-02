@@ -23,6 +23,7 @@ namespace Dna.Utilities
 
         public static unsafe string CompileToWindowsDll(LLVMValueRef targetFunction, string llPath, bool overwrite = false)
         {
+            llPath = ArtifactPaths.Resolve(llPath);
             targetFunction.GlobalParent.WriteToLlFile(llPath);
 
 
@@ -66,12 +67,7 @@ define i32 @main(i32 %argc, i8** %argv)
 
 
             // Compile the .ll to an exe.
-            var objPath = Path.Combine(dir, Path.ChangeExtension(fileName, ".exe"));
-            if (File.Exists(objPath) && overwrite == false)
-            {
-                var randName = Guid.NewGuid().ToString();
-                objPath = Path.Combine(dir, randName);
-            }
+            var objPath = ArtifactPaths.GetAvailablePath(Path.Combine(dir, Path.ChangeExtension(fileName, ".exe")), overwrite);
 
             RunClang(clangPath, @$"""{asmPath}"" -target x86_64-pc-windows-msvc -O3 -mno-avx -mno-avx512f -fno-vectorize -fno-slp-vectorize -O3 -fasync-exceptions -fseh-exceptions -fexceptions -fcxx-exceptions -mno-sse -shared -o ""{objPath}""");
 
@@ -84,6 +80,7 @@ define i32 @main(i32 %argc, i8** %argv)
 
         public static unsafe string Compile(string llPath, bool overwrite = false)
         {
+            llPath = ArtifactPaths.ResolveInputFile(llPath);
             /*
             foreach(var function in module.GetFunctions())
             {
@@ -101,12 +98,7 @@ define i32 @main(i32 %argc, i8** %argv)
 
 
             // Compile the .ll to an exe.
-            var objPath = Path.Combine(dir, Path.ChangeExtension(fileName, ".exe"));
-            if (File.Exists(objPath) && overwrite == false)
-            {
-                var randName = Guid.NewGuid().ToString();
-                objPath = Path.Combine(dir, randName);
-            }
+            var objPath = ArtifactPaths.GetAvailablePath(Path.Combine(dir, Path.ChangeExtension(fileName, ".exe")), overwrite);
 
             RunClang(clangPath, @$"""{asmPath}"" -target x86_64-pc-windows-msvc -O3 -fasync-exceptions -fseh-exceptions -fexceptions -fcxx-exceptions -fno-vectorize -fno-slp-vectorize -c -mno-sse -o ""{objPath}""");
 
@@ -139,6 +131,7 @@ define i32 @main(i32 %argc, i8** %argv)
 
         public static LLVMModuleRef Optimize(LLVMModuleRef module, string llPath, bool overwrite = false)
         {
+            llPath = ArtifactPaths.Resolve(llPath);
             module.WriteToLlFile(llPath);
 
             // If the file already exists, we don't want to overwrite it.
@@ -147,9 +140,9 @@ define i32 @main(i32 %argc, i8** %argv)
             var fileName = Path.GetFileName(llPath);
             var newPath = Path.Combine(dir, Path.ChangeExtension(fileName, ".opt.ll"));
 
-            RunClang(optPath, @$"-O3 -S ""{llPath}"" -o {newPath}");
+            RunClang(optPath, @$"-O3 -S ""{llPath}"" -o ""{newPath}""");
 
-            return RemillUtils.LoadModuleFromFile(module.Context, Path.Combine(Directory.GetCurrentDirectory(), newPath)).Value;
+            return RemillUtils.LoadModuleFromFile(module.Context, newPath).Value;
         }
     }
 }

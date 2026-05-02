@@ -229,7 +229,7 @@ namespace Dna.BinaryTranslator.Safe
             return new SafelyTranslatedFunction(binaryFunction, executableRuntime, updatedFilterFunctions);
 
             /*
-            executableRuntime.OutputFunction.GlobalParent.PrintToFile("translatedFunction.ll");
+            executableRuntime.OutputFunction.GlobalParent.PrintToFile(ArtifactPaths.Resolve("translatedFunction.ll"));
             string path = null;
             bool toDll = true;
             if (toDll)
