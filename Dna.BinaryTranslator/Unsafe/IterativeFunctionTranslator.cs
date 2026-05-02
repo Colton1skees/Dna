@@ -83,8 +83,6 @@ namespace Dna.BinaryTranslator.Unsafe
 
             while (true)
             {
-                arch = new RemillArch(ctx, RemillOsId.kOSWindows, RemillArchId.kArchAMD64_AVX512);
-
                 // Apply recursive descent to disassemble the control flow graph.
                 // When an unresolvable branch is encountered(call rax, jmp rax, etc.), the callback
                 // is invoked to check if any known edges exist.
@@ -99,7 +97,7 @@ namespace Dna.BinaryTranslator.Unsafe
 
                 // Lift the function using remill.
                 var encodedCfg = X86CfgEncoder.EncodeCfg(dna.Binary, cfg);
-                (var liftedFunction, var blockMapping, var filterFunctions) = CfgTranslator.Translate(dna.Binary.BaseAddress, arch, "C:\\Users\\colton\\Downloads\\remill-17-semantics", ctx, new BinaryFunction(encodedCfg, scopeTableTree, solvedTables.AsReadOnly()), fallthroughFromIps, CallHandlingKind.Normal);
+                (var liftedFunction, var blockMapping, var filterFunctions) = CfgTranslator.Translate(dna.Binary.BaseAddress, arch, RemillArch.GetDefaultSemanticsSearchPath(), ctx, new BinaryFunction(encodedCfg, scopeTableTree, solvedTables.AsReadOnly()), fallthroughFromIps, CallHandlingKind.Normal);
                 liftedFunction = FunctionIsolator.IsolateFunctionIntoNewModuleWithSehSupport(arch, liftedFunction, filterFunctions.Select(x => x.LiftedFilterFunction).ToList().AsReadOnly()).function;
 
                 liftedFunction.GlobalParent.PrintToFile(ArtifactPaths.Resolve("translatedFunction.ll"));
@@ -184,7 +182,7 @@ namespace Dna.BinaryTranslator.Unsafe
             var encodedCfg = X86CfgEncoder.EncodeCfg(dna.Binary, cfg);
 
 
-            (var liftedFunction, var blockMapping, var filterFunctions) = CfgTranslator.Translate(dna.Binary.BaseAddress, arch, "C:\\Users\\colton\\Downloads\\remill-17-semantics", ctx, new BinaryFunction(encodedCfg, scopeTableTree, solvedTables.AsReadOnly()), fallthroughFromIps, CallHandlingKind.Normal);
+            (var liftedFunction, var blockMapping, var filterFunctions) = CfgTranslator.Translate(dna.Binary.BaseAddress, arch, RemillArch.GetDefaultSemanticsSearchPath(), ctx, new BinaryFunction(encodedCfg, scopeTableTree, solvedTables.AsReadOnly()), fallthroughFromIps, CallHandlingKind.Normal);
             liftedFunction = FunctionIsolator.IsolateFunctionIntoNewModuleWithSehSupport(arch, liftedFunction, filterFunctions.Select(x => x.LiftedFilterFunction).ToList().AsReadOnly()).function;
             liftedFunction = StripRuntime(liftedFunction);
 

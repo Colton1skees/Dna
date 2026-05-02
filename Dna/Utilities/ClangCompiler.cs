@@ -12,14 +12,34 @@ namespace Dna.Utilities
 {
     public static class ClangCompiler
     {
-        // TODO: Remove hardcoded path.
-        private const string clangPath = @"C:\Users\colton\source\repos\cxx-common-cmake-win\cxx-common-cmake\build\install\bin\clang.exe";
+        private static readonly string clangPath = FindLlvmTool("clang.exe");
 
-        // TODO: Remove hardcoded path.
-        private const string objcpyPath = @"C:\Users\colton\source\repos\cxx-common-cmake-win\cxx-common-cmake\build\install\bin\llvm-objcopy.exe";
+        private static readonly string objcpyPath = FindLlvmTool("llvm-objcopy.exe");
 
-        // TODO: Remove hardcoded path.
-        private const string optPath = @"C:\Users\colton\source\repos\cxx-common-cmake-win\cxx-common-cmake\build\install\bin\opt.exe";
+        private static readonly string optPath = FindLlvmTool("opt.exe");
+
+        private static string FindLlvmTool(string toolName)
+        {
+            var envPath = Environment.GetEnvironmentVariable("DNA_LLVM_BIN");
+            if (!string.IsNullOrWhiteSpace(envPath))
+            {
+                var toolPath = Path.Combine(envPath, toolName);
+                if (File.Exists(toolPath))
+                    return toolPath;
+            }
+
+            var dir = new DirectoryInfo(Directory.GetCurrentDirectory());
+            while (dir != null)
+            {
+                var toolPath = Path.Combine(dir.FullName, "Dna.LLVMInterop", "dependencies", "install", "bin", toolName);
+                if (File.Exists(toolPath))
+                    return toolPath;
+
+                dir = dir.Parent;
+            }
+
+            return toolName;
+        }
 
         public static unsafe string CompileToWindowsDll(LLVMValueRef targetFunction, string llPath, bool overwrite = false)
         {

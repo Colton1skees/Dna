@@ -9,8 +9,27 @@ namespace Dna.Utilities
 {
     public static class IDALoader
     {
-        // TODO: Remove hardcoded path.
-        private const string idaPath = @"C:\Program Files\IDA 7.5\ida64.exe";
+        private static readonly string idaPath = FindIdaPath();
+
+        private static string FindIdaPath()
+        {
+            var envPath = Environment.GetEnvironmentVariable("IDA_PATH");
+            if (!string.IsNullOrWhiteSpace(envPath) && File.Exists(envPath))
+                return envPath;
+
+            var programFiles = Environment.GetFolderPath(Environment.SpecialFolder.ProgramFiles);
+            if (!string.IsNullOrWhiteSpace(programFiles) && Directory.Exists(programFiles))
+            {
+                foreach (var idaDir in Directory.EnumerateDirectories(programFiles, "IDA*"))
+                {
+                    var idaPath = Path.Combine(idaDir, "ida64.exe");
+                    if (File.Exists(idaPath))
+                        return idaPath;
+                }
+            }
+
+            return "ida64.exe";
+        }
 
         public static string Load(string exePath, bool overwrite = false)
         {
