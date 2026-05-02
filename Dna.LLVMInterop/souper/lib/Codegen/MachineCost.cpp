@@ -14,7 +14,6 @@
 
 #include "souper/Codegen/Codegen.h"
 #include "souper/Inst/Inst.h"
-#include "llvm/ADT/Optional.h"
 #include "llvm/ADT/Statistic.h"
 #include "llvm/IR/Dominators.h"
 #include "llvm/IR/IRBuilder.h"
@@ -32,6 +31,7 @@
 #include "llvm/Target/TargetMachine.h"
 #include "llvm/Target/TargetOptions.h"
 #include <map>
+#include <optional>
 
 #define DEBUG_TYPE "souper"
 
@@ -104,11 +104,16 @@ void getBackendCost(InstContext &IC, souper::Inst *I, BackendCost &BC) {
   // TODO is this better than just forcing all clients of this code to
   // do the init themselves?
   if (!Init) {
-    InitializeAllTargetInfos();
-    InitializeAllTargets();
-    InitializeAllTargetMCs();
-    InitializeAllAsmParsers();
-    InitializeAllAsmPrinters();
+    LLVMInitializeX86TargetInfo();
+    LLVMInitializeX86Target();
+    LLVMInitializeX86TargetMC();
+    LLVMInitializeX86AsmParser();
+    LLVMInitializeX86AsmPrinter();
+    LLVMInitializeAArch64TargetInfo();
+    LLVMInitializeAArch64Target();
+    LLVMInitializeAArch64TargetMC();
+    LLVMInitializeAArch64AsmParser();
+    LLVMInitializeAArch64AsmPrinter();
     Init = true;
   }
 
@@ -132,7 +137,7 @@ void getBackendCost(InstContext &IC, souper::Inst *I, BackendCost &BC) {
 
     auto Features = "";
     TargetOptions Opt;
-    auto RM = llvm::Optional<Reloc::Model>();
+    auto RM = std::optional<Reloc::Model>();
     auto TM = Target->createTargetMachine(T.Trip, T.CPU, Features, Opt, RM);
 
     Cost.C.push_back(getCodeSize(M, TM));

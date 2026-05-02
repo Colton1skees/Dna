@@ -139,6 +139,42 @@
     <ClInclude Include="API\LLVM\IR\Dominators.h">
       <Filter>API\LLVM\IR</Filter>
     </ClInclude>
+    <ClInclude Include="klee\include\klee\Config\config.h">
+      <Filter>klee</Filter>
+    </ClInclude>
+    <ClInclude Include="klee\include\klee\Config\Version.h">
+      <Filter>klee</Filter>
+    </ClInclude>
+    <ClInclude Include="klee\include\klee\Constraints.h">
+      <Filter>klee</Filter>
+    </ClInclude>
+    <ClInclude Include="klee\include\klee\Expr.h">
+      <Filter>klee</Filter>
+    </ClInclude>
+    <ClInclude Include="klee\include\klee\Internal\Support\IntEvaluation.h">
+      <Filter>klee</Filter>
+    </ClInclude>
+    <ClInclude Include="klee\include\klee\Solver.h">
+      <Filter>klee</Filter>
+    </ClInclude>
+    <ClInclude Include="klee\include\klee\util\Bits.h">
+      <Filter>klee</Filter>
+    </ClInclude>
+    <ClInclude Include="klee\include\klee\util\ExprPPrinter.h">
+      <Filter>klee</Filter>
+    </ClInclude>
+    <ClInclude Include="klee\include\klee\util\ExprSMTLIBPrinter.h">
+      <Filter>klee</Filter>
+    </ClInclude>
+    <ClInclude Include="klee\include\klee\util\PrintContext.h">
+      <Filter>klee</Filter>
+    </ClInclude>
+    <ClInclude Include="klee\include\klee\util\Ref.h">
+      <Filter>klee</Filter>
+    </ClInclude>
+    <ClInclude Include="souper\include\klee\Config\config.h">
+      <Filter>souper</Filter>
+    </ClInclude>
     <ClInclude Include="souper\include\souper\Util\LLVMUtils.h">
       <Filter>souper</Filter>
     </ClInclude>
@@ -194,6 +230,9 @@
       <Filter>souper</Filter>
     </ClInclude>
     <ClInclude Include="souper\include\souper\Extractor\ExprBuilder.h">
+      <Filter>souper</Filter>
+    </ClInclude>
+    <ClInclude Include="souper\include\souper\Extractor\Solver.h">
       <Filter>souper</Filter>
     </ClInclude>
     <ClInclude Include="souper\include\souper\Codegen\Codegen.h">
@@ -322,16 +361,16 @@
     <ClCompile Include="souper\lib\Codegen\MachineCost.cpp">
       <Filter>souper</Filter>
     </ClCompile>
-    <ClCompile Include="..\..\..\klee\lib\Expr\Expr.cpp">
+    <ClCompile Include="klee\lib\Expr\Expr.cpp">
       <Filter>klee</Filter>
     </ClCompile>
-    <ClCompile Include="..\..\..\klee\lib\Expr\ExprPPrinter.cpp">
+    <ClCompile Include="klee\lib\Expr\ExprPPrinter.cpp">
       <Filter>klee</Filter>
     </ClCompile>
-    <ClCompile Include="..\..\..\klee\lib\Expr\ExprSMTLIBPrinter.cpp">
+    <ClCompile Include="klee\lib\Expr\ExprSMTLIBPrinter.cpp">
       <Filter>klee</Filter>
     </ClCompile>
-    <ClCompile Include="..\..\..\klee\lib\Expr\Updates.cpp">
+    <ClCompile Include="klee\lib\Expr\Updates.cpp">
       <Filter>klee</Filter>
     </ClCompile>
     <ClCompile Include="souper\lib\Infer\Z3Driver.cpp">
@@ -410,10 +449,25 @@
     </Filter>
   </ItemGroup>
   <ItemGroup>
+    <None Include="klee\include\klee\Config\config.h.in">
+      <Filter>klee</Filter>
+    </None>
+    <None Include="klee\LICENSE.TXT">
+      <Filter>klee</Filter>
+    </None>
+    <None Include="klee\README.txt">
+      <Filter>klee</Filter>
+    </None>
     <None Include="souper\include\souper\Tool\GetSolver.h.in">
       <Filter>souper</Filter>
     </None>
     <None Include="souper\include\souper\KVStore\KVSocket.h.in">
+      <Filter>souper</Filter>
+    </None>
+    <None Include="souper\LICENSE">
+      <Filter>souper</Filter>
+    </None>
+    <None Include="souper\README.txt">
       <Filter>souper</Filter>
     </None>
   </ItemGroup>

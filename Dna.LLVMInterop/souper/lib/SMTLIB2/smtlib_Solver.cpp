@@ -18,7 +18,6 @@
 #include "llvm/ADT/SmallString.h"
 #include "llvm/ADT/Statistic.h"
 #include "llvm/ADT/StringRef.h"
-#include "llvm/ADT/Optional.h"
 #include "llvm/Support/FileSystem.h"
 #include "llvm/Support/MemoryBuffer.h"
 #include "llvm/Support/Program.h"
@@ -28,6 +27,7 @@
 #include <stdio.h>
 #include <sys/stat.h>
 #include <sys/types.h>
+#include <optional>
 #include <system_error>
 
 using namespace llvm;
@@ -311,7 +311,7 @@ SolverProgram souper::makeExternalSolverProgram(StringRef Path) {
     std::vector<StringRef> ArgPtrs;
     ArgPtrs.push_back(PathStr);
     ArgPtrs.insert(ArgPtrs.end(), Args.begin(), Args.end());
-    Optional<StringRef> Redirects[] = {RedirectIn, RedirectOut, RedirectErr};
+    std::optional<StringRef> Redirects[] = {RedirectIn, RedirectOut, RedirectErr};
     return sys::ExecuteAndWait(PathStr, ArgPtrs, std::nullopt, Redirects, Timeout);
   };
 }
