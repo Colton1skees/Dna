@@ -3,6 +3,7 @@ using Dna.LLVMInterop.API.Remill.Manual;
 using LLVMSharp.Interop;
 using System;
 using System.Collections.Generic;
+using System.IO;
 using System.Linq;
 using System.Runtime.InteropServices;
 using System.Text;
@@ -18,6 +19,10 @@ namespace Dna.LLVMInterop.API.Remill.Arch
         public readonly nint Handle;
 
         private RemillDecodingContext defaultCtx = null;
+
+        private bool hasSemanticsModule;
+
+        private LLVMModuleRef semanticsModule;
 
         public unsafe LLVMTypeRef AddressType => NativeRemillArchApi.Arch_AddressType(this);
 
@@ -90,6 +95,25 @@ namespace Dna.LLVMInterop.API.Remill.Arch
         public unsafe void PrepareModule(LLVMModuleRef module) => NativeRemillArchApi.Arch_PrepareModule(this, module);
 
         public unsafe void PrepareModuleDataLayout(LLVMModuleRef module) => NativeRemillArchApi.Arch_PrepareModuleDataLayout(this, module);
+
+        public LLVMModuleRef GetOrLoadSemantics(string? path = null)
+        {
+            if (hasSemanticsModule)
+                return semanticsModule;
+
+            semanticsModule = RemillUtils.LoadArchSemantics(this, path ?? GetDefaultSemanticsSearchPath());
+            hasSemanticsModule = true;
+            return semanticsModule;
+        }
+
+        public static string GetDefaultSemanticsSearchPath()
+        {
+            var configuredPath = Environment.GetEnvironmentVariable("DNA_REMILL_SEMANTICS");
+            if (!string.IsNullOrWhiteSpace(configuredPath))
+                return configuredPath;
+
+            return Path.Combine(AppContext.BaseDirectory, "remill-semantics");
+        }
 
         /// <summary>
         /// Decodes a single remill instruction. 

@@ -32,4 +32,53 @@ Note that `Dna` is currently based on LLVM 17.
 `Dna` contains a VMProtect devirtualization plugin located in `Dna.BinaryTranslator/VMProtect`. See [this PR](https://github.com/Colton1skees/Dna/pull/8) for more info.
 
 # Building
-`Dna` will not build out of the box. Custom patches to remill and souper were needed for this to build on windows. If you would like to work on Dna, open an issue or email me `colton1skees@gmail.com`. At some point I may publish proper build steps, but I make no guarantees. 
+
+Dna currently targets LLVM 17 and is expected to be built on Windows x64 with Visual Studio 2022.
+Build `Dna.LLVMInterop` in **Release** mode; the native dependency tree is Release-built and Debug interop builds are not supported.
+
+## Prerequisites
+
+- Visual Studio 2022 with C++/MSBuild tools
+- CMake
+- Ninja
+- clang-cl / LLVM tools available from the VS toolchain
+- Rust/Cargo, for the EqSat simplifier DLL
+- .NET SDK 8+
+
+Run the commands below from a VS x64 developer shell, or another shell with the VS C++ tools on `PATH`.
+
+## 1. Build native dependencies
+
+The dependency superbuild installs LLVM 17, Remill, Z3, XED, gflags/glog, and related native libraries into `Dna.LLVMInterop/dependencies/install`.
+
+```powershell
+cmake -S Dna.LLVMInterop/dependencies `
+      -B Dna.LLVMInterop/dependencies/build `
+      -G Ninja `
+      -DCMAKE_BUILD_TYPE=Release `
+      -DCMAKE_C_COMPILER=clang-cl `
+      -DCMAKE_CXX_COMPILER=clang-cl
+
+cmake --build Dna.LLVMInterop/dependencies/build
+```
+
+If changing compiler, build type, or CRT settings, delete both `Dna.LLVMInterop/dependencies/build` and `Dna.LLVMInterop/dependencies/install` before reconfiguring.
+
+## 2. Build the Rust simplifier DLL
+
+`Dna.Example` and the simplifier projects copy `eq_sat.dll` from the Cargo release output.
+
+```powershell
+cargo build --manifest-path Simplifier/EqSat/Cargo.toml --release
+```
+
+## 3. Build the solution
+
+```powershell
+& "C:\Program Files\Microsoft Visual Studio\2022\Community\MSBuild\Current\Bin\MSBuild.exe" `
+  Dna.sln `
+  /restore `
+  /p:Configuration=Release `
+  /p:Platform=x64 `
+  /m
+```

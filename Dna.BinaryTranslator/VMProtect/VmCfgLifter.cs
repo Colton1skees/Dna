@@ -4,6 +4,7 @@ using Dna.ControlFlow;
 using Dna.Extensions;
 using Dna.LLVMInterop.API.LLVMBindings.Transforms.Utils;
 using Dna.LLVMInterop.API.Remill.Arch;
+using Dna.Utilities;
 using LLVMSharp;
 using LLVMSharp.Interop;
 using System;
@@ -85,13 +86,13 @@ namespace Dna.BinaryTranslator.VMProtect
             LiftBlocks(blockMapping, registerAllocaMapping);
 
 
-            module.PrintToFile("translatedFunction.ll");
+            module.PrintToFile(ArtifactPaths.Resolve("translatedFunction.ll"));
 
             // Inline all calls to each basic block. TODO: Delete.
             foreach (var func in blockToFunctionMapping.Values)
                 LLVMCloning.InlineFunction(func.func);
 
-            module.PrintToFile("translatedFunction.ll");
+            module.PrintToFile(ArtifactPaths.Resolve("translatedFunction.ll"));
             //module.Verify(LLVMVerifierFailureAction.LLVMPrintMessageAction);
   
             Console.WriteLine("lifted all blocks");
@@ -192,7 +193,7 @@ namespace Dna.BinaryTranslator.VMProtect
 
             //  Console.WriteLine(defaultBlock);
             //  Console.WriteLine(indirectPc);
-            module.PrintToFile("translatedFunction.ll");
+            module.PrintToFile(ArtifactPaths.Resolve("translatedFunction.ll"));
             //  Console.ReadLine();
             builder.PositionAtEnd(llvmBlock);
             var swtch = builder.BuildSwitch(indirectPc, defaultBlock, (uint)outgoingAddresses.Count);

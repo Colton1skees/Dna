@@ -1,6 +1,7 @@
 ﻿using Dna.BinaryTranslator.Lifting;
 using Dna.Extensions;
 using Dna.LLVMInterop.API.LLVMBindings.IR;
+using Dna.Utilities;
 using LLVMSharp.Interop;
 using System;
 using System.Collections.Generic;
@@ -36,7 +37,7 @@ namespace Dna.BinaryTranslator.Safe
 
         private void Implement()
         {
-            liftedFunction.GlobalParent.PrintToFile("translatedFunction.ll");
+            liftedFunction.GlobalParent.PrintToFile(ArtifactPaths.Resolve("translatedFunction.ll"));
             // If the function has no SEH filters then do nothing.
             if (!liftedFilterFunctions.Any())
                 return;
@@ -92,7 +93,7 @@ namespace Dna.BinaryTranslator.Safe
         {
             foreach(var filter in liftedFilterFunctions)
             {
-                filter.LlvmFunction.GlobalParent.PrintToFile("translatedFunction.ll");
+                filter.LlvmFunction.GlobalParent.PrintToFile(ArtifactPaths.Resolve("translatedFunction.ll"));
                 // Emit @llvm.eh.recoverfp. Note that argument 1 of any filter function is the parent functions frame pointer.
                 builder.PositionBefore(filter.LlvmFunction.EntryBasicBlock.FirstInstruction);
                 var recoverFp = intrinsicBuilder.EmitSehRecoverFp(liftedFunction, filter.LlvmFunction.GetParam(1));

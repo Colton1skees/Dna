@@ -20,7 +20,7 @@ namespace Dna.BinaryTranslator.VMProtect
         {
             if(dbg)
             {
-                function.GlobalParent.PrintToFile("translatedFunction.ll");
+                function.GlobalParent.PrintToFile(ArtifactPaths.Resolve("translatedFunction.ll"));
                 Console.WriteLine("dbg");
             }
 

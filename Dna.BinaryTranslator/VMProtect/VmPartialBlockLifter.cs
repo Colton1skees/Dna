@@ -5,6 +5,7 @@ using Dna.Extensions;
 using Dna.LLVMInterop.API.LLVMBindings.Transforms.Utils;
 using Dna.LLVMInterop.API.Remill.Arch;
 using Dna.LLVMInterop.API.Remill.BC;
+using Dna.Utilities;
 using LLVMSharp.Interop;
 using System;
 using System.Collections.Generic;
@@ -69,7 +70,7 @@ namespace Dna.BinaryTranslator.VMProtect
                 func.DeleteFunction();
             }
 
-            module.PrintToFile("translatedFunction.ll");
+            module.PrintToFile(ArtifactPaths.Resolve("translatedFunction.ll"));
             return blockToLlvmFunc;
         }
 
@@ -83,7 +84,7 @@ namespace Dna.BinaryTranslator.VMProtect
                 memPtr.Initializer = memoryPtrNull;
             }
 
-            module.PrintToFile("translatedFunction.ll");
+            module.PrintToFile(ArtifactPaths.Resolve("translatedFunction.ll"));
             module.Verify(LLVMVerifierFailureAction.LLVMAbortProcessAction);
 
             // Create the function

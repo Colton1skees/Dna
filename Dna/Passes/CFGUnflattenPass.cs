@@ -1,4 +1,5 @@
 ﻿using Dna.Extensions;
+using Dna.Utilities;
 using Dna.LLVMInterop.API.LLVMBindings.Transforms.Utils;
 using LLVMSharp.Interop;
 using System;
@@ -31,7 +32,7 @@ namespace Dna.Passes
             if (function.GetInstructions().Any(x => x.InstructionOpcode == LLVMOpcode.LLVMPHI))
                 LLVMCloning.PrepareForCloning(function, false);
 
-            function.GlobalParent.PrintToFile("beforecloning.ll");
+            function.GlobalParent.PrintToFile(ArtifactPaths.Resolve("beforecloning.ll"));
 
             var directJmps = function.GetBlocks().Where(x => x.LastInstruction.InstructionOpcode == LLVMOpcode.LLVMBr && x.LastInstruction.OperandCount == 1).Select(x => x.LastInstruction).ToList();
             if (!directJmps.Any())
@@ -59,7 +60,7 @@ namespace Dna.Passes
                 //    throw new InvalidOperationException("Failed to merge basic block!");
             }
 
-            function.GlobalParent.PrintToFile("cloned.ll");
+            function.GlobalParent.PrintToFile(ArtifactPaths.Resolve("cloned.ll"));
 
             return true;
             // Clone the basic block.

@@ -1,6 +1,7 @@
 ﻿using Dna.LLVMInterop.API.LLVMBindings.IR;
 using Dna.LLVMInterop.API.LLVMBindings.Transforms.Utils;
 using Dna.LLVMInterop.API.Remill.BC;
+using Dna.Utilities;
 using LLVMSharp.Interop;
 using System;
 using System.Collections.Generic;
@@ -15,7 +16,7 @@ namespace Dna.Extensions
     {
         public static void WriteToLlFile(this LLVMModuleRef module, string path)
         {
-            File.WriteAllText(path, module.GetModuleText());
+            File.WriteAllText(ArtifactPaths.Resolve(path), module.GetModuleText());
         }
 
         public static string GetModuleText(this LLVMModuleRef module)

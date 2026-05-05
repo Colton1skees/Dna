@@ -33,7 +33,7 @@ namespace Dna.BinaryTranslator.VMProtect
             var targetFunc = function.GlobalParent.GetFunctions().SingleOrDefault(x => x.Name.Contains("vmp_maybe_unsolved_jump"));
             if(targetFunc == null)
             {
-                function.GlobalParent.PrintToFile("translatedFunction.ll");
+                function.GlobalParent.PrintToFile(ArtifactPaths.Resolve("translatedFunction.ll"));
                 throw new InvalidOperationException($"No jump tables to solve!");
             }
 
@@ -45,7 +45,7 @@ namespace Dna.BinaryTranslator.VMProtect
             {
                 if (jmpCall.GetOperand(2).Kind != LLVMValueKind.LLVMConstantIntValueKind)
                 {
-                    function.GlobalParent.PrintToFile("translatedFunction.ll");
+                    function.GlobalParent.PrintToFile(ArtifactPaths.Resolve("translatedFunction.ll"));
                     throw new InvalidOperationException($"Could not identify jump from address for call {jmpCall}");
                 }
 
@@ -83,7 +83,7 @@ namespace Dna.BinaryTranslator.VMProtect
                 else
                 {
                     // Otherwise this is probably an unsolved jump table. Error out.
-                    jmpCall.InstructionParent.Parent.GlobalParent.PrintToFile("translatedFunction.ll");
+                    jmpCall.InstructionParent.Parent.GlobalParent.PrintToFile(ArtifactPaths.Resolve("translatedFunction.ll"));
                     throw new InvalidOperationException($"Failed to solve indirect jump! {jmpCall}");
                 }
             }
@@ -116,8 +116,8 @@ namespace Dna.BinaryTranslator.VMProtect
                 memPtr.Initializer = memoryPtrNull;
             }
 
-            jmpCall.InstructionParent.Parent.GlobalParent.PrintToFile("translatedFunction.ll");
-            jmpCall.InstructionParent.Parent.GlobalParent.WriteBitcodeToFile("translatedFunction.bc");
+            jmpCall.InstructionParent.Parent.GlobalParent.PrintToFile(ArtifactPaths.Resolve("translatedFunction.ll"));
+            jmpCall.InstructionParent.Parent.GlobalParent.WriteBitcodeToFile(ArtifactPaths.Resolve("translatedFunction.bc"));
             throw new InvalidOperationException($"Failed to solve indirect jump! {jmpCall}");
         }
 

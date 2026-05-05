@@ -44,7 +44,7 @@ namespace Dna.BinaryTranslator.Safe
 
             //OptimizationApi.OptimizeModule(llvmFunction.GlobalParent, llvmFunction);
 
-            llvmFunction.GlobalParent.PrintToFile("translatedFunction.ll");
+            llvmFunction.GlobalParent.PrintToFile(ArtifactPaths.Resolve("translatedFunction.ll"));
 
             var path = ClangCompiler.CompileToWindowsDll(llvmFunction, "translatedFunction.ll", false);
             IDALoader.Load(path, true);

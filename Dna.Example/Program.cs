@@ -236,7 +236,7 @@ if(prototypeBounds)
 
     var l = LowerLshr.LowerLshrToLlvm(toSlice, bld);
     toSlice.ReplaceAllUsesWith(l);
-    fromFile.PrintToFile("nolshr.ll");
+    fromFile.PrintToFile(ArtifactPaths.Resolve("nolshr.ll"));
 
 
     var loopInfo = new LoopInfo();
@@ -364,8 +364,8 @@ var ctx = LLVMContextRef.Create();
 Console.WriteLine((int)RemillArchId.kArchAMD64_AVX512);
 
 
-var bcPath = "C:\\Users\\colton\\Downloads\\remill-17-semantics";
-ctx.TryGetBitcodeModule(LlvmUtilities.CreateMemoryBuffer(@"C:\Users\colton\Downloads\remill-17-semantics" + "\\amd64_sleigh.bc"), out LLVMModuleRef theModule, out string msg);
+var bcPath = RemillArch.GetDefaultSemanticsSearchPath();
+ctx.TryGetBitcodeModule(LlvmUtilities.CreateMemoryBuffer(Path.Combine(bcPath, "amd64_sleigh.bc")), out LLVMModuleRef theModule, out string msg);
 
 
 theModule.WriteToLlFile("remillModule.ll");
@@ -376,7 +376,7 @@ var arch = new RemillArch(ctx, RemillOsId.kOSWindows, RemillArchId.kArchAMD64);
 
 
 Console.WriteLine("Loading arch semantics");
-var archModule = RemillUtils.LoadArchSemantics(arch, bcPath);
+var archModule = arch.GetOrLoadSemantics(bcPath);
 Console.WriteLine("Getting reg name.");
 Console.WriteLine(arch.StackPointerRegisterName);
 Console.WriteLine("Got reg name");

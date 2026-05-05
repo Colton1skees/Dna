@@ -9,22 +9,41 @@ namespace Dna.Utilities
 {
     public static class IDALoader
     {
-        // TODO: Remove hardcoded path.
-        private const string idaPath = @"C:\Program Files\IDA 7.5\ida64.exe";
+        private static readonly string idaPath = FindIdaPath();
+
+        private static string FindIdaPath()
+        {
+            var envPath = Environment.GetEnvironmentVariable("IDA_PATH");
+            if (!string.IsNullOrWhiteSpace(envPath) && File.Exists(envPath))
+                return envPath;
+
+            var programFiles = Environment.GetFolderPath(Environment.SpecialFolder.ProgramFiles);
+            if (!string.IsNullOrWhiteSpace(programFiles) && Directory.Exists(programFiles))
+            {
+                foreach (var idaDir in Directory.EnumerateDirectories(programFiles, "IDA*"))
+                {
+                    var idaPath = Path.Combine(idaDir, "ida64.exe");
+                    if (File.Exists(idaPath))
+                        return idaPath;
+                }
+            }
+
+            return "ida64.exe";
+        }
 
         public static string Load(string exePath, bool overwrite = false)
         {
-            // If the file already exists, we don't want to overwrite it.
-            var dir = Path.GetDirectoryName(exePath);
-            // Compile the .ll file to assembly with vectorization disabled.
-            var fileName = Path.GetFileName(exePath);
+            exePath = ArtifactPaths.CopyInputToOutput(ArtifactPaths.ResolveInputFile(exePath));
 
-            // Compile the .ll to an exe.
+            // If the database already exists, use a unique copy so IDA does not
+            // reuse/overwrite an old .i64 next to the input.
             if (File.Exists(exePath) && overwrite == false)
             {
-                var randName = Guid.NewGuid().ToString();
-                var newPath = Path.Combine(dir, randName);
-                File.Move(exePath, newPath);
+                var dir = Path.GetDirectoryName(exePath) ?? ArtifactPaths.OutputDirectory;
+                var fileName = Path.GetFileNameWithoutExtension(exePath);
+                var extension = Path.GetExtension(exePath);
+                var newPath = Path.Combine(dir, $"{fileName}-{Guid.NewGuid():N}{extension}");
+                File.Copy(exePath, newPath, overwrite: false);
                 exePath = newPath;
             }
 

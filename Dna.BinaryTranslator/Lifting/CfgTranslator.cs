@@ -69,7 +69,7 @@ namespace Dna.BinaryTranslator.Lifting
             )
         {
             var ctx = LLVMContextRef.Global;
-            return Translate(imagebase, arch, "C:\\Users\\colton\\Downloads\\remill-17-semantics", ctx, binaryFunction, fallthroughFromIps, callHandlingKind);
+            return Translate(imagebase, arch, RemillArch.GetDefaultSemanticsSearchPath(), ctx, binaryFunction, fallthroughFromIps, callHandlingKind);
         }
 
         public static (LLVMValueRef function, BlockMapping blockMapping, IReadOnlyList<LiftedSehEntry> filterFunctions) Translate(
@@ -90,7 +90,7 @@ namespace Dna.BinaryTranslator.Lifting
             this.imagebase = imagebase;
             this.arch = arch;
             this.ctx = ctx;
-            module = RemillUtils.LoadArchSemantics(arch, semanticsPath);
+            module = arch.GetOrLoadSemantics(semanticsPath);
             builder = ctx.CreateBuilder();
             this.binaryFunction = binaryFunction;
             this.fallthroughFromIps = fallthroughFromIps;

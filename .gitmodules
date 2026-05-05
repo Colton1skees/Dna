@@ -10,3 +10,6 @@
 [submodule "Simplifier"]
 	path = Simplifier
 	url = https://github.com/mazeworks-security/Simplifier.git
+[submodule "Dna.LLVMInterop/dependencies/remill"]
+	path = Dna.LLVMInterop/dependencies/remill
+	url = https://github.com/lifting-bits/remill
