@@ -54,6 +54,8 @@ namespace Dna.Passes
 
         public static bool Run3(LLVMValueRef function)
         {
+            //Console.WriteLine($"Visiting func: {function.Name}");
+            //function.GlobalParent.PrintToFile("instcombine.ll");
             var builder = LLVMBuilderRef.Create(LLVMContextRef.Global);
             foreach (var inst in function.GetInstructions().ToList())
             {
@@ -68,12 +70,14 @@ namespace Dna.Passes
                     continue;
 
                 var replacement = Visit(builder, gepIndex, new(), 0);
-                Console.WriteLine($"Replacing {gepIndex} with {replacement}");
+                if (replacement == gepIndex)
+                    continue;
+                //Console.WriteLine($"Replacing {gepIndex} with {replacement}");
                 gepIndex.ReplaceAllUsesWith(replacement);
 
             }
 
-            function.GlobalParent.PrintToFile("instcombine.ll");
+            //function.GlobalParent.PrintToFile("instcombine.ll");
 
             return true;
         }

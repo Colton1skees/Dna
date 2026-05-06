@@ -73,13 +73,13 @@ if (genDsl)
 //LazyLLVMFixes.InstallValueToStringBugFix(RemillUtils.LLVMValueToString);
 
 
-bool dbgCode = true;
+bool dbgCode = false;
 if (dbgCode)
 {
-    var irPath = "C:\\Users\\colton\\Downloads\\failed_path_solve.ll";
+    var irPath = "C:\\Users\\colton\\Downloads\\crash.ll";
     Console.WriteLine(irPath);
     var tempNewMod = RemillUtils.LoadModuleFromFile(LLVMContextRef.Global, irPath).Value;
-    var existingFunc = tempNewMod.GetFunctions().Single(x => x.Name.Contains("snork"));
+    var existingFunc = tempNewMod.GetFunctions().Single(x => x.Name.Contains("Parameterized_TranslatedFrom1400045CB"));
 
 
     while (true)
