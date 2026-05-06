@@ -73,7 +73,7 @@ if (genDsl)
 //LazyLLVMFixes.InstallValueToStringBugFix(RemillUtils.LLVMValueToString);
 
 
-bool dbgCode = true;
+bool dbgCode = false;
 if (dbgCode)
 {
     var irPath = "C:\\Users\\colton\\Downloads\\crash5.ll";
@@ -88,15 +88,15 @@ if (dbgCode)
         unsafe
         {
             //MbaDeobfuscationPass.Run(existingFunc);
-            MultiUseCloningPass.Run(existingFunc);
-            existingFunc.GlobalParent.PrintToFile("instcombine.ll");
+            //MultiUseCloningPass.Run(existingFunc);
+            //existingFunc.GlobalParent.PrintToFile("instcombine.ll");
             if (false)
             {
                 new AdhocInstCombinePass().InstCombine((LLVMOpaqueValue*)existingFunc.Handle, 0, 0);
                 MultiUseCloningPass.Run(existingFunc);
                 MbaDeobfuscationPass.Run(existingFunc);
             }
-            
+
         } 
 
         var vmpPath = @"C:\Users\colton\Downloads\DNA Assets\vmptest.vmp.bin";
@@ -124,6 +124,7 @@ if (dbgCode)
 
         sw.Stop();
             Console.WriteLine($"Pass took {sw.ElapsedMilliseconds}ms ");
+        Debugger.Break();
     }
     Debugger.Break();
 

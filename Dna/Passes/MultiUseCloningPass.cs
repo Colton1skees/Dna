@@ -110,7 +110,6 @@ namespace Dna.Passes
 
             if (!opcodesToClone.Contains(inst.InstructionOpcode) && !isCall)
             {
-                Console.WriteLine(inst.InstructionOpcode);
                 return inst;
             }
 
@@ -180,7 +179,7 @@ namespace Dna.Passes
 
         public static bool Run(LLVMValueRef function)
         {
-            //return Run3(function);
+            return Run3(function);
             //return Run2(function);
             //return MbaDeobfuscationPass.Run(function);
             
