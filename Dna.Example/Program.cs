@@ -53,11 +53,90 @@ using Dna.LLVMInterop.API.LLVMBindings.Analysis;
 using Dna.BinaryTranslator.JmpTables.Precise;
 using Dna.Reconstruction;
 using Dna.Passes;
+using Dna.BinaryTranslator.VMProtect;
+using Dna.Passes.Mba;
+using Mba.Simplifier.DSL;
+
+
+bool genDsl = false;
+if (genDsl)
+{
+    var dsl = DslParser.ParseDsl(File.ReadAllText("C:\\Users\\colton\\source\\repos\\dna-build-refactor\\Dna\\Simplifier\\Mba.Simplifier\\DSL\\simplification.rules"));
+    var backend = new IsleBackend(dsl);
+    backend.Generate();
+    Debugger.Break();
+}
 
 // Regrettably, install some runtime hooks to fix some FFI issues w/ LLVMSharp
 //LazyLLVMFixes.InstallModuleToStringBugFix(RemillUtils.LLVMModuleToString);
 //LazyLLVMFixes.InstallModuleToFileBugFix();
 //LazyLLVMFixes.InstallValueToStringBugFix(RemillUtils.LLVMValueToString);
+
+
+bool dbgCode = true;
+if (dbgCode)
+{
+    var irPath = "C:\\Users\\colton\\Downloads\\failed_path_solve.ll";
+    Console.WriteLine(irPath);
+    var tempNewMod = RemillUtils.LoadModuleFromFile(LLVMContextRef.Global, irPath).Value;
+    var existingFunc = tempNewMod.GetFunctions().Single(x => x.Name.Contains("snork"));
+
+
+    while (true)
+    {
+        var sw = Stopwatch.StartNew();
+        unsafe
+        {
+            if (false)
+            {
+                new AdhocInstCombinePass().InstCombine((LLVMOpaqueValue*)existingFunc.Handle, 0, 0);
+            }
+            
+        } 
+
+        var vmpPath = @"C:\Users\colton\Downloads\DNA Assets\vmptest.vmp.bin";
+        var vmpBin = WindowsBinary.From(vmpPath);
+        var vmpDna = new Dna.Dna(vmpBin);
+
+        PassPipeline.Run(vmpBin, existingFunc);
+
+
+        tempNewMod.PrintToFile("instcombine.ll");
+
+        //MbaDeobfuscationPass.Run(existingFunc);
+        sw.Stop();
+        Console.WriteLine($"Pass took {sw.ElapsedMilliseconds}ms ");
+    }
+    Debugger.Break();
+
+    //PassPipeline.Run(bin, existingFunc);
+
+}
+
+bool useVmp = true;
+if (useVmp)
+{
+
+    var vmpPath = @"C:\Users\colton\Downloads\DNA Assets\vmptest.vmp.bin";
+    var vmpBin = WindowsBinary.From(vmpPath);
+    var vmpDna = new Dna.Dna(vmpBin);
+
+    var vmpCtx = LLVMContextRef.Global;
+    var vmpArch = new RemillArch(vmpCtx, RemillOsId.kOSLinux, RemillArchId.kArchAMD64_AVX512);
+    var translator = new IterativeVmpTranslator(vmpDna, vmpArch, vmpCtx, 0x140001030);
+
+    var sw = Stopwatch.StartNew();
+    var devirtedFunc = translator.Run();
+    sw.Stop();
+
+    Console.WriteLine($"Took {sw.ElapsedMilliseconds}ms ");
+    Debugger.Break();
+    VmpContextRemovalPass.Run(devirtedFunc);
+
+    
+
+
+}
 
 // TODO: https://github.com/cnr-isti-vclab/meshlab/releases/download/MeshLab-2023.12/MeshLab2023.12-windows.exe
 // Lift N functions from MeshLab
@@ -194,7 +273,7 @@ var target = exceptions.Single(x => (ulong)x.Begin.Rva + bin.BaseAddress == 0x14
     var codes = UnwindCodeParser.ParseUnwindCode(bin, uwcAddr, uwRef.UnwindCodes.Length * 2, uwRef.Version);
 
     var height = StackHeightCalculator.Get(codes);
-    Console.WriteLine($"Stack height: 0x{height.ToString("X")} ");
+    Console.WriteLine($"Stack height: 0x{height.ToString("X")}  ");
     //Console.WriteLine(height);
     // Iteratively explore and lift the functiom until no new edges can be discovered.
     var remillArch = new RemillArch(LLVMContextRef.Global, RemillOsId.kOSWindows, RemillArchId.kArchAMD64_AVX512);

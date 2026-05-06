@@ -70,7 +70,7 @@ namespace Dna.BinaryTranslator.VMProtect
                 func.DeleteFunction();
             }
 
-            module.PrintToFile(ArtifactPaths.Resolve("translatedFunction.ll"));
+            //module.PrintToFile(ArtifactPaths.Resolve("translatedFunction.ll"));
             return blockToLlvmFunc;
         }
 
@@ -84,8 +84,8 @@ namespace Dna.BinaryTranslator.VMProtect
                 memPtr.Initializer = memoryPtrNull;
             }
 
-            module.PrintToFile(ArtifactPaths.Resolve("translatedFunction.ll"));
-            module.Verify(LLVMVerifierFailureAction.LLVMAbortProcessAction);
+            //module.PrintToFile(ArtifactPaths.Resolve("translatedFunction.ll"));
+            //module.Verify(LLVMVerifierFailureAction.LLVMAbortProcessAction);
 
             // Create the function
             LLVMValueRef outFunction = module.AddFunction($"block_{block.Address.ToString("X")}", StateStruct.ParameterizedFunctionPrototype);

@@ -64,7 +64,7 @@ namespace Dna.BinaryTranslator.VMProtect
             // Lift the trace into an LLVM IR function.
             var function = TraceLifter.Lift(module, arch, traceInsts);
 
-            function.GlobalParent.PrintToFile(ArtifactPaths.Resolve("translatedFunction.ll"));
+            //function.GlobalParent.PrintToFile(ArtifactPaths.Resolve("translatedFunction.ll"));
 
             // Apply concrete implementations to all intrinsics.
             // E.g. __remill_memory_read() and __remill_memory_write().
@@ -75,7 +75,7 @@ namespace Dna.BinaryTranslator.VMProtect
             var parameterizedStateStruct = VmpParameterizedStateStructure.CreateFromFunction(arch, function);
             function = parameterizedStateStruct.OutputFunction;
 
-            function.GlobalParent.PrintToFile(ArtifactPaths.Resolve("translatedFunction.ll"));
+            //function.GlobalParent.PrintToFile(ArtifactPaths.Resolve("translatedFunction.ll"));
             // Replace the remill return and error intrinsics with
             // functions that are more amenable to optimization.
             ErrorAndReturnImplementer.Implement(function);

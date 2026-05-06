@@ -27,7 +27,7 @@ namespace Dna.Passes
             PtrToStoreLoadPropagation = new dgAdhocInstCombinePass(InstCombine);
         }
 
-        private unsafe bool InstCombine(LLVMOpaqueValue* function, nint loopInfo, nint mssa)
+        public unsafe bool InstCombine(LLVMOpaqueValue* function, nint loopInfo, nint mssa)
         {
             builder = LLVMBuilderRef.Create(LLVMContextRef.Global);
             return Run(function);
@@ -41,6 +41,7 @@ namespace Dna.Passes
                 changed |= TryRewriteBinaryOperator(inst);
                 changed |= TryRewriteConstantShiftOfConstantSelect(inst);
                 changed |= TryRewriteTruncOfConstantSelect(inst);
+                changed |= TryDistributeSelect(inst);
             }
 
             return changed;
@@ -109,6 +110,46 @@ namespace Dna.Passes
                 return false;
             }
 
+        }
+
+        private static readonly LLVMOpcode[] Opcodes = { LLVMOpcode.LLVMAdd, LLVMOpcode.LLVMSub, LLVMOpcode.LLVMAnd, LLVMOpcode.LLVMOr, LLVMOpcode.LLVMXor, LLVMOpcode.LLVMLShr, LLVMOpcode.LLVMAShr };
+
+        private bool TryDistributeSelect(LLVMValueRef inst)
+        {
+            
+            var opcode = inst.InstructionOpcode;
+            if (Array.IndexOf(Opcodes, opcode) == -1)
+                return false;
+
+            // Get the operands
+            var op1 = inst.GetOperand(0);
+            var op2 = inst.GetOperand(1);
+
+            // At least one operand must be a select of two constants
+            if (!IsSelect(op1) && !IsSelect(op2))
+                return false;
+
+            var selectIndex = IsSelect(op1) ? 0 : 1;
+            var selectOperand = selectIndex == 0 ? op1 : op2;
+            var otherIndex = IsSelect(op1) ? 1 : 0;
+            var otherOperand = otherIndex == 0 ? op1 : op2;
+
+            var clone0 = inst.InstructionClone;
+            builder.PositionBefore(inst.NextInstruction);
+            builder.Insert(clone0);
+            clone0.Name = inst.Name;
+
+            var clone1 = inst.InstructionClone;
+            builder.PositionBefore(clone0.NextInstruction);
+            builder.Insert(clone1);
+            clone1.Name = clone0.Name;
+
+            clone0.SetOperand((uint)selectIndex, selectOperand.GetOperand(1));
+            clone1.SetOperand((uint)selectIndex, selectOperand.GetOperand(2));
+
+            var res = builder.BuildSelect(selectOperand.GetOperand(0), clone0, clone1);
+            Replace(inst, res);
+            return true;
         }
 
         /// <summary>
@@ -210,6 +251,8 @@ namespace Dna.Passes
             return true;
         }
 
+
+
         private (bool isConstant, LLVMValueRef selectOp1, LLVMValueRef selectOp2) AsSelectOfTwoConstants(LLVMValueRef select)
         {
             // If this is not a select between two constants, skip it.
@@ -221,12 +264,29 @@ namespace Dna.Passes
 
         private static bool IsSelectOfTwoConstants(LLVMValueRef inst)
         {
+            if (inst.Kind != LLVMValueKind.LLVMInstructionValueKind)
+                return false;
+
             // Return false if it's not a select inst.
             if (inst.InstructionOpcode != LLVMOpcode.LLVMSelect)
                 return false;
 
             // If either operand is not a constant, return false.
             if (inst.GetOperand(1).Kind != LLVMValueKind.LLVMConstantIntValueKind || inst.GetOperand(2).Kind != LLVMValueKind.LLVMConstantIntValueKind)
+                return false;
+
+            return true;
+        }
+
+        private static bool IsSelect(LLVMValueRef inst)
+        {
+            return IsSelectOfTwoConstants(inst);
+
+            if (inst.Kind != LLVMValueKind.LLVMInstructionValueKind)
+                return false;
+
+            // Return false if it's not a select inst.
+            if (inst.InstructionOpcode != LLVMOpcode.LLVMSelect)
                 return false;
 
             return true;

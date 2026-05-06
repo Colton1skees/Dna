@@ -87,7 +87,7 @@ namespace Dna.BinaryTranslator.JmpTables.Precise
             indJmp.SetOperand(1, intraBlockPtr);
 
             //jmpPtr = intraBlockPtr;
-            function.GlobalParent.PrintToFile(ArtifactPaths.Resolve("translatedFunction.ll"));
+            //function.GlobalParent.PrintToFile(ArtifactPaths.Resolve("translatedFunction.ll"));
 
             // Build the set of path constraints necessary to reach the remill_jump.
             var exprBuilder = new SouperExprBuilder(instCtx);

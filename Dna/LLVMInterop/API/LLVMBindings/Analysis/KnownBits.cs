@@ -15,8 +15,8 @@ namespace Dna.LLVMInterop.API.LLVMBindings.Analysis
     [StructLayout(LayoutKind.Explicit, Size = 16)]
     public struct NativeKnownBits
     {
-        [FieldOffset(0)] ulong Zero;
-        [FieldOffset(8)] ulong One;
+        [FieldOffset(0)] public ulong Zero;
+        [FieldOffset(8)] public ulong One;
 
         public ulong GetKnownMask()
         {
@@ -82,7 +82,7 @@ namespace Dna.LLVMInterop.API.LLVMBindings.Analysis
             }
         }
 
-        [DllImport("Dna.LLVMInterop", EntryPoint = "KnownBits_Get")]
+        [DllImport("Dna.LLVMInterop", CallingConvention = CallingConvention.Cdecl)]
         public unsafe static extern LLVMOpaqueTargetData* GetKnownBits(nint instruction, LLVMOpaqueTargetData* targetData, NativeKnownBits* outVal);
     }
 }

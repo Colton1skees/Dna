@@ -7,6 +7,7 @@ using Dna.LLVMInterop.API.Optimization;
 using Dna.LLVMInterop.API.Remill.Arch;
 using Dna.LLVMInterop.API.Remill.BC;
 using Dna.Passes;
+using Dna.Passes.Mba;
 using Dna.SEH;
 using Dna.Utilities;
 using Iced.Intel;

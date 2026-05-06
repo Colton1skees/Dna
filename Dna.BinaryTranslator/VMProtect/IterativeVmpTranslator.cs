@@ -97,7 +97,7 @@ namespace Dna.BinaryTranslator.VMProtect
                 // Clear the to-lift worklists.
                 handlersRipsToLift.Clear();
 
-                outModule.PrintToFile(ArtifactPaths.Resolve("translatedFunction.ll"));
+                //outModule.PrintToFile(ArtifactPaths.Resolve("translatedFunction.ll"));
 
                 // Create a control flow graph out of the current partial CFG.
                 // Create a "true" CFG by inlining direct jumps to targets with only one predecessor.
@@ -141,7 +141,7 @@ namespace Dna.BinaryTranslator.VMProtect
 
                 // Isolate the lifted function into it's own module.
                 liftedFunction = FunctionIsolator.IsolateFunctionInto(outModule, liftedFunction);
-                outModule.PrintToFile(ArtifactPaths.Resolve("translatedFunction.ll"));
+                //outModule.PrintToFile(ArtifactPaths.Resolve("translatedFunction.ll"));
 
                 var callTargets = outModule.GetFunctions().Where(x => x.Name.Contains("TranslatedFrom"));
                 foreach(var caller in callTargets)
@@ -152,10 +152,10 @@ namespace Dna.BinaryTranslator.VMProtect
 
 
                 // Run our optimization pipeline.
-                liftedFunction.GlobalParent.WriteToLlFile("translatedFunction.ll");
+                //liftedFunction.GlobalParent.WriteToLlFile("translatedFunction.ll");
                 PassPipeline.Run(dna.Binary, liftedFunction, false);
 
-                liftedFunction.GlobalParent.WriteToLlFile("translatedFunction.ll");
+                //liftedFunction.GlobalParent.WriteToLlFile("translatedFunction.ll");
                 Console.WriteLine("Compiling to an exe.");
 
                 // Solve for any unknown indirect jumps in the control flow graph.

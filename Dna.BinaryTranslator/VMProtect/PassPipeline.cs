@@ -29,9 +29,14 @@ namespace Dna.BinaryTranslator.VMProtect
             int i = 0;
             int c = 1;
             int lastCount = int.MaxValue;
+
+
+            int numIter = 0;
+
             var func = newMod.GetFunctions().FirstOrDefault(func => func.Name == "vmp_maybe_unsolved_jump");
-            while (i < 3)
+            while (i < 3 && numIter < 15)
             {
+                numIter++;
                 Console.WriteLine($"Round {c++}!");
                 i++;
 
@@ -78,6 +83,8 @@ namespace Dna.BinaryTranslator.VMProtect
                 }
 
                 lastCount = count;
+
+                
 
                 //
                 //OptimizationApi.OptimizeMbaModule(newMod, false, false, false);

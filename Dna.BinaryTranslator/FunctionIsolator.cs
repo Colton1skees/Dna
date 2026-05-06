@@ -68,7 +68,7 @@ namespace Dna.BinaryTranslator
                 builder.CreateMsvcPersonalityFunction();
             }
 
-            isolatedFunction.GlobalParent.PrintToFile(ArtifactPaths.Resolve("translatedFunction.ll"));
+            //isolatedFunction.GlobalParent.PrintToFile(ArtifactPaths.Resolve("translatedFunction.ll"));
             return (isolatedFunction, newFilters);
         }
     }

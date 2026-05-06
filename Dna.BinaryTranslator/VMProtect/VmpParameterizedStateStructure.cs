@@ -178,7 +178,7 @@ namespace Dna.BinaryTranslator.VMProtect
             //builder.BuildRet(call);
 
             // Inline the call to the original function.
-            inputFunction.GlobalParent.WriteToLlFile("translatedFunction.ll");
+            //inputFunction.GlobalParent.WriteToLlFile("translatedFunction.ll");
 
             LLVMCloning.InlineFunction(inputFunction);
 

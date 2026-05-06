@@ -2,6 +2,7 @@
 using Dna.ControlFlow.Extensions;
 using Dna.Extensions;
 using Dna.LLVMInterop.API.LLVMBindings.Analysis;
+using Dna.Passes.Mba;
 using LLVMSharp.Interop;
 using Microsoft.Z3;
 using System;
@@ -32,8 +33,133 @@ namespace Dna.Passes
             return Run(function);
         }
 
+        private static readonly LLVMOpcode[] opcodesToClone =
+        {
+                LLVMOpcode.LLVMAdd,
+                LLVMOpcode.LLVMSub,
+                LLVMOpcode.LLVMMul,
+                LLVMOpcode.LLVMAnd,
+                LLVMOpcode.LLVMOr,
+                LLVMOpcode.LLVMXor,
+                LLVMOpcode.LLVMAShr,
+                LLVMOpcode.LLVMLShr,
+                LLVMOpcode.LLVMShl,
+                LLVMOpcode.LLVMICmp,
+                LLVMOpcode.LLVMExtractElement,
+                LLVMOpcode.LLVMExtractValue,
+                LLVMOpcode.LLVMSelect,
+                LLVMOpcode.LLVMSExt,
+                LLVMOpcode.LLVMZExt
+        };
+
+        public static bool Run3(LLVMValueRef function)
+        {
+            var builder = LLVMBuilderRef.Create(LLVMContextRef.Global);
+            foreach (var inst in function.GetInstructions().ToList())
+            {
+                if (inst.InstructionOpcode != LLVMOpcode.LLVMGetElementPtr)
+                    continue;
+
+                //if (!inst.ToString().Contains("%getelementptr332 = getelementptr inbounds i8, ptr %load"))
+                //    continue;
+
+                var gepIndex = inst.GetOperand(1);
+                if (gepIndex.Kind != LLVMValueKind.LLVMInstructionValueKind)
+                    continue;
+
+                var replacement = Visit(builder, gepIndex, new(), 0);
+                Console.WriteLine($"Replacing {gepIndex} with {replacement}");
+                gepIndex.ReplaceAllUsesWith(replacement);
+
+            }
+
+            function.GlobalParent.PrintToFile("instcombine.ll");
+
+            return true;
+        }
+
+        public static LLVMValueRef Visit(LLVMBuilderRef builder, LLVMValueRef inst, Dictionary<LLVMValueRef, LLVMValueRef> cache, int depth)
+        {
+            if (inst.Kind != LLVMValueKind.LLVMInstructionValueKind)
+                return inst;
+            if (cache.TryGetValue(inst, out var existing))
+                return existing;
+            if (depth >= 50)
+                return inst;
+
+            if (!opcodesToClone.Contains(inst.InstructionOpcode))
+                return inst;
+
+            var clone = Clone(builder, inst);
+            for(uint i = 0; i < (uint)inst.OperandCount; i++)
+            {
+                clone.SetOperand(i, Visit(builder, inst.GetOperand(i), cache, depth+1));
+            }
+
+            cache[inst] = clone;
+            return clone;
+        }
+
+        public static bool Run2(LLVMValueRef function)
+        {
+           // Run3(function);
+            var builder = LLVMBuilderRef.Create(LLVMContextRef.Global);
+
+            var unique = function.GetInstructions().Select(x => x.InstructionOpcode).Distinct().ToList();
+            for (int iter = 0; iter < 30; iter++)
+            {
+                //Console.WriteLine($"iter: {iter}");
+                //if (iter == 29)
+               //     Debugger.Break();
+                var instructions = function.GetInstructions().Where(x => Array.IndexOf(opcodesToClone, x.InstructionOpcode) != -1 && x.GetUsers().Count > 1).ToList();
+                foreach(var inst in instructions)
+                {
+                    var users = inst.GetUsers();
+                    if (users.Count <= 1)
+                        continue;
+
+                    int replacementCount = 0;
+                    for(int i = 0; i < users.Count - 1; i++)
+                    {
+                        var user = users[i];
+                        var clone = Clone(builder, inst);
+                        for (int operandIdx = 0; operandIdx < user.OperandCount; operandIdx++)
+                        {
+                            if (user.GetOperand((uint)operandIdx) == inst)
+                            {
+                                user.SetOperand((uint)operandIdx, clone);
+                                replacementCount++;
+                            }
+                        }
+                    }
+
+                    if (replacementCount != users.Count - 1)
+                        Debugger.Break();
+
+                    //Console.WriteLine($"Replaced {replacementCount} operands for inst with {users.Count} users");
+                }
+            }
+
+            //function.GlobalParent.PrintToFile("instcombine.ll");
+
+            return true;
+        }
+
+        private static LLVMValueRef Clone(LLVMBuilderRef builder, LLVMValueRef inst)
+        {
+            var clone = inst.InstructionClone;
+            builder.PositionBefore(inst.NextInstruction);
+            builder.Insert(clone);
+            //clone.Name = inst.Name;
+            return clone;
+        }
+
         public static bool Run(LLVMValueRef function)
         {
+            return Run3(function);
+            //return Run2(function);
+            //return MbaDeobfuscationPass.Run(function);
+            
             Console.WriteLine($"Running multi-use cloning pass on {function.Name}...");
 
             var builder = LLVMBuilderRef.Create(LLVMContextRef.Global);
@@ -57,10 +183,11 @@ namespace Dna.Passes
                 var ast = llvmToTriton.GetAst(inst);
 
                 // TODO: Re-enable size check when the ast size change is pushed up to master
-                /*
-                if (ast.astSize > 2000)
-                    continue;
-                */
+
+                //if (ast.AstSize > 2000)
+                //    continue;
+
+                //continue;
 
                 // Create the inverse substitution mapping.
                 var inverseSubstitutionMapping = new Dictionary<TemporaryNode, LLVMValueRef>();
@@ -97,6 +224,8 @@ namespace Dna.Passes
                 before.ReplaceAllUsesWith(after);
             }
             */
+
+            function.GlobalParent.PrintToFile("instcombine.ll");
 
             return toReplace.Count > 0;
         }
