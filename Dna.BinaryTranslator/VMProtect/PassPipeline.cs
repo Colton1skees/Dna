@@ -11,6 +11,7 @@ using System.Runtime.InteropServices;
 using Dna.Extensions;
 using Dna.LLVMInterop.API.Remill.BC;
 using Dna.Passes;
+using Dna.Passes.Mba;
 
 namespace Dna.BinaryTranslator.VMProtect
 {
@@ -49,6 +50,9 @@ namespace Dna.BinaryTranslator.VMProtect
 
                 var multiUseCloning = new MultiUseCloningPass();
                 var pMultiUseCloning = Marshal.GetFunctionPointerForDelegate(multiUseCloning.PtrToStoreLoadPropagation);
+
+                //if (i != 0 && i % 2 != 0)
+                //    MbaDeobfuscationPass.Run(function);
 
                 OptimizationApi.OptimizeModuleVmp(function.GlobalParent, function, false, false, 0, false, 0, false, false, 0, pStoreToLoad, pInstCombine, useCloning ? pMultiUseCloning : 0);
 

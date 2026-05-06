@@ -156,6 +156,8 @@ namespace Dna.Extensions
             }
         }
 
+        public static LLVMValueRef GetCallInstTarget(this LLVMValueRef callInst) => callInst.GetOperand((uint)callInst.OperandCount - 1);
+
         public static LLVMTypeRef GetFunctionPrototype(this LLVMValueRef func) => LLVMCloning.GetFunctionPrototype(func);
 
         private static unsafe LLVMUseRef GetNextUse(this LLVMUseRef use) => LLVM.GetNextUse(use);

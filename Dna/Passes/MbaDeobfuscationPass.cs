@@ -90,7 +90,7 @@ namespace Dna.Passes.Mba
             }
 
             bool changed = false;
-            return changed;
+            //return changed;
             //return;
 
             // Lower all of the simplifications back down to LLVM IR, then replace the old instructions.
@@ -121,8 +121,9 @@ namespace Dna.Passes.Mba
                 //Console.WriteLine($"Replaced {pair.Idx}");
             }
 
+            
        
-            //function.GlobalParent.Verify(LLVMVerifierFailureAction.LLVMAbortProcessAction);
+            function.GlobalParent.Verify(LLVMVerifierFailureAction.LLVMAbortProcessAction);
             Console.WriteLine("Finished mba pass");
             return changed;
         }
@@ -263,8 +264,8 @@ namespace Dna.Passes.Mba
                 LLVMOpcode.LLVMSub => Sub(ctx, op1(), op2()),
                 LLVMOpcode.LLVMZExt => ctx.Zext(op1(), (byte)inst.TypeOf.IntWidth),
                 LLVMOpcode.LLVMTrunc => inst.GetOperand(0).TypeOf.IntWidth > 64 ? GetUnsupportedInstruction(inst) : ctx.Trunc(op1(), (byte)inst.TypeOf.IntWidth),
-                LLVMOpcode.LLVMSelect => ctx.Select(op1(), op2(), op3()),
-                LLVMOpcode.LLVMICmp => ctx.ICmp(ConvPredicate(inst.ICmpPredicate), op1(), op2()),
+                //LLVMOpcode.LLVMSelect => ctx.Select(op1(), op2(), op3()),
+                //LLVMOpcode.LLVMICmp => ctx.ICmp(ConvPredicate(inst.ICmpPredicate), op1(), op2()),
                 LLVMOpcode.LLVMAdd => ctx.Add(op1(), op2()),
                 LLVMOpcode.LLVMMul => ctx.Mul(op1(), op2()),
                 _ => GetUnsupportedInstruction(inst)
@@ -280,8 +281,15 @@ namespace Dna.Passes.Mba
             var name = $"uns{substMapping.Count}";
             var def = ctx.Symbol(name, (byte)inst.TypeOf.IntWidth);
 
-            var knownBits = NativeKnownBits.Get(inst, function.GlobalParent);
 
+            substMapping[inst] = def;
+            return def;
+
+            if (inst.GetUsers().Any(x => x.InstructionOpcode == LLVMOpcode.LLVMPHI))
+                return def;
+
+            var knownBits = NativeKnownBits.Get(inst, function.GlobalParent);
+            var oldDef = def;
             if (knownBits.GetKnownBitCount() > 0)
             {
                 var w = ctx.GetWidth(def);
@@ -289,9 +297,10 @@ namespace Dna.Passes.Mba
                 def = ctx.And(ctx.Constant(~knownBits.Zero, w), def);
             }
 
-            
 
-            substMapping[inst] = def;
+
+
+            substMapping[inst] = oldDef;
             return def;
         }
 
@@ -362,16 +371,15 @@ namespace Dna.Passes.Mba
                     //var simplified = simplifier.SimplifyGeneral(pair.Idx);
                     var simplified = pair.Idx;
 
-                    //if (optimal.TryGetValue(pair.Idx, out var existing))
-                    if (false)
+                    if (optimal.TryGetValue(pair.Idx, out var existing))
                     {
-                       // simplified = existing;
+                       simplified = existing;
                     }
 
 
                     else if (UNSOUND)
                     {
-                       
+                        optimal[pair.Idx] = pair.Idx;
 
                         var unsound = SimplifyUnsound(simplified);
                         if (unsound != null)
@@ -379,10 +387,10 @@ namespace Dna.Passes.Mba
                             var c1 = ctx.GetCost(unsound.Value);
                             var c2 = ctx.GetCost(pair.Idx);
 
-
-                            if (c1 < c2 && c1 < 50)
+                            var part1 = pair.Idx;
+                            if (c1 < c2 && c1 < 50 && ProbableEquivalenceChecker.ProbablyEquivalentZ3(ctx, part1, unsound.Value))
                             {
-
+                                optimal[pair.Idx] = unsound.Value;
                                 if (IsNeg(pair.Idx))
                                 {
                                     simplSubst.Add(pair.Idx, unsound.Value);
@@ -390,7 +398,7 @@ namespace Dna.Passes.Mba
                                 }
                                     
                                 //var part1 = GeneralSimplifier.BackSubstitute(ctx, pair.Idx, simplSubst);
-                                var part1 = pair.Idx;
+                                
                                // for (int ii = 0; ii < 3; ii++)
                                //     part1 = ctx.RecursiveSimplify(part1);
 
@@ -399,9 +407,9 @@ namespace Dna.Passes.Mba
 
                                 var s1 = ctx.GetAstString(part1);
                                 var s2 = ctx.GetAstString(unsound.Value);
-                                Console.WriteLine($"{s1} => {s2}");
+                                Console.WriteLine($"{s1}\n    =>\n{s2}\n");
 
-                                ProbableEquivalenceChecker.ProbablyEquivalentZ3(ctx, part1, unsound.Value);
+                    
 
                                 Console.WriteLine("\n\n\n");
 
@@ -437,11 +445,23 @@ namespace Dna.Passes.Mba
 
                     else
                     {
-              
+
+                        if (pair.Inst.ToString().Contains("%216 ="))
+                            Debugger.Break();
+
                         var r = simplifier.SimplifyGeneral(pair.Idx);
                         r = simplifier.SimplifyGeneral(r);
                         r = simplifier.SimplifyGeneral(r);
-                        optimal[pair.Idx] = r;
+                        optimal[pair.Idx] = pair.Idx;
+
+                        // var guess = SimplifyUnsound(r);
+
+                        if (!ProbableEquivalenceChecker.ProbablyEquivalent(ctx, pair.Idx, r, slowHeuristics: true, pagePtr1, pagePtr2))
+                        {
+                            Console.WriteLine("Not equiv!");
+                            Debugger.Break();
+                        }
+
 
                         var c1 = ctx.GetCost(pair.Idx);
                         var c2 = ctx.GetCost(r);
@@ -449,6 +469,8 @@ namespace Dna.Passes.Mba
                         if (c2 < c1)
                         {
                             simplified = r;
+                            optimal[pair.Idx] = r;
+
 
                             var s1 = ctx.GetAstString(pair.Idx);
                             var s2 = ctx.GetAstString(simplified);
@@ -456,7 +478,6 @@ namespace Dna.Passes.Mba
                             //if (s1.Contains("(72057594037927936*(255&(uns30>>24)))"))
 
                             ////ProbableEquivalenceChecker.ProbablyEquivalentZ3(ctx, pair.Idx, simplified);
-
                             Console.WriteLine($"{s1}\n  =>\n{s2}\n");
                         }
 

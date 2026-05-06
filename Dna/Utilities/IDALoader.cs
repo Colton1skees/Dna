@@ -31,7 +31,7 @@ namespace Dna.Utilities
             return "ida64.exe";
         }
 
-        public static string Load(string exePath, bool overwrite = false)
+        public static string Load(string exePath, bool overwrite = true)
         {
             exePath = ArtifactPaths.CopyInputToOutput(ArtifactPaths.ResolveInputFile(exePath));
 

@@ -49,31 +49,46 @@ namespace Dna.Passes
                 LLVMOpcode.LLVMExtractValue,
                 LLVMOpcode.LLVMSelect,
                 LLVMOpcode.LLVMSExt,
-                LLVMOpcode.LLVMZExt
+                LLVMOpcode.LLVMZExt,
+                LLVMOpcode.LLVMTrunc,
         };
 
         public static bool Run3(LLVMValueRef function)
         {
+            var distinct = function.GetInstructions().Select(x => x.InstructionOpcode).Distinct().ToList();
+
+            //var notSupported = distinct.Where(x => !opcodesToClone.Contains(x)).ToList();
+
             //Console.WriteLine($"Visiting func: {function.Name}");
             //function.GlobalParent.PrintToFile("instcombine.ll");
             var builder = LLVMBuilderRef.Create(LLVMContextRef.Global);
             foreach (var inst in function.GetInstructions().ToList())
             {
-                if (inst.InstructionOpcode != LLVMOpcode.LLVMGetElementPtr)
-                    continue;
+                if (inst.InstructionOpcode == LLVMOpcode.LLVMGetElementPtr)
+                {
 
-                //if (!inst.ToString().Contains("%getelementptr332 = getelementptr inbounds i8, ptr %load"))
-                //    continue;
+                    var gepIndex = inst.GetOperand(1);
+                    if (gepIndex.Kind != LLVMValueKind.LLVMInstructionValueKind)
+                        continue;
 
-                var gepIndex = inst.GetOperand(1);
-                if (gepIndex.Kind != LLVMValueKind.LLVMInstructionValueKind)
-                    continue;
+                    var replacement = Visit(builder, gepIndex, new(), 0);
+                    if (replacement == gepIndex)
+                        continue;
+                    //Console.WriteLine($"Replacing {gepIndex} with {replacement}");
+                    gepIndex.ReplaceAllUsesWith(replacement);
+                }
 
-                var replacement = Visit(builder, gepIndex, new(), 0);
-                if (replacement == gepIndex)
-                    continue;
-                //Console.WriteLine($"Replacing {gepIndex} with {replacement}");
-                gepIndex.ReplaceAllUsesWith(replacement);
+                else if (inst.InstructionOpcode == LLVMOpcode.LLVMStore && inst.GetOperand(0).TypeOf.Kind == LLVMTypeKind.LLVMIntegerTypeKind)
+                {
+                    inst.SetOperand(0, Visit(builder, inst.GetOperand(0), new(), 0));
+                }
+
+                //else if (opcodesToClone.Contains(inst.InstructionOpcode))
+                //{
+                //    var clone = Visit(builder, inst, new(), 25);
+                //    if (clone != inst)
+                //        inst.ReplaceAllUsesWith(clone);
+                //}
 
             }
 
@@ -91,8 +106,13 @@ namespace Dna.Passes
             if (depth >= 50)
                 return inst;
 
-            if (!opcodesToClone.Contains(inst.InstructionOpcode))
+            var isCall = inst.InstructionOpcode == LLVMOpcode.LLVMCall && inst.GetCallInstTarget().Kind == LLVMValueKind.LLVMFunctionValueKind && inst.GetCallInstTarget().Name.StartsWith("llvm.ctpop.");
+
+            if (!opcodesToClone.Contains(inst.InstructionOpcode) && !isCall)
+            {
+                Console.WriteLine(inst.InstructionOpcode);
                 return inst;
+            }
 
             var clone = Clone(builder, inst);
             for(uint i = 0; i < (uint)inst.OperandCount; i++)
@@ -106,7 +126,7 @@ namespace Dna.Passes
 
         public static bool Run2(LLVMValueRef function)
         {
-           // Run3(function);
+            Run3(function);
             var builder = LLVMBuilderRef.Create(LLVMContextRef.Global);
 
             var unique = function.GetInstructions().Select(x => x.InstructionOpcode).Distinct().ToList();
@@ -160,7 +180,7 @@ namespace Dna.Passes
 
         public static bool Run(LLVMValueRef function)
         {
-            return Run3(function);
+            //return Run3(function);
             //return Run2(function);
             //return MbaDeobfuscationPass.Run(function);
             

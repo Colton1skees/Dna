@@ -73,13 +73,13 @@ if (genDsl)
 //LazyLLVMFixes.InstallValueToStringBugFix(RemillUtils.LLVMValueToString);
 
 
-bool dbgCode = false;
+bool dbgCode = true;
 if (dbgCode)
 {
-    var irPath = "C:\\Users\\colton\\Downloads\\crash.ll";
+    var irPath = "C:\\Users\\colton\\Downloads\\crash5.ll";
     Console.WriteLine(irPath);
     var tempNewMod = RemillUtils.LoadModuleFromFile(LLVMContextRef.Global, irPath).Value;
-    var existingFunc = tempNewMod.GetFunctions().Single(x => x.Name.Contains("Parameterized_TranslatedFrom1400045CB"));
+    var existingFunc = tempNewMod.GetFunctions().Single(x => x.Name.Contains("snork"));
 
 
     while (true)
@@ -87,9 +87,14 @@ if (dbgCode)
         var sw = Stopwatch.StartNew();
         unsafe
         {
+            //MbaDeobfuscationPass.Run(existingFunc);
+            MultiUseCloningPass.Run(existingFunc);
+            existingFunc.GlobalParent.PrintToFile("instcombine.ll");
             if (false)
             {
                 new AdhocInstCombinePass().InstCombine((LLVMOpaqueValue*)existingFunc.Handle, 0, 0);
+                MultiUseCloningPass.Run(existingFunc);
+                MbaDeobfuscationPass.Run(existingFunc);
             }
             
         } 
@@ -98,14 +103,27 @@ if (dbgCode)
         var vmpBin = WindowsBinary.From(vmpPath);
         var vmpDna = new Dna.Dna(vmpBin);
 
+
+        //MbaDeobfuscationPass.Run(existingFunc);
+        PassPipeline.Run(vmpBin, existingFunc);
+        //MbaDeobfuscationPass.Run(existingFunc);
         PassPipeline.Run(vmpBin, existingFunc);
 
 
         tempNewMod.PrintToFile("instcombine.ll");
+        tempNewMod.PrintToFile(ArtifactPaths.Resolve("compile.ll"));
 
-        //MbaDeobfuscationPass.Run(existingFunc);
+        var compiledPath3 = ClangCompiler.Compile("compile.ll");
+
+        Console.WriteLine("Loading into IDA.");
+        var exePath3 = IDALoader.Load(compiledPath3);
+
+
+
+        //IDALoader.Load(ClangCompiler.Compile("instcombine.ll"));
+
         sw.Stop();
-        Console.WriteLine($"Pass took {sw.ElapsedMilliseconds}ms ");
+            Console.WriteLine($"Pass took {sw.ElapsedMilliseconds}ms ");
     }
     Debugger.Break();
 

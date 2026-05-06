@@ -7,8 +7,10 @@ using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.Linq;
+using System.Security.Cryptography;
 using System.Text;
 using System.Threading.Tasks;
+using WebAssembly.Instructions;
 using static Dna.LLVMInterop.NativePassApi;
 
 namespace Dna.Passes
@@ -42,6 +44,8 @@ namespace Dna.Passes
                 changed |= TryRewriteConstantShiftOfConstantSelect(inst);
                 changed |= TryRewriteTruncOfConstantSelect(inst);
                 changed |= TryDistributeSelect(inst);
+                changed |= TryRewriteVmpShifts(inst);
+                changed |= TrySinkLoadOfSelect(inst);
             }
 
             return changed;
@@ -252,7 +256,6 @@ namespace Dna.Passes
         }
 
 
-
         private (bool isConstant, LLVMValueRef selectOp1, LLVMValueRef selectOp2) AsSelectOfTwoConstants(LLVMValueRef select)
         {
             // If this is not a select between two constants, skip it.
@@ -291,6 +294,77 @@ namespace Dna.Passes
 
             return true;
         }
+
+        // %188 = lshr i64 %load3552, 8
+        // %189 = and i64 %188, 255
+        // %196 = mul nuw nsw i64 %189, 1099511628032
+        private bool TryRewriteVmpShifts(LLVMValueRef inst)
+        {
+            if (inst.InstructionOpcode != LLVMOpcode.LLVMMul && inst.InstructionOpcode != LLVMOpcode.LLVMShl)
+                return false;
+
+            var coeff = inst.GetOperand(1);
+            if (coeff.Kind != LLVMValueKind.LLVMConstantIntValueKind)
+                return false;
+
+            if (inst.InstructionOpcode == LLVMOpcode.LLVMShl)
+                coeff = LLVMValueRef.CreateConstInt(inst.TypeOf, 1ul << (ushort)coeff.ConstIntZExt);
+
+            var andInst = inst.GetOperand(0);
+            if (andInst.Kind != LLVMValueKind.LLVMInstructionValueKind || andInst.InstructionOpcode != LLVMOpcode.LLVMAnd)
+                return false;
+            var mask = andInst.GetOperand(1);
+            if (mask.Kind != LLVMValueKind.LLVMConstantIntValueKind)
+                return false;
+
+            var shiftInst = andInst.GetOperand(0);
+            if (shiftInst.Kind != LLVMValueKind.LLVMInstructionValueKind || shiftInst.InstructionOpcode != LLVMOpcode.LLVMLShr || shiftInst.GetOperand(1).Kind != LLVMValueKind.LLVMConstantIntValueKind)
+                return false;
+
+            var shift = shiftInst.GetOperand(1);
+            if ((coeff.ConstIntZExt & ModuloReducer.GetMask((uint)shift.ConstIntZExt)) != 0)
+                return false;
+
+            var newMask = mask.ConstIntZExt << (ushort)shift.ConstIntZExt;
+            var newCoeff = coeff.ConstIntZExt >> (ushort)shift.ConstIntZExt;
+
+            builder.PositionBefore(inst);
+            var result = builder.BuildAnd(shiftInst.GetOperand(0), LLVMValueRef.CreateConstInt(shiftInst.TypeOf, newMask));
+            result = builder.BuildMul(result, LLVMValueRef.CreateConstInt(result.TypeOf, newCoeff));
+            Replace(inst, result);
+            return true;
+        }
+
+        // %154 = select i1 %124, i64 %2, i64 %3
+        // %getelementptr3551 = getelementptr inbounds i8, ptr %load, i64 %154
+        // %load3552 = load i64, ptr %getelementptr3551, align 8
+        private bool TrySinkLoadOfSelect(LLVMValueRef inst)
+        {
+            if (inst.InstructionOpcode != LLVMOpcode.LLVMLoad)
+                return false;
+            var gep = inst.GetOperand(0);
+            if (gep.Kind != LLVMValueKind.LLVMInstructionValueKind || gep.InstructionOpcode != LLVMOpcode.LLVMGetElementPtr)
+                return false;
+
+            var select = gep.GetOperand(1);
+            if (select.Kind != LLVMValueKind.LLVMInstructionValueKind || select.InstructionOpcode != LLVMOpcode.LLVMSelect)
+                return false;
+
+
+            builder.PositionBefore(inst);
+            var ptr0 = builder.BuildInBoundsGEP2(gep.TypeOf, gep.GetOperand(0), new LLVMValueRef[] { select.GetOperand(1)});
+            var load0 = builder.BuildLoad2(inst.TypeOf, ptr0);
+
+            var ptr1 = builder.BuildInBoundsGEP2(gep.TypeOf, gep.GetOperand(0), new LLVMValueRef[] { select.GetOperand(2) });
+            var load1 = builder.BuildLoad2(inst.TypeOf, ptr1);
+
+          
+            var replacement = builder.BuildSelect(select.GetOperand(0), load0, load1);
+            Replace(inst, replacement);
+
+            return true;
+        }
+
 
         private void Replace(LLVMValueRef from, LLVMValueRef to)
         {

@@ -55,8 +55,8 @@ namespace Dna.Utilities
             if (IsInOutputDirectory(fullPath))
                 return fullPath;
 
-            var targetPath = GetAvailablePath(Path.Combine(OutputDirectory, Path.GetFileName(path)), overwrite: false);
-            File.Copy(fullPath, targetPath, overwrite: false);
+            var targetPath = GetAvailablePath(Path.Combine(OutputDirectory, Path.GetFileName(path)), overwrite: true);
+            File.Copy(fullPath, targetPath, overwrite: true);
             return targetPath;
         }
 
