@@ -134,7 +134,9 @@ namespace Dna.BinaryTranslator.VMProtect.Rewrite
                 var reachableNodes = GetReachableNodes(newCfg, changedNodes);
                 foreach(var (handler, info) in newCfg.Instructions)
                     info.Metadata.IsComplete = !reachableNodes.Contains(handler);
-                
+
+                // Replace the CFG
+                vCfg = newCfg;
                 Debugger.Break();
             }
 
