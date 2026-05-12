@@ -1,11 +1,9 @@
 ﻿
 Microsoft Visual Studio Solution File, Format Version 12.00
-# Visual Studio Version 17
-VisualStudioVersion = 17.1.32228.430
+# Visual Studio Version 18
+VisualStudioVersion = 18.6.11716.218 insiders
 MinimumVisualStudioVersion = 10.0.40219.1
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Dna", "Dna\Dna.csproj", "{27764F9E-FD92-4C25-8A67-C76389BF0837}"
-EndProject
-Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Dna.ControlFlow", "Dna.ControlFlow\Dna.ControlFlow.csproj", "{0A69F908-3D88-4D0E-9F19-C35C14685CD8}"
 EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "TritonTranslator", "TritonTranslator\TritonTranslator\TritonTranslator.csproj", "{F2084D58-2087-4CB8-86CC-1112E98B7FF5}"
 EndProject
@@ -56,10 +54,6 @@ Global
 		{27764F9E-FD92-4C25-8A67-C76389BF0837}.Debug|x64.Build.0 = Debug|x64
 		{27764F9E-FD92-4C25-8A67-C76389BF0837}.Release|x64.ActiveCfg = Release|x64
 		{27764F9E-FD92-4C25-8A67-C76389BF0837}.Release|x64.Build.0 = Release|x64
-		{0A69F908-3D88-4D0E-9F19-C35C14685CD8}.Debug|x64.ActiveCfg = Debug|x64
-		{0A69F908-3D88-4D0E-9F19-C35C14685CD8}.Debug|x64.Build.0 = Debug|x64
-		{0A69F908-3D88-4D0E-9F19-C35C14685CD8}.Release|x64.ActiveCfg = Release|x64
-		{0A69F908-3D88-4D0E-9F19-C35C14685CD8}.Release|x64.Build.0 = Release|x64
 		{F2084D58-2087-4CB8-86CC-1112E98B7FF5}.Debug|x64.ActiveCfg = Debug|x64
 		{F2084D58-2087-4CB8-86CC-1112E98B7FF5}.Debug|x64.Build.0 = Debug|x64
 		{F2084D58-2087-4CB8-86CC-1112E98B7FF5}.Release|x64.ActiveCfg = Release|x64

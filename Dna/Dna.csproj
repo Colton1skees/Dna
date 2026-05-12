@@ -44,6 +44,7 @@
     <PackageReference Include="AsmResolver.PE" Version="5.3.0" />
     <PackageReference Include="AsmResolver.PE.File" Version="5.3.0" />
     <PackageReference Include="AutomaticGraphLayout" Version="1.1.12" />
+    <PackageReference Include="DotNetGraph" Version="2.7.0" />
     <PackageReference Include="ELFSharp" Version="2.16.1" />
     <PackageReference Include="Iced" Version="1.21.0" />
     <PackageReference Include="Microsoft.Z3" Version="4.11.2" />
@@ -52,7 +53,6 @@
   </ItemGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\Dna.ControlFlow\Dna.ControlFlow.csproj" />
     <ProjectReference Include="..\Dna.DataStructures\Dna.DataStructures.csproj" />
     <ProjectReference Include="..\Dna.LLVMInterop\Dna.LLVMInterop.vcxproj">
       <Private>True</Private>

@@ -20,5 +20,12 @@ namespace Dna.Extensions
             node.UserData.Clear();
             node.UserData.Add(block.Address.ToString("X"), block);
         }
+
+        public static BlockEdge<T> ToBlockEdge<T>(this Edge edge)
+        {
+            var source = (BasicBlock<T>)edge.Source;
+            var target = (BasicBlock<T>)edge.Target;
+            return new BlockEdge<T>(source, target);
+        }
     }
 }
