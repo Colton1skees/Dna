@@ -1,5 +1,8 @@
 ﻿using Dna.DataStructures;
+using Dna.Extensions;
+using Dna.LLVMInterop.API.LLVMBindings.Transforms.Utils;
 using Dna.LLVMInterop.API.Remill.Arch;
+using Dna.Utilities;
 using LLVMSharp.Interop;
 using System;
 using System.Collections.Generic;
@@ -7,6 +10,7 @@ using System.Diagnostics;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
+using WebAssembly.Instructions;
 using VmCfg = Dna.ControlFlow.InstGraph<Dna.BinaryTranslator.VMProtect.VmHandler, Dna.BinaryTranslator.VMProtect.Rewrite.HandlerMetadata>;
 
 namespace Dna.BinaryTranslator.VMProtect.Rewrite
@@ -69,6 +73,8 @@ namespace Dna.BinaryTranslator.VMProtect.Rewrite
                 IterativeVmpTranslator.LiftHandlersIntoCache(handlerCache, dna, handlersRipsToLift);
                 handlersRipsToLift.Clear();
 
+                var stateStruct = handlerCache.GetLiftedHandler(handlers.First().NativeRip).ParameterizedStateStructure;
+                new IterativeCfgBuilder(outModule, arch, stateStruct, vCfg, handlerCache, vmexitHandlerRips).Run(default, handlers.First());
                 Debugger.Break();
             }
 
@@ -83,7 +89,6 @@ namespace Dna.BinaryTranslator.VMProtect.Rewrite
         private readonly LLVMModuleRef module;
 
         private readonly RemillArch arch;
-        private readonly LLVMValueRef? existingFunction;
         private readonly VmpParameterizedStateStructure stateStruct;
 
         private readonly VmCfg vCfg;
@@ -94,11 +99,10 @@ namespace Dna.BinaryTranslator.VMProtect.Rewrite
 
         private LLVMBuilderRef builder;
 
-        public IterativeCfgBuilder(LLVMModuleRef module, RemillArch arch, LLVMValueRef? existingFunction, VmpParameterizedStateStructure stateStruct, VmCfg vCfg, VmHandlerCache handlerCache, IReadOnlySet<ulong> vmexitHandlerRips)
+        public IterativeCfgBuilder(LLVMModuleRef module, RemillArch arch, VmpParameterizedStateStructure stateStruct, VmCfg vCfg, VmHandlerCache handlerCache, IReadOnlySet<ulong> vmexitHandlerRips)
         {
             this.module = module;
             this.arch = arch;
-            this.existingFunction = existingFunction;
             this.stateStruct = stateStruct;
             this.vCfg = vCfg;
             this.handlerCache = handlerCache;
@@ -106,7 +110,7 @@ namespace Dna.BinaryTranslator.VMProtect.Rewrite
             builder = LLVMBuilderRef.Create(module.Context);
         }
 
-        public void Run(LLVMValueRef translatedFunction)
+        public LLVMValueRef Run(LLVMValueRef translatedFunction, VmHandler entryHandler)
         {
             bool incremental = translatedFunction.Handle != 0;
             if (!incremental)
@@ -114,20 +118,33 @@ namespace Dna.BinaryTranslator.VMProtect.Rewrite
                 translatedFunction = module.AddFunction($"PartialCfg", stateStruct.ParameterizedFunctionPrototype);
                 translatedFunction.AppendBasicBlock("entry");
             }
+
             
             // Stack allocate a local state structure and copy all registers into it
-            builder.PositionBefore(translatedFunction.EntryBasicBlock.FirstInstruction);
+            builder.Position(translatedFunction.EntryBasicBlock, translatedFunction.EntryBasicBlock.FirstInstruction);
             var registerAllocaMapping = VmPartialBlockLifter.CreateLocalStateStruct(builder, stateStruct, translatedFunction);
 
             // Lift all handlers into their own basic block
-            LiftInsts(incremental, translatedFunction, registerAllocaMapping);
+            var exitBlock = translatedFunction.AppendBasicBlock("exit");
+            builder.Position(exitBlock, exitBlock.FirstInstruction);
+            builder.BuildRetVoid();
+            var blockMapping = LiftInsts(incremental, translatedFunction, exitBlock, registerAllocaMapping);
+
+            if (!incremental)
+            {
+                builder.PositionAtEnd(translatedFunction.EntryBasicBlock);
+                builder.BuildBr(blockMapping[entryHandler]);
+            }
 
             // If we cant incremental build, need to do everything from scatch. Put each inst in basic block, hook them up. Maybe split into SESE regions just to not be insanely unreadable. Insert hooks on exit
             // If incremental, we are just wiring into an existing
-
+            // TODO: If incremental build, wire up state structure and outgoing edges.
+            module.PrintToFile(ArtifactPaths.Resolve("translatedFunction.ll"));
+            Debugger.Break();
+            return translatedFunction;
         }
 
-        private Dictionary<VmHandler, LLVMBasicBlockRef> LiftInsts(bool incremental, LLVMValueRef function, IReadOnlyDictionary<RemillRegister, LLVMValueRef> registerAllocaMapping)
+        private Dictionary<VmHandler, LLVMBasicBlockRef> LiftInsts(bool incremental, LLVMValueRef function, LLVMBasicBlockRef exitBlock, IReadOnlyDictionary<RemillRegister, LLVMValueRef> registerAllocaMapping)
         {
             // Create blocks for each lifted instructions
             var blockMapping = new Dictionary<VmHandler, LLVMBasicBlockRef>();
@@ -144,26 +161,68 @@ namespace Dna.BinaryTranslator.VMProtect.Rewrite
             {
                 builder.PositionAtEnd(block);
                 var liftedHandler = handlerCache.CloneLiftedHandlerIntoModule(handler.NativeRip, module);
-                VmPartialBlockLifter.CallVmHandler(builder, function, liftedHandler, registerAllocaMapping, stateStruct);
-                // TODO: Inline^
-                LiftInstEdges(handler, function, blockMapping, registerAllocaMapping);
-
+                var call = VmPartialBlockLifter.CallVmHandler(builder, function, liftedHandler, registerAllocaMapping, stateStruct);
+                LLVMCloning.InlineFunction(liftedHandler);
+                liftedHandler.DeleteFunction();
+                LiftInstEdges(handler, function, exitBlock, blockMapping, registerAllocaMapping);
             }
-
-           
 
             return blockMapping;
         }
 
-        private void LiftInstEdges(VmHandler handler, LLVMValueRef function, Dictionary<VmHandler, LLVMBasicBlockRef> blockMapping, IReadOnlyDictionary<RemillRegister, LLVMValueRef> registerAllocaMapping)
+        private void LiftInstEdges(VmHandler handler, LLVMValueRef function, LLVMBasicBlockRef exitBlock, Dictionary<VmHandler, LLVMBasicBlockRef> blockMapping, IReadOnlyDictionary<RemillRegister, LLVMValueRef> registerAllocaMapping)
         {
             var llvmBlock = blockMapping[handler];
             bool isVmExit = vmexitHandlerRips.Contains(handler.NativeRip);
             var info = vCfg.Instructions[handler];
             bool isComplete = info.Metadata.IsComplete;
+
+            // If this is an exit node, store all register values and exit.
             if ((isComplete && info.Successors.Count == 0) || isVmExit)
             {
                 VmPartialBlockLifter.UpdateOutputRegisters(builder, function, registerAllocaMapping, stateStruct);
+                builder.BuildRetVoid();
+                return;
+            }
+
+            // Load the indirect jump value.
+            var int64Ty = module.Context.GetInt64Ty();
+            var indirectPc = VmCfgLifter.LoadBytecodePointer(builder, registerAllocaMapping);
+
+            var liftedCases = new HashSet<VmHandler>();
+            LLVMBasicBlockRef defaultBlock = null;
+            var outgoingAddresses = info.Successors.OrderBy(x => x).ToList();
+            // If the jump table is considered incomplete(we know some edges but potentially not all), then we lift the jump table as a switch statement
+            // where the known values get their own 'case', and the default case points to an remill_jump intrinsic.
+            if (!isComplete)
+            {
+                defaultBlock = function.AppendBasicBlock($"reprove_new_edge_for_jmp_table_{handler.BytecodeRip.ToString("X")}");
+                builder.PositionAtEnd(defaultBlock);
+                VmPartialBlockLifter.UpdateOutputRegisters(builder, function, registerAllocaMapping, stateStruct);
+                VmCfgLifter.AddCallToIndirectBranchIntrinsic(module, builder, llvmBlock, registerAllocaMapping, exitBlock, handler.BytecodeRip);
+                builder.PositionAtEnd(llvmBlock);
+            }
+
+            // If the jump table is considered complete(i.e. we are 100% confident that we know all possible outgoing values),
+            // then we make the default case for the jump table point to a randomly selected(first) jump table outgoing block.
+            else
+            {
+                defaultBlock = blockMapping[outgoingAddresses.First()];
+                liftedCases.Add(outgoingAddresses.First());
+            }
+
+            builder.PositionAtEnd(llvmBlock);
+            var swtch = builder.BuildSwitch(indirectPc, defaultBlock, (uint)outgoingAddresses.Count);
+
+            foreach (var target in outgoingAddresses)
+            {
+                if (liftedCases.Contains(target))
+                    continue;
+
+                liftedCases.Add(target);
+                var targetBlock = blockMapping.Single(x => x.Key.BytecodeRip == target.BytecodeRip).Value;
+ 
+                swtch.AddCase(LLVMValueRef.CreateConstInt(module.Context.Int64Type, target.BytecodeRip), targetBlock);
             }
         }
     }

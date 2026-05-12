@@ -9,6 +9,7 @@ using LLVMSharp;
 using LLVMSharp.Interop;
 using System;
 using System.Collections.Generic;
+using System.Collections.ObjectModel;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
@@ -158,7 +159,7 @@ namespace Dna.BinaryTranslator.VMProtect
 
             // Load the indirect jump value.
             var int64Ty = module.Context.GetInt64Ty();
-            var indirectPc = LoadBytecodePointer();
+            var indirectPc = LoadBytecodePointer(builder, registerAllocaMapping);
 
             var liftedCases = new HashSet<ulong>
             {
@@ -176,7 +177,7 @@ namespace Dna.BinaryTranslator.VMProtect
                 var jmpFromAddr = block.ExitInstruction.BytecodeRip;
                 defaultBlock = translatedFunction.AppendBasicBlock($"reprove_new_edge_for_jmp_table_{jmpFromAddr.ToString("X")}");
                 builder.PositionAtEnd(defaultBlock);
-                AddCallToIndirectBranchIntrinsic(defaultBlock, jmpFromAddr);
+                AddCallToIndirectBranchIntrinsic(module, builder, defaultBlock, registerAllocaMapping, exitBlock, jmpFromAddr);
                 builder.PositionAtEnd(llvmBlock);
             }
 
@@ -221,21 +222,21 @@ namespace Dna.BinaryTranslator.VMProtect
                 throw new InvalidOperationException($"A basic block may only have one unsolved exit, and that exit must be at the end of the block!");
         }
 
-        private void AddCallToIndirectBranchIntrinsic(LLVMBasicBlockRef llvmBlock, ulong exitFromRip)
+        public static void AddCallToIndirectBranchIntrinsic(LLVMModuleRef module, LLVMBuilderRef builder, LLVMBasicBlockRef llvmBlock, IReadOnlyDictionary<RemillRegister, LLVMValueRef> registerAllocaMapping, LLVMBasicBlockRef exitBlock, ulong exitFromRip)
         {
             // Get or create the function.
             var int64Ty = module.Context.GetInt64Ty();
-            var (prototype, intrinsicFunc) = GetOrCreateJmpIntrinsic();
+            var (prototype, intrinsicFunc) = GetOrCreateJmpIntrinsic(module);
 
             var args = new List<LLVMValueRef>();
-            args.Add(LoadBytecodePointer());
-            args.Add(LoadNativeInstructionPointer());
+            args.Add(LoadBytecodePointer(builder, registerAllocaMapping));
+            args.Add(LoadNativeInstructionPointer(builder, registerAllocaMapping));
             args.Add((LLVMValueRef.CreateConstInt(int64Ty, exitFromRip)));
             var call = builder.BuildCall2(prototype, intrinsicFunc, args.ToArray());
             builder.BuildBr(exitBlock);
         }
 
-        private LLVMValueRef LoadBytecodePointer()
+        public static LLVMValueRef LoadBytecodePointer(LLVMBuilderRef builder, IReadOnlyDictionary<RemillRegister, LLVMValueRef> registerAllocaMapping)
         {
             // TODO: Stop hardcoding RDI as the bytecode pointer.
             var regPtr = registerAllocaMapping.Single(x => x.Key.Name.Contains("RSI")).Value;
@@ -245,7 +246,7 @@ namespace Dna.BinaryTranslator.VMProtect
             return regValue;
         }
 
-        private LLVMValueRef LoadNativeInstructionPointer()
+        public static LLVMValueRef LoadNativeInstructionPointer(LLVMBuilderRef builder, IReadOnlyDictionary<RemillRegister, LLVMValueRef> registerAllocaMapping)
         {
             // TODO: Stop hardcoding RDI as the bytecode pointer.
             var regPtr = registerAllocaMapping.Single(x => x.Key.Name.Contains("RDX")).Value;
@@ -255,7 +256,7 @@ namespace Dna.BinaryTranslator.VMProtect
             return regValue;
         }
 
-        private (LLVMTypeRef prototype, LLVMValueRef function) GetOrCreateJmpIntrinsic()
+        public static (LLVMTypeRef prototype, LLVMValueRef function) GetOrCreateJmpIntrinsic(LLVMModuleRef module)
         {
             var ptrType = module.Context.GetPtrType();
             var i64Type = LLVMTypeRef.Int64;
