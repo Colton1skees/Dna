@@ -1,4 +1,5 @@
-﻿using Dna.DataStructures;
+﻿using Dna.ControlFlow.Extensions;
+using Dna.DataStructures;
 using Dna.Extensions;
 using Dna.LLVMInterop.API.LLVMBindings.Transforms.Utils;
 using Dna.LLVMInterop.API.Remill.Arch;
@@ -53,6 +54,7 @@ namespace Dna.BinaryTranslator.VMProtect.Rewrite
             // Note that we use the random garbage for the bytecode pointer.
             // This is fine because the bytecode pointer of the first handler does not really matter.
             handlers.Add(new VmHandler(funcRip, funcRip));
+            bytecodeAddrToRip[funcRip] = funcRip;
 
             HashSet<ulong> vmexitHandlerRips = new();
 
@@ -85,13 +87,75 @@ namespace Dna.BinaryTranslator.VMProtect.Rewrite
                 // Solve for any unknown indirect jumps in the control flow graph.
                 var solver = new VmpJmpTableSolver(liftedFunction);
                 var (newTables, bytecodePtrToRips) = solver.Solve();
+                foreach (var entry in bytecodePtrToRips)
+                {
+                    bytecodeAddrToRip.TryAdd(entry.Key, entry.Value);
+                    if (bytecodeAddrToRip[entry.Key] != entry.Value)
+                        throw new InvalidOperationException($"Multiple native addresses assigned to the same bytecode ptr!");
+                }
 
-                // An incomplete instruction becomes complete when we've solved the current set of destinations and no new predecessors are added
+                var cloneAddr = (VmHandler x) => x;
+                var cloneMetadata = (HandlerMetadata x) => x;
+                var newCfg = vCfg.Clone(cloneAddr, cloneMetadata);
+
+                var getHandler = (ulong x) => new VmHandler(x, bytecodeAddrToRip[x]);
+
+                foreach(var table in newTables)
+                {
+                    // Update the CFG with new edge info
+                    var handler = getHandler(table.JmpFromAddr);
+                    foreach (var pred in table.KnownPredecessorAddresses)
+                        newCfg.AddEdge(getHandler(pred), handler);
+                    foreach (var succ in table.KnownOutgoingAddresses)
+                        newCfg.AddEdge(handler, getHandler(succ));
+                }
+
+                WorkList<VmHandler> changedNodes = new WorkList<VmHandler>();
+                foreach (var (handler, info) in newCfg.Instructions)
+                {
+                    // All new nodes get marked as changed
+                    if (!vCfg.Contains(handler))
+                    {
+                        changedNodes.AddToBack(handler);
+                        continue;
+                    }
+
+                    // If a node has new predecessors, it should be marked as changed.
+                    var oldInfo = vCfg.Instructions[handler];
+                    if (!oldInfo.Predecessors.SetEquals(info.Predecessors))
+                    {
+                        changedNodes.AddToBack(handler);
+                        continue;
+                    }
+                }
+
+                // Get all reachable nodes starting from the list of changed nodes
+                // (this is includes the changed nodes themselves)
+                var reachableNodes = GetReachableNodes(newCfg, changedNodes);
+                foreach(var (handler, info) in newCfg.Instructions)
+                    info.Metadata.IsComplete = !reachableNodes.Contains(handler);
+                
+                Debugger.Break();
             }
 
 
             Debugger.Break();
             return default;
+        }
+
+        private HashSet<VmHandler> GetReachableNodes(VmCfg vCfg, WorkList<VmHandler> worklist)
+        {
+            var seen = new HashSet<VmHandler>();
+            while (worklist.Count != 0)
+            {
+                var pop = worklist.PopBack();
+                if (!seen.Add(pop))
+                    continue;
+
+                worklist.AddRangeToBack(vCfg.Instructions[pop].Successors);
+            }
+
+            return seen;
         }
 
 
@@ -153,7 +217,7 @@ namespace Dna.BinaryTranslator.VMProtect.Rewrite
             // If incremental, we are just wiring into an existing
             // TODO: If incremental build, wire up state structure and outgoing edges.
             module.PrintToFile(ArtifactPaths.Resolve("translatedFunction.ll"));
-            Debugger.Break();
+            //Debugger.Break();
             return translatedFunction;
         }
 

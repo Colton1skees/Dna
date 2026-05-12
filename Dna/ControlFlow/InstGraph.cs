@@ -66,6 +66,9 @@ namespace Dna.ControlFlow
             return existing;
         }
 
+        public void AddEdge(TAddress from, TAddress to)
+            => AddEdge(GetOrAdd(from), GetOrAdd(to));
+
         public void AddEdge(InstData<TAddress, TMetadata> from, InstData<TAddress, TMetadata> to)
         {
             from.Successors.Add(to.Address);
