@@ -83,28 +83,88 @@ namespace Dna.BinaryTranslator.VMProtect.Rewrite
         private readonly LLVMModuleRef module;
 
         private readonly RemillArch arch;
-
         private readonly LLVMValueRef? existingFunction;
-
         private readonly VmpParameterizedStateStructure stateStruct;
 
         private readonly VmCfg vCfg;
 
+        private readonly VmHandlerCache handlerCache;
+
         private readonly IReadOnlySet<ulong> vmexitHandlerRips;
 
-        public IterativeCfgBuilder(LLVMModuleRef module, RemillArch arch, LLVMValueRef? existingFunction, VmpParameterizedStateStructure stateStruct, VmCfg vCfg, IReadOnlySet<ulong> vmexitHandlerRips)
+        private LLVMBuilderRef builder;
+
+        public IterativeCfgBuilder(LLVMModuleRef module, RemillArch arch, LLVMValueRef? existingFunction, VmpParameterizedStateStructure stateStruct, VmCfg vCfg, VmHandlerCache handlerCache, IReadOnlySet<ulong> vmexitHandlerRips)
         {
             this.module = module;
             this.arch = arch;
             this.existingFunction = existingFunction;
             this.stateStruct = stateStruct;
             this.vCfg = vCfg;
+            this.handlerCache = handlerCache;
             this.vmexitHandlerRips = vmexitHandlerRips;
+            builder = LLVMBuilderRef.Create(module.Context);
         }
 
-        public void Run()
+        public void Run(LLVMValueRef translatedFunction)
         {
+            bool incremental = translatedFunction.Handle != 0;
+            if (!incremental)
+            {
+                translatedFunction = module.AddFunction($"PartialCfg", stateStruct.ParameterizedFunctionPrototype);
+                translatedFunction.AppendBasicBlock("entry");
+            }
+            
+            // Stack allocate a local state structure and copy all registers into it
+            builder.PositionBefore(translatedFunction.EntryBasicBlock.FirstInstruction);
+            var registerAllocaMapping = VmPartialBlockLifter.CreateLocalStateStruct(builder, stateStruct, translatedFunction);
 
+            // Lift all handlers into their own basic block
+            LiftInsts(incremental, translatedFunction, registerAllocaMapping);
+
+            // If we cant incremental build, need to do everything from scatch. Put each inst in basic block, hook them up. Maybe split into SESE regions just to not be insanely unreadable. Insert hooks on exit
+            // If incremental, we are just wiring into an existing
+
+        }
+
+        private Dictionary<VmHandler, LLVMBasicBlockRef> LiftInsts(bool incremental, LLVMValueRef function, IReadOnlyDictionary<RemillRegister, LLVMValueRef> registerAllocaMapping)
+        {
+            // Create blocks for each lifted instructions
+            var blockMapping = new Dictionary<VmHandler, LLVMBasicBlockRef>();
+            foreach(var (handler, info) in vCfg.Instructions)
+            {
+                // Skip if we are doing incremental building and already have this inst in the IR
+                if (incremental && info.Metadata.IsComplete)
+                    continue;
+
+                blockMapping[handler] = function.AppendBasicBlock($"bb_{handler.BytecodeRip.ToString("X")}");
+            }
+
+            foreach (var (handler, block) in blockMapping)
+            {
+                builder.PositionAtEnd(block);
+                var liftedHandler = handlerCache.CloneLiftedHandlerIntoModule(handler.NativeRip, module);
+                VmPartialBlockLifter.CallVmHandler(builder, function, liftedHandler, registerAllocaMapping, stateStruct);
+                // TODO: Inline^
+                LiftInstEdges(handler, function, blockMapping, registerAllocaMapping);
+
+            }
+
+           
+
+            return blockMapping;
+        }
+
+        private void LiftInstEdges(VmHandler handler, LLVMValueRef function, Dictionary<VmHandler, LLVMBasicBlockRef> blockMapping, IReadOnlyDictionary<RemillRegister, LLVMValueRef> registerAllocaMapping)
+        {
+            var llvmBlock = blockMapping[handler];
+            bool isVmExit = vmexitHandlerRips.Contains(handler.NativeRip);
+            var info = vCfg.Instructions[handler];
+            bool isComplete = info.Metadata.IsComplete;
+            if ((isComplete && info.Successors.Count == 0) || isVmExit)
+            {
+                VmPartialBlockLifter.UpdateOutputRegisters(builder, function, registerAllocaMapping, stateStruct);
+            }
         }
     }
 }
