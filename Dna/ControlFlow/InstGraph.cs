@@ -36,9 +36,9 @@ namespace Dna.ControlFlow
     {
         public TAddress Address { get;}
 
-        public HashSet<TAddress> Predecessors { get; } = new(2);
+        public HashSet<TAddress> Predecessors { get; set; } = new(2);
 
-        public HashSet<TAddress> Successors { get; } = new(2);
+        public HashSet<TAddress> Successors { get; set; } = new(2);
 
         public TMetadata Metadata;
 
@@ -65,12 +65,25 @@ namespace Dna.ControlFlow
             Instructions.Add(address, existing);
             return existing;
         }
-        
 
         public void AddEdge(InstData<TAddress, TMetadata> from, InstData<TAddress, TMetadata> to)
         {
             from.Successors.Add(to.Address);
             to.Predecessors.Add(from.Address);
+        }
+
+        public InstGraph<TAddress, TMetadata> Clone(Func<TAddress, TAddress> cloneAddress, Func<TMetadata, TMetadata> cloneMetadata)
+        {
+            var result = new InstGraph<TAddress, TMetadata>();
+            foreach(var (currAddress, currData) in Instructions)
+            {
+                var data = new InstData<TAddress, TMetadata>(currAddress);
+                data.Predecessors = currData.Predecessors.Select(x => cloneAddress(x)).ToHashSet();
+                data.Successors = currData.Successors.Select(x => cloneAddress(x)).ToHashSet();
+                data.Metadata = cloneMetadata(currData.Metadata);
+            }
+
+            return result;
         }
     }
 }

@@ -266,7 +266,7 @@ namespace Dna.BinaryTranslator.VMProtect
             }
         }
 
-        private static void CanonicalizeMemoryPtr(LLVMValueRef function)
+        public static void CanonicalizeMemoryPtr(LLVMValueRef function)
         {
             // Create a single @memory pointer.
             var ctx = function.GlobalParent.Context;

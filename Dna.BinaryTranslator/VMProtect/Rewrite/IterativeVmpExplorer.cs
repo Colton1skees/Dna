@@ -36,7 +36,6 @@ namespace Dna.BinaryTranslator.VMProtect.Rewrite
 
         private OrderedSet<VmHandler> handlers = new OrderedSet<VmHandler>();
 
-
         public IterativeVmpExplorer(IDna dna, RemillArch arch, LLVMContextRef ctx, ulong funcRip)
         {
             this.dna = dna;
@@ -73,15 +72,29 @@ namespace Dna.BinaryTranslator.VMProtect.Rewrite
                 IterativeVmpTranslator.LiftHandlersIntoCache(handlerCache, dna, handlersRipsToLift);
                 handlersRipsToLift.Clear();
 
+                // Lift the partial CFG
                 var stateStruct = handlerCache.GetLiftedHandler(handlers.First().NativeRip).ParameterizedStateStructure;
-                new IterativeCfgBuilder(outModule, arch, stateStruct, vCfg, handlerCache, vmexitHandlerRips).Run(default, handlers.First());
-                Debugger.Break();
+                var liftedFunction = new IterativeCfgBuilder(outModule, arch, stateStruct, vCfg, handlerCache, vmexitHandlerRips).Run(default, handlers.First());
+
+
+                IterativeVmpTranslator.CanonicalizeMemoryPtr(liftedFunction);
+
+                // Run our optimization pipeline
+                PassPipeline.Run(dna.Binary, liftedFunction, false);
+
+                // Solve for any unknown indirect jumps in the control flow graph.
+                var solver = new VmpJmpTableSolver(liftedFunction);
+                var (newTables, bytecodePtrToRips) = solver.Solve();
+
+                // An incomplete instruction becomes complete when we've solved the current set of destinations and no new predecessors are added
             }
 
 
             Debugger.Break();
             return default;
         }
+
+
     }
 
     public class IterativeCfgBuilder
