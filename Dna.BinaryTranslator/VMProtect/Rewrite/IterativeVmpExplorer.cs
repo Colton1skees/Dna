@@ -159,8 +159,6 @@ namespace Dna.BinaryTranslator.VMProtect.Rewrite
 
             return seen;
         }
-
-
     }
 
     public class IterativeCfgBuilder
@@ -168,6 +166,7 @@ namespace Dna.BinaryTranslator.VMProtect.Rewrite
         private readonly LLVMModuleRef module;
 
         private readonly RemillArch arch;
+
         private readonly VmpParameterizedStateStructure stateStruct;
 
         private readonly VmCfg vCfg;
