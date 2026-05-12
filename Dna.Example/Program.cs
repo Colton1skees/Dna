@@ -56,6 +56,7 @@ using Dna.Passes;
 using Dna.BinaryTranslator.VMProtect;
 using Dna.Passes.Mba;
 using Mba.Simplifier.DSL;
+using Dna.BinaryTranslator.VMProtect.Rewrite;
 
 
 bool genDsl = false;
@@ -142,8 +143,8 @@ if (useVmp)
 
     var vmpCtx = LLVMContextRef.Global;
     var vmpArch = new RemillArch(vmpCtx, RemillOsId.kOSLinux, RemillArchId.kArchAMD64_AVX512);
-    var translator = new IterativeVmpTranslator(vmpDna, vmpArch, vmpCtx, 0x140001030);
-
+    //var translator = new IterativeVmpTranslator(vmpDna, vmpArch, vmpCtx, 0x140001030);
+    var translator = new IterativeVmpExplorer(vmpDna, vmpArch, vmpCtx, 0x140001030);
     var sw = Stopwatch.StartNew();
     var devirtedFunc = translator.Run();
     sw.Stop();

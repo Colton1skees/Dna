@@ -52,7 +52,7 @@ namespace Dna.BinaryTranslator.VMProtect
             this.funcRip = funcRip;
         }
 
-        private static LLVMModuleRef CreateOutputModule(LLVMContextRef ctx, RemillArch arch)
+        public static LLVMModuleRef CreateOutputModule(LLVMContextRef ctx, RemillArch arch)
         {
             // Create a new remill module.
             var guid = Guid.NewGuid().ToString();
@@ -239,7 +239,7 @@ namespace Dna.BinaryTranslator.VMProtect
             return output;
         }
 
-        private static void LiftHandlersIntoCache(VmHandlerCache handlerCache, IDna dna, OrderedSet<(ulong nativeRip, bool isVmEnter)> handlerRipsToLift)
+        public static void LiftHandlersIntoCache(VmHandlerCache handlerCache, IDna dna, OrderedSet<(ulong nativeRip, bool isVmEnter)> handlerRipsToLift)
         {
             var output = new List<(ulong nativeRip, FunctionWithStateStructure function)>();
             foreach (var handler in handlerRipsToLift)

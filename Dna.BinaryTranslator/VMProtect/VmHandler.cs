@@ -7,7 +7,7 @@ using System.Threading.Tasks;
 
 namespace Dna.BinaryTranslator.VMProtect
 {
-    public struct VmHandler
+    public struct VmHandler : IEquatable<VmHandler>
     {
         public ulong BytecodeRip { get; }
 
@@ -31,12 +31,18 @@ namespace Dna.BinaryTranslator.VMProtect
 
         public override int GetHashCode()
         {
-            return BytecodeRip.GetHashCode() + NativeRip.GetHashCode();
+            return BytecodeRip.GetHashCode();
+            //return BytecodeRip.GetHashCode() + NativeRip.GetHashCode();
         }
 
         public override string ToString()
         {
             return $"0x{BytecodeRip.ToString("X")}";
+        }
+
+        public bool Equals(VmHandler other)
+        {
+            return this == other;
         }
     }
 }
