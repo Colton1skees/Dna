@@ -100,7 +100,7 @@ define i32 @main(i32 %argc, i8** %argv)
 
         public static unsafe string Compile(string llPath, bool overwrite = false)
         {
-            llPath = ArtifactPaths.ResolveInputFile(llPath);
+            //llPath = ArtifactPaths.ResolveInputFile(llPath);
             /*
             foreach(var function in module.GetFunctions())
             {
@@ -118,7 +118,8 @@ define i32 @main(i32 %argc, i8** %argv)
 
 
             // Compile the .ll to an exe.
-            var objPath = ArtifactPaths.GetAvailablePath(Path.Combine(dir, Path.ChangeExtension(fileName, ".exe")), overwrite);
+            //var objPath = ArtifactPaths.GetAvailablePath(Path.Combine(dir, Path.ChangeExtension(fileName, ".exe")), overwrite);
+            var objPath = Path.Combine(dir, Path.ChangeExtension(fileName, ".exe"));
 
             RunClang(clangPath, @$"""{asmPath}"" -target x86_64-pc-windows-msvc -O3 -fasync-exceptions -fseh-exceptions -fexceptions -fcxx-exceptions -fno-vectorize -fno-slp-vectorize -c -mno-sse -o ""{objPath}""");
 

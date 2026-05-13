@@ -109,7 +109,7 @@ namespace Dna.BinaryTranslator.Safe
                 var imgbase = builder.BuildLoad2(ctx.Int64Type, gep, "imgbase");
 
                 //var users = filter.RspGlobal.GetUsersAsValues().ToList();
-                var users = CFGApi.GetValueUsers(filter.RspGlobal);
+                var users = LLVMUtil.GetValueUsers(filter.RspGlobal);
 
                 foreach(var user in users.Where(x => x.Kind == LLVMValueKind.LLVMInstructionValueKind))
                 {

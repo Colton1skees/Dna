@@ -9,7 +9,7 @@ using System.Threading.Tasks;
 
 namespace Dna.LLVMInterop.API.LLVMBindings
 {
-    public static class NativeCFGApi
+    public static class LLVMUtilApi
     {
         [DllImport("Dna.LLVMInterop", CallingConvention = CallingConvention.Cdecl)]
         public unsafe static extern uint BasicBlock_GetPredSize(LLVMOpaqueBasicBlock* block);
@@ -25,5 +25,18 @@ namespace Dna.LLVMInterop.API.LLVMBindings
 
         [DllImport("Dna.LLVMInterop", CallingConvention = CallingConvention.Cdecl)]
         public unsafe static extern OpaqueManagedVector<LLVMOpaqueValue>* Value_GetUsers(LLVMOpaqueValue* block);
+
+        [DllImport("Dna.LLVMInterop", CallingConvention = CallingConvention.Cdecl)]
+        public unsafe static extern LLVMOpaqueBasicBlock* SplitBasicBlockAt(LLVMOpaqueBasicBlock* block, LLVMOpaqueValue* inst, sbyte* name, bool before);
+
+        [DllImport("Dna.LLVMInterop")]
+        public unsafe static extern void MakeArgNoAlias(LLVMOpaqueValue* arg);
+
+        [DllImport("Dna.LLVMInterop", CallingConvention = CallingConvention.Cdecl)]
+        public unsafe static extern void MakeDsoLocal(LLVMOpaqueValue* function, bool dsoLocal);
+
+        [DllImport("Dna.LLVMInterop")]
+        public unsafe static extern void AddNoSideEffectAttributes(LLVMOpaqueValue* value);
+
     }
 }

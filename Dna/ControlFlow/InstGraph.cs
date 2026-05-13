@@ -84,6 +84,7 @@ namespace Dna.ControlFlow
                 data.Predecessors = currData.Predecessors.Select(x => cloneAddress(x)).ToHashSet();
                 data.Successors = currData.Successors.Select(x => cloneAddress(x)).ToHashSet();
                 data.Metadata = cloneMetadata(currData.Metadata);
+                result.Instructions[currAddress] = data;
             }
 
             return result;

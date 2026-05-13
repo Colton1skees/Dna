@@ -77,10 +77,10 @@ if (genDsl)
 bool dbgCode = false;
 if (dbgCode)
 {
-    var irPath = "C:\\Users\\colton\\Downloads\\crash5.ll";
+    var irPath = "C:\\Users\\colton\\Downloads\\inc_failure0.ll";
     Console.WriteLine(irPath);
     var tempNewMod = RemillUtils.LoadModuleFromFile(LLVMContextRef.Global, irPath).Value;
-    var existingFunc = tempNewMod.GetFunctions().Single(x => x.Name.Contains("snork"));
+    var existingFunc = tempNewMod.GetFunctions().Single(x => x.Name.Contains("Partial"));
 
 
     while (true)
@@ -112,7 +112,7 @@ if (dbgCode)
 
 
         tempNewMod.PrintToFile("instcombine.ll");
-        tempNewMod.PrintToFile(ArtifactPaths.Resolve("compile.ll"));
+        tempNewMod.PrintToFile(("compile.ll"));
 
         var compiledPath3 = ClangCompiler.Compile("compile.ll");
 

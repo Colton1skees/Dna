@@ -49,4 +49,35 @@ namespace Dna::API {
 		// Construct and return an immutable managed vector
 		return ImmutableManagedVector::NonCopyingFrom(vec);
 	}
+
+	DNA_EXPORT llvm::BasicBlock* SplitBasicBlockAt(llvm::BasicBlock* block, llvm::Instruction* inst, char* name, bool before)
+	{
+		return block->splitBasicBlock(inst, name, before);
+	}
+
+	// Add a set of side effects(taken by analyzing function-attrs),
+	// that allow DCE / other passes to delete unnecessary calls to this function.
+	// attributes #8 = { mustprogress nofree noinline norecurse nosync nounwind willreturn memory(none) }
+	DNA_EXPORT void AddNoSideEffectAttributes(llvm::Function* function)
+	{
+		function->addFnAttr(llvm::Attribute::MustProgress);
+		function->addFnAttr(llvm::Attribute::NoFree);
+		function->addFnAttr(llvm::Attribute::NoRecurse);
+		function->addFnAttr(llvm::Attribute::NoSync);
+		function->addFnAttr(llvm::Attribute::NoUnwind);
+		function->addFnAttr(llvm::Attribute::WillReturn);
+		function->setMemoryEffects(MemoryEffects::none());
+		return;
+	}
+
+	DNA_EXPORT void MakeArgNoAlias(llvm::Argument* arg)
+	{
+		arg->addAttr(llvm::Attribute::NoAlias);
+	}
+
+	DNA_EXPORT void MakeDsoLocal(llvm::GlobalValue* function, bool dsoLocal)
+	{
+		function->setDSOLocal(dsoLocal);
+	}
+
 }

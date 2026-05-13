@@ -296,7 +296,7 @@ namespace Dna.BinaryTranslator.Lifting
                 var entry = liftedSehEntry.ScopeTableNode.Entry;
                 var (tryBlock, startLlvmBlock) = blockMapping.Single(x => x.Key.Address == entry.BeginAddr);
                 var val = startLlvmBlock.AsValue();
-                var preds = CFGApi.GetBlockPredecessors(startLlvmBlock);
+                var preds = LLVMUtil.GetBlockPredecessors(startLlvmBlock);
                 foreach (var incomingBlock in preds)
                 {
                     var exitInst = incomingBlock.LastInstruction;

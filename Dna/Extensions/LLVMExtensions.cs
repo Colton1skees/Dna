@@ -82,13 +82,13 @@ namespace Dna.Extensions
             }
         }
 
-        public static int GetPredCount(this LLVMBasicBlockRef block) => (int)CFGApi.GetBlockPredessorsCount(block);
+        public static int GetPredCount(this LLVMBasicBlockRef block) => (int)LLVMUtil.GetBlockPredessorsCount(block);
 
-        public static IReadOnlyList<LLVMBasicBlockRef> GetPredecessors(this LLVMBasicBlockRef block) => CFGApi.GetBlockPredecessors(block);
+        public static IReadOnlyList<LLVMBasicBlockRef> GetPredecessors(this LLVMBasicBlockRef block) => LLVMUtil.GetBlockPredecessors(block);
 
-        public static int GetSuccCount(this LLVMBasicBlockRef block) => (int)CFGApi.GetBlockSuccessorsCount(block);
+        public static int GetSuccCount(this LLVMBasicBlockRef block) => (int)LLVMUtil.GetBlockSuccessorsCount(block);
 
-        public static IReadOnlyList<LLVMBasicBlockRef> GetSuccessors(this LLVMBasicBlockRef block) => CFGApi.GetBlockSuccessors(block);
+        public static IReadOnlyList<LLVMBasicBlockRef> GetSuccessors(this LLVMBasicBlockRef block) => LLVMUtil.GetBlockSuccessors(block);
 
         public static IEnumerable<LLVMValueRef> GetInstructions(this LLVMValueRef function)
         {
@@ -127,7 +127,7 @@ namespace Dna.Extensions
 
         public static IReadOnlyList<LLVMValueRef> GetUsers(this LLVMValueRef value)
         {
-            return CFGApi.GetValueUsers(value);
+            return LLVMUtil.GetValueUsers(value);
             //return value.GetUsers().Select(x => x.AsValue());
         }
 

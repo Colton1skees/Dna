@@ -55,10 +55,4 @@ namespace Dna::API {
 		//attrList = attrList.addFnAttribute(function->getContext(), AttributeList::FunctionIndex, Attribute::AlwaysInline);
 	}
 
-	DNA_EXPORT void MakeDsoLocal(llvm::Function* function, bool dsoLocal)
-	{
-		function->setDSOLocal(dsoLocal);
-	}
-
-
 }

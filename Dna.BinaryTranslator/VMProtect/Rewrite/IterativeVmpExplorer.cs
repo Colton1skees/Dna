@@ -1,9 +1,12 @@
 ﻿using Dna.ControlFlow.Extensions;
 using Dna.DataStructures;
 using Dna.Extensions;
+using Dna.LLVMInterop.API.LLVMBindings.IR;
 using Dna.LLVMInterop.API.LLVMBindings.Transforms.Utils;
 using Dna.LLVMInterop.API.Remill.Arch;
+using Dna.LLVMInterop.API.Remill.BC;
 using Dna.Utilities;
+using FASTER.core;
 using LLVMSharp.Interop;
 using System;
 using System.Collections.Generic;
@@ -68,15 +71,31 @@ namespace Dna.BinaryTranslator.VMProtect.Rewrite
             vCfg.Instructions[handlers.First()].Metadata.IsComplete = false;
 
             var blockCache = new VmBlockCache(ctx);
+            LLVMValueRef liftedFunction = default;
+            int ii = 0;
             while (true)
             {
+                Console.WriteLine($"Lifting iteration {ii++}");
+
+                // Identify all VmExit handlers.
+                foreach (var (rip, isVmEnter) in handlersRipsToLift)
+                {
+                    var cfg = dna.RecursiveDescent.ReconstructCfg(rip);
+                    var insts = cfg.GetInstructions();
+                    var count = insts.Count(x => x.Mnemonic == Iced.Intel.Mnemonic.Pop);
+                    if (count > 10)
+                        vmexitHandlerRips.Add(rip);
+                }
+
+
                 // Lift all native handlers to LLVM IR and cache them
                 IterativeVmpTranslator.LiftHandlersIntoCache(handlerCache, dna, handlersRipsToLift);
                 handlersRipsToLift.Clear();
 
                 // Lift the partial CFG
                 var stateStruct = handlerCache.GetLiftedHandler(handlers.First().NativeRip).ParameterizedStateStructure;
-                var liftedFunction = new IterativeCfgBuilder(outModule, arch, stateStruct, vCfg, handlerCache, vmexitHandlerRips).Run(default, handlers.First());
+                liftedFunction = new IterativeCfgBuilder(outModule, arch, stateStruct, vCfg, handlerCache, vmexitHandlerRips).Run(liftedFunction, handlers.First());
+                FixMemPtr(liftedFunction.GlobalParent);
 
 
                 IterativeVmpTranslator.CanonicalizeMemoryPtr(liftedFunction);
@@ -87,9 +106,22 @@ namespace Dna.BinaryTranslator.VMProtect.Rewrite
                 // Solve for any unknown indirect jumps in the control flow graph.
                 var solver = new VmpJmpTableSolver(liftedFunction);
                 var (newTables, bytecodePtrToRips) = solver.Solve();
+
+                if(!newTables.Any())
+                {
+                    Console.WriteLine($"Finished devirt");
+                    outModule.PrintToFile("translatedFunction.ll");
+                    IDALoader.Load(ClangCompiler.Compile("translatedFunction.ll"));
+                    Debugger.Break();
+                }
+
                 foreach (var entry in bytecodePtrToRips)
                 {
-                    bytecodeAddrToRip.TryAdd(entry.Key, entry.Value);
+                    
+                    if (bytecodeAddrToRip.TryAdd(entry.Key, entry.Value) && !handlerCache.ContainsHandler(entry.Value))
+                        handlersRipsToLift.Add((entry.Value, false));
+                    
+
                     if (bytecodeAddrToRip[entry.Key] != entry.Value)
                         throw new InvalidOperationException($"Multiple native addresses assigned to the same bytecode ptr!");
                 }
@@ -110,13 +142,14 @@ namespace Dna.BinaryTranslator.VMProtect.Rewrite
                         newCfg.AddEdge(handler, getHandler(succ));
                 }
 
-                WorkList<VmHandler> changedNodes = new WorkList<VmHandler>();
+                // Get all newly added nodes & nodes with new predecessors
+                WorkList<VmHandler> worklist = new WorkList<VmHandler>();
                 foreach (var (handler, info) in newCfg.Instructions)
                 {
                     // All new nodes get marked as changed
                     if (!vCfg.Contains(handler))
                     {
-                        changedNodes.AddToBack(handler);
+                        worklist.AddToBack(handler);
                         continue;
                     }
 
@@ -124,23 +157,26 @@ namespace Dna.BinaryTranslator.VMProtect.Rewrite
                     var oldInfo = vCfg.Instructions[handler];
                     if (!oldInfo.Predecessors.SetEquals(info.Predecessors))
                     {
-                        changedNodes.AddToBack(handler);
+                        worklist.AddToBack(handler);
                         continue;
                     }
                 }
 
-                // Get all reachable nodes starting from the list of changed nodes
-                // (this is includes the changed nodes themselves)
-                var reachableNodes = GetReachableNodes(newCfg, changedNodes);
+                // Get all reachable nodes starting from the worklist
+                // (this is includes the changed worklist members themselves)
+                var reachableNodes = GetReachableNodes(newCfg, worklist);
                 foreach(var (handler, info) in newCfg.Instructions)
                     info.Metadata.IsComplete = !reachableNodes.Contains(handler);
 
                 // Replace the CFG
                 vCfg = newCfg;
-                Debugger.Break();
+
+                liftedFunction.GlobalParent.PrintToFile(ArtifactPaths.Resolve("translatedFunction.ll"));
+
+                //Debugger.Break();
             }
 
-
+            // TODO tomorrow: Hook up incremental algorithm
             Debugger.Break();
             return default;
         }
@@ -158,6 +194,17 @@ namespace Dna.BinaryTranslator.VMProtect.Rewrite
             }
 
             return seen;
+        }
+
+        public static void FixMemPtr(LLVMModuleRef module)
+        {
+            var memPtr = module.GetNamedGlobal("memory");
+            if (memPtr.Handle != 0)
+            {
+                memPtr.Linkage = LLVMLinkage.LLVMCommonLinkage;
+                var memoryPtrNull = LLVMValueRef.CreateConstPointerNull(module.GetPtrType());
+                memPtr.Initializer = memoryPtrNull;
+            }
         }
     }
 
@@ -197,7 +244,12 @@ namespace Dna.BinaryTranslator.VMProtect.Rewrite
                 translatedFunction.AppendBasicBlock("entry");
             }
 
-            
+            foreach (var outReg in stateStruct.RegisterOutputArgumentIndices.Values)
+                LLVMUtil.MakeParamNoAlias(translatedFunction.GetParam((uint)outReg));
+
+            var jmpHandler = module.GetNamedFunction("vmp_maybe_unsolved_jump");
+            var callers = jmpHandler.Handle == 0 ? new List<LLVMValueRef>() : RemillUtils.CallersOf(jmpHandler);
+
             // Stack allocate a local state structure and copy all registers into it
             builder.Position(translatedFunction.EntryBasicBlock, translatedFunction.EntryBasicBlock.FirstInstruction);
             var registerAllocaMapping = VmPartialBlockLifter.CreateLocalStateStruct(builder, stateStruct, translatedFunction);
@@ -208,15 +260,66 @@ namespace Dna.BinaryTranslator.VMProtect.Rewrite
             builder.BuildRetVoid();
             var blockMapping = LiftInsts(incremental, translatedFunction, exitBlock, registerAllocaMapping);
 
+            // If rebuilding cfg from scratch, insert jump from entry block to first VM instruction
             if (!incremental)
             {
                 builder.PositionAtEnd(translatedFunction.EntryBasicBlock);
                 builder.BuildBr(blockMapping[entryHandler]);
+                return translatedFunction;
+            }
+
+            // Wire new handlers into CFG
+            // We need to identify the vmp_maybe_unsolved_jmp calls and hook them up
+            foreach (var caller in callers)
+            {
+                // Fetch register values from the local state structure
+                builder.PositionBefore(caller);
+                VmPartialBlockLifter.LoadOutputRegisters(builder, translatedFunction, registerAllocaMapping, stateStruct);
+
+
+                var destIp = caller.GetOperand(0);
+                //var destBlock = blockMapping.Single(x => x.Key.BytecodeRip ==  destIp);
+
+                var srcIp = caller.GetOperand(2).ConstIntZExt;
+                var handler = vCfg.Instructions.Single(x => x.Key.BytecodeRip == srcIp).Key;
+                var vNode = vCfg.Instructions[handler];
+ 
+
+                var outgoingAddresses = vNode.Successors.OrderBy(x => x).ToList();
+                var defaultBlock = blockMapping[outgoingAddresses.First()];
+                var liftedCases = new HashSet<VmHandler>() { outgoingAddresses.First() };
+
+
+            
+                var swtch = builder.BuildSwitch(destIp, defaultBlock, (uint)outgoingAddresses.Count);
+
+                foreach (var target in outgoingAddresses)
+                {
+                    if (liftedCases.Contains(target))
+                        continue;
+
+                    liftedCases.Add(target);
+                    var targetBlock = blockMapping.Single(x => x.Key.BytecodeRip == target.BytecodeRip).Value;
+
+                    swtch.AddCase(LLVMValueRef.CreateConstInt(module.Context.Int64Type, target.BytecodeRip), targetBlock);
+                }
+
+                LLVMUtil.SplitBlockAt(caller.InstructionParent, caller, "split", true);
+                swtch.InstructionParent.LastInstruction.InstructionEraseFromParent();
+
+                if (false)
+                    LiftInstEdges(default, translatedFunction, exitBlock, blockMapping, registerAllocaMapping);
+
+                // TODO: Split basic block before lifting edges..
+                // copy from args to local state structure.. make them no alias
+                module.PrintToFile(ArtifactPaths.Resolve("translatedFunction.ll"));
+                //Debugger.Break();
             }
 
             // If we cant incremental build, need to do everything from scatch. Put each inst in basic block, hook them up. Maybe split into SESE regions just to not be insanely unreadable. Insert hooks on exit
             // If incremental, we are just wiring into an existing
             // TODO: If incremental build, wire up state structure and outgoing edges.
+            // vmp_unsolved_jump(target ptr, rip, jmp from bytecode ptr)
             module.PrintToFile(ArtifactPaths.Resolve("translatedFunction.ll"));
             //Debugger.Break();
             return translatedFunction;
@@ -240,9 +343,10 @@ namespace Dna.BinaryTranslator.VMProtect.Rewrite
                 builder.PositionAtEnd(block);
                 var liftedHandler = handlerCache.CloneLiftedHandlerIntoModule(handler.NativeRip, module);
                 var call = VmPartialBlockLifter.CallVmHandler(builder, function, liftedHandler, registerAllocaMapping, stateStruct);
+                module.PrintToFile(ArtifactPaths.Resolve("translatedFunction.ll"));
+                LiftInstEdges(handler, function, exitBlock, blockMapping, registerAllocaMapping);
                 LLVMCloning.InlineFunction(liftedHandler);
                 liftedHandler.DeleteFunction();
-                LiftInstEdges(handler, function, exitBlock, blockMapping, registerAllocaMapping);
             }
 
             return blockMapping;

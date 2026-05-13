@@ -262,5 +262,16 @@ namespace Dna.BinaryTranslator.VMProtect
                 builder.BuildStore(regValue, regPtr);
             }
         }
+
+        public static void LoadOutputRegisters(LLVMBuilderRef builder, LLVMValueRef function, IReadOnlyDictionary<RemillRegister, LLVMValueRef> registerAllocaMapping, VmpParameterizedStateStructure StateStruct)
+        {
+            // For each output register argument, store the register value to the local state structure
+            foreach (var (reg, index) in StateStruct.RegisterOutputArgumentIndices.OrderBy(x => x.Value))
+            {
+                var regPtr = function.GetParam((uint)index);
+                var load = builder.BuildLoad2(LLVMTypeRef.Int64, regPtr);
+                builder.BuildStore(load, registerAllocaMapping[reg]);
+            }
+        }
     }
 }

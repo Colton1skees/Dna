@@ -33,7 +33,8 @@ namespace Dna.Utilities
 
         public static string Load(string exePath, bool overwrite = true)
         {
-            exePath = ArtifactPaths.CopyInputToOutput(ArtifactPaths.ResolveInputFile(exePath));
+            //exePath = ArtifactPaths.CopyInputToOutput(ArtifactPaths.ResolveInputFile(exePath));
+
 
             // If the database already exists, use a unique copy so IDA does not
             // reuse/overwrite an old .i64 next to the input.
