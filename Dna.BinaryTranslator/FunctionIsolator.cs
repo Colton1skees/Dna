@@ -16,7 +16,7 @@ namespace Dna.BinaryTranslator
     {
         public static unsafe LLVMValueRef IsolateFunctionIntoNewModule(RemillArch arch, LLVMValueRef function)
         {
-            File.WriteAllText(ArtifactPaths.Resolve("translatedFunction.ll"), function.PrintToString());
+            //File.WriteAllText(ArtifactPaths.Resolve("translatedFunction.ll"), function.PrintToString());
             // Console.WriteLine("");
             //Console.WriteLine(function);
             // Optimize the lifted function(mainly to inline intrinsics).

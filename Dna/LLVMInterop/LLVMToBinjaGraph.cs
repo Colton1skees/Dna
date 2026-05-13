@@ -31,7 +31,7 @@ namespace Dna.LLVMInterop
         /// </summary>
         /// <param name="function"></param>
         /// <returns></returns>
-        public void Process()
+        public string Process()
         {
             sb.AppendLine("graph = FlowGraph()");
             int i = 0;
@@ -84,7 +84,7 @@ namespace Dna.LLVMInterop
             }
 
             sb.AppendLine($"show_graph_report(\"Custom Graph\", graph)");
-            Console.WriteLine(sb.ToString());
+            return sb.ToString();
         }
 
         public void SeparateLineIntoTokens(string line)

@@ -1,12 +1,21 @@
-﻿using Dna.ControlFlow.Extensions;
+﻿using Dna.BinaryTranslator.JmpTables;
+using Dna.BinaryTranslator.Lifting;
+using Dna.BinaryTranslator.Unsafe;
+using Dna.BinaryTranslator.X86;
+using Dna.ControlFlow;
+using Dna.ControlFlow.Extensions;
 using Dna.DataStructures;
 using Dna.Extensions;
+using Dna.LLVMInterop;
 using Dna.LLVMInterop.API.LLVMBindings.IR;
 using Dna.LLVMInterop.API.LLVMBindings.Transforms.Utils;
 using Dna.LLVMInterop.API.Remill.Arch;
 using Dna.LLVMInterop.API.Remill.BC;
+using Dna.Relocation;
+using Dna.SEH;
 using Dna.Utilities;
 using FASTER.core;
+using Iced.Intel;
 using LLVMSharp.Interop;
 using System;
 using System.Collections.Generic;
@@ -15,6 +24,10 @@ using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 using WebAssembly.Instructions;
+
+using static Iced.Intel.AssemblerRegisters;
+
+
 using VmCfg = Dna.ControlFlow.InstGraph<Dna.BinaryTranslator.VMProtect.VmHandler, Dna.BinaryTranslator.VMProtect.Rewrite.HandlerMetadata>;
 
 namespace Dna.BinaryTranslator.VMProtect.Rewrite
@@ -73,6 +86,7 @@ namespace Dna.BinaryTranslator.VMProtect.Rewrite
             var blockCache = new VmBlockCache(ctx);
             LLVMValueRef liftedFunction = default;
             int ii = 0;
+            var handlerLifter = new HandlerLifter(dna, ctx, arch);
             while (true)
             {
                 Console.WriteLine($"Lifting iteration {ii++}");
@@ -80,6 +94,7 @@ namespace Dna.BinaryTranslator.VMProtect.Rewrite
                 // Identify all VmExit handlers.
                 foreach (var (rip, isVmEnter) in handlersRipsToLift)
                 {
+                    handlerLifter.LiftHandler(rip, handlers.Count == 1);
                     var cfg = dna.RecursiveDescent.ReconstructCfg(rip);
                     var insts = cfg.GetInstructions();
                     var count = insts.Count(x => x.Mnemonic == Iced.Intel.Mnemonic.Pop);
@@ -89,7 +104,7 @@ namespace Dna.BinaryTranslator.VMProtect.Rewrite
 
 
                 // Lift all native handlers to LLVM IR and cache them
-                IterativeVmpTranslator.LiftHandlersIntoCache(handlerCache, dna, handlersRipsToLift);
+                IterativeVmpTranslator.LiftHandlersIntoCache(arch, handlerCache, dna, handlersRipsToLift);
                 handlersRipsToLift.Clear();
 
                 // Lift the partial CFG
@@ -112,7 +127,10 @@ namespace Dna.BinaryTranslator.VMProtect.Rewrite
                     Console.WriteLine($"Finished devirt");
                     outModule.PrintToFile("translatedFunction.ll");
                     IDALoader.Load(ClangCompiler.Compile("translatedFunction.ll"));
+                    Console.WriteLine("Finished devirt");
+
                     Debugger.Break();
+                    Console.ReadLine();
                 }
 
                 foreach (var entry in bytecodePtrToRips)
@@ -280,12 +298,14 @@ namespace Dna.BinaryTranslator.VMProtect.Rewrite
                 var destIp = caller.GetOperand(0);
                 //var destBlock = blockMapping.Single(x => x.Key.BytecodeRip ==  destIp);
 
+
                 var srcIp = caller.GetOperand(2).ConstIntZExt;
                 var handler = vCfg.Instructions.Single(x => x.Key.BytecodeRip == srcIp).Key;
                 var vNode = vCfg.Instructions[handler];
  
 
                 var outgoingAddresses = vNode.Successors.OrderBy(x => x).ToList();
+                // If this lookup fails, an incremental rebuild was not possible. TODO: Set `incremental` to false and clear CFG in this case
                 var defaultBlock = blockMapping[outgoingAddresses.First()];
                 var liftedCases = new HashSet<VmHandler>() { outgoingAddresses.First() };
 
@@ -406,6 +426,152 @@ namespace Dna.BinaryTranslator.VMProtect.Rewrite
  
                 swtch.AddCase(LLVMValueRef.CreateConstInt(module.Context.Int64Type, target.BytecodeRip), targetBlock);
             }
+        }
+    }
+
+    public class HandlerLifter
+    {
+        private readonly IDna dna;
+
+        private readonly LLVMContextRef ctx;
+
+        private readonly RemillArch arch;
+
+        private readonly LLVMModuleRef cacheModule;
+
+        private readonly Dictionary<ulong, LLVMValueRef> handlerRipToLlvmFunction = new();
+
+        public HandlerLifter(IDna dna, LLVMContextRef ctx, RemillArch arch)
+        {
+            this.dna = dna;
+            this.ctx = ctx;
+            this.arch = arch;
+            cacheModule = ctx.CreateModuleWithName("HandlerCache");
+        }
+
+        public LLVMValueRef LiftHandler(ulong handlerRip, bool isVmEnter)
+        {
+            if (handlerRipToLlvmFunction.TryGetValue(handlerRip, out var existing))
+                return existing;
+
+            var cfg = dna.RecursiveDescent.ReconstructCfg(handlerRip);
+
+            var scopeTable = IterativeFunctionTranslator.GetScopeTable(dna.Binary, handlerRip);
+            var scopeTableTree = new ScopeTableTree(scopeTable);
+            (cfg, var fallthroughFromIps) = IterativeFunctionTranslator.PreprocessCfg(cfg, scopeTable);
+
+            // TODO: The sub rsp rewriting might emit an instruction with a different length. I might need to concretize RIPs in the CFG translator.
+            if (isVmEnter)
+                ReplaceStackExpansion(cfg);
+
+            // Lift the function using remill.
+            var encodedCfg = X86CfgEncoder.EncodeCfg(dna.Binary, cfg);
+            var (liftedFunction, blockMapping, filterFunctions) = CfgTranslator.Translate(dna.Binary.BaseAddress, arch, new BinaryFunction(encodedCfg, scopeTableTree, new List<JmpTable>()), fallthroughFromIps);
+            liftedFunction = FunctionIsolator.IsolateFunctionIntoNewModuleWithSehSupport(arch, liftedFunction, filterFunctions.Select(x => x.LiftedFilterFunction).ToList().AsReadOnly()).function;
+
+            liftedFunction.GlobalParent.Verify(LLVMVerifierFailureAction.LLVMAbortProcessAction);
+     
+            var stripped = IterativeFunctionTranslator.StripRuntimeVmp(dna, ctx, arch, liftedFunction);
+            liftedFunction.Handle = 0;
+
+            // Eliminate any stack expansion in the IR
+            EliminateStackExpansionLoop(stripped, handlerRip);
+
+            // Run the pass pipeline one last time
+            PassPipeline.Run(dna.Binary, stripped);
+
+            // Move the newly created function into the target module.
+            var newHandler = FunctionIsolator.IsolateFunctionInto(cacheModule, stripped);
+            handlerRipToLlvmFunction[handlerRip] = stripped;
+            return newHandler;
+
+            //File.WriteAllText("binja.py", new LLVMToBinjaGraph(stripped).Process());
+
+        }
+
+        private void ReplaceStackExpansion(ControlFlowGraph<Instruction> cfg)
+        {
+            foreach(var block in cfg.GetBlocks())
+            {
+                for(int i = 0; i < block.Instructions.Count; i++)
+                {
+                    if (!IsSubRspImm(block.Instructions[i]))
+                        continue;
+
+                    var assembler = new Assembler(64);
+                    assembler.sub(rsp, 12582912);
+                    var encodedInst = InstructionEncoder.RelocateInstructions(assembler.Instructions.ToList(), block.Instructions[i].IP).Single();
+                    block.Instructions[i] = encodedInst;
+                }
+            }
+        }
+
+        private bool IsSubRspImm(Instruction x)
+            => x.Mnemonic == Mnemonic.Sub && x.Op0Kind == OpKind.Register && x.Op0Register == Register.RSP && x.Op1Kind.IsImmediate();
+
+        // VMProtect handlers will relocate the stack to a new location if they run out of space.
+        // To make optimization a bit easier we modify the VMEnter to allocate a huge amount of stack space and delete all of the stack expansion loops.
+        private void EliminateStackExpansionLoop(LLVMValueRef function, ulong handlerRip)
+        {
+            // Get a bitmask indicating which branches lead to a cycle
+            var getCycles = () =>
+            {
+                var entryBlock = function.EntryBasicBlock;
+                if (entryBlock.LastInstruction.InstructionOpcode != LLVMOpcode.LLVMBr || entryBlock.LastInstruction.OperandCount <= 1)
+                    return 0u;
+
+                var b0 = entryBlock.LastInstruction.GetOperand(1).AsBasicBlock();
+                var b0Cyclic = ReachesCycle(b0, new(), new());
+                var b1 = entryBlock.LastInstruction.GetOperand(2).AsBasicBlock();
+                var b1Cyclic = ReachesCycle(b1, new(), new());
+
+                uint r = 0;
+                r |= b0Cyclic ? 1u : 0;
+                r |= b1Cyclic ? 2u : 0;
+                return r;
+            };
+
+            // If neither has a cycle, there is no stack expansion.
+            if (getCycles() == 0)
+                return;
+
+            // Run the full pass pipeline hoping that any spurious cycles get eliminated
+            PassPipeline.Run(dna.Binary, function);
+            var cycles = getCycles();
+            if (cycles == 0)
+                return;
+
+            // This should never happen. There should be only one path leading to the virtual stack expansion loop
+            if (cycles == 3)
+                throw new InvalidOperationException($"Cyclic handler at 0x{handlerRip.ToString("X")}");
+
+            // Update the branch instruction accordingly.
+            var terminator = function.EntryBasicBlock.LastInstruction;
+            var cond = LLVMValueRef.CreateConstInt(LLVMTypeRef.Int1, cycles == 1 ? 1u : 0);
+            terminator.SetOperand(0, cond);
+        }
+
+        private bool ReachesCycle(LLVMBasicBlockRef curr, HashSet<LLVMBasicBlockRef> visited, HashSet<LLVMBasicBlockRef> stack)
+        {
+            if (stack.Contains(curr))
+                return true;
+            if (visited.Contains(curr))
+                return false;
+
+            stack.Add(curr);
+            visited.Add(curr);
+            var terminator = curr.Terminator;
+            if (terminator != null)
+            {
+                for(var i = 0; i < terminator.SuccessorsCount; i++)
+                {
+                    if (ReachesCycle(terminator.GetSuccessor((uint)i), visited, stack))
+                        return true;
+                }
+            }
+
+            stack.Remove(curr);
+            return false;
         }
     }
 }

@@ -93,7 +93,7 @@ namespace Dna.BinaryTranslator.VMProtect
                 }
 
                 // If any new handlers have been discovered, lift them to LLVM IR and cache them.
-                LiftHandlersIntoCache(handlerCache, dna, handlersRipsToLift);
+                LiftHandlersIntoCache(arch, handlerCache, dna, handlersRipsToLift);
                 // Clear the to-lift worklists.
                 handlersRipsToLift.Clear();
 
@@ -239,7 +239,7 @@ namespace Dna.BinaryTranslator.VMProtect
             return output;
         }
 
-        public static void LiftHandlersIntoCache(VmHandlerCache handlerCache, IDna dna, OrderedSet<(ulong nativeRip, bool isVmEnter)> handlerRipsToLift)
+        public static void LiftHandlersIntoCache(RemillArch arch, VmHandlerCache handlerCache, IDna dna, OrderedSet<(ulong nativeRip, bool isVmEnter)> handlerRipsToLift)
         {
             var output = new List<(ulong nativeRip, FunctionWithStateStructure function)>();
             foreach (var handler in handlerRipsToLift)
@@ -250,10 +250,10 @@ namespace Dna.BinaryTranslator.VMProtect
                 // Get a sequential list of instructions for the handler.
                 // This is only legal because VMP handlers do not have legitimate branches.
                 var handlerInstructions = extractor.Process(handler.nativeRip, handler.isVmEnter);
-
+              
                 // Lift the handler to LLVM IR.
                 var traceLifter = new ObfuscatedTraceLifter(handlerCache.CacheModule.Context, dna, handlerInstructions);
-                var (arch, function) = traceLifter.Lift();
+                var (_, function) = traceLifter.Lift(arch);
 
                 // Clone the function into our persistent module.
                 var outputFunction = FunctionIsolator.IsolateFunctionInto(handlerCache.CacheModule, function.OutputFunction);

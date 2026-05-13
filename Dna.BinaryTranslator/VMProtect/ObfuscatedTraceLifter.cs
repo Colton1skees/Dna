@@ -54,9 +54,10 @@ namespace Dna.BinaryTranslator.VMProtect
             return traceInsts;
         }
 
-        public (RemillArch arch, VmpParameterizedStateStructure function) Lift()
+        public (RemillArch arch, VmpParameterizedStateStructure function) Lift(RemillArch arch)
         {
-            var arch = new RemillArch(ctx, RemillOsId.kOSWindows, RemillArchId.kArchAMD64_AVX512);
+            if (arch == null)
+                arch = new RemillArch(ctx, RemillOsId.kOSWindows, RemillArchId.kArchAMD64_AVX512);
 
             // Load the remill semantics into a new module.
             var module = arch.GetOrLoadSemantics();

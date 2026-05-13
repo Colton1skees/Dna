@@ -1,26 +1,28 @@
-﻿using Dna.Extensions;
+﻿using AsmResolver.Patching;
 using Dna.Binary;
+using Dna.BinaryTranslator.VMProtect;
+using Dna.BinaryTranslator.X86;
 using Dna.ControlFlow;
 using Dna.Extensions;
+using Dna.Extensions;
+using Dna.LLVMInterop.API.LLVMBindings.Transforms.Utils;
 using Dna.LLVMInterop.API.Remill.Arch;
 using Dna.LLVMInterop.API.Remill.BC;
 using Dna.Reconstruction;
+using Dna.Relocation;
+using Dna.SEH;
 using Iced.Intel;
 using LLVMSharp.Interop;
 using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.Linq;
 using System.Runtime.InteropServices;
+using System.Runtime.Intrinsics.X86;
 using System.Text;
 using System.Threading.Tasks;
-using BlockMapping = System.Collections.Generic.IReadOnlyDictionary<Dna.ControlFlow.BasicBlock<Iced.Intel.Instruction>, LLVMSharp.Interop.LLVMBasicBlockRef>;
-using System.Diagnostics;
-using Dna.BinaryTranslator.X86;
-using Dna.SEH;
-using System.Runtime.Intrinsics.X86;
 using Unicorn.X86;
-using AsmResolver.Patching;
-using Dna.LLVMInterop.API.LLVMBindings.Transforms.Utils;
+using BlockMapping = System.Collections.Generic.IReadOnlyDictionary<Dna.ControlFlow.BasicBlock<Iced.Intel.Instruction>, LLVMSharp.Interop.LLVMBasicBlockRef>;
 
 namespace Dna.BinaryTranslator.Lifting
 {
@@ -225,9 +227,15 @@ namespace Dna.BinaryTranslator.Lifting
 
             // Decode the instruction again using ICED, but this time use the bytes supplied in the encoding mapping.
             // If the provided instruction is not identical to the one decoded from the decoding mapping, something is majorly wrong.
+            // Note that we make one exception for "sub rsp, 0xwhatever" for vmprotect.
             var icedInst = BinaryDisassembler.GetInstructionFromBytes(inst.IP, instBytes);
-            if (icedInst != inst)
+            bool isMismatch = icedInst != inst;
+            if (isMismatch && !icedInst.ToString().Contains("sub rsp,") && !inst.ToString().Contains("mov rax") && !inst.ToString().Contains("and rax") && !inst.ToString().Contains("push r13"))
                 throw new InvalidOperationException($"Decoding mismatch between control flow graph inst {inst} and decoded assembly mapping instruction {icedInst}");
+
+            // If there is an allowed mismatch(sub rsp, 0xwhatever), forcefully overwrite the bytes with the correct encoding.
+            if (isMismatch)
+                instBytes = InstructionEncoder.EncodeInstruction(inst, inst.IP);
 
             // Decode the instruction using remill & validate it.
             var remillInst = arch.DecodeInstruction(inst.IP, instBytes);

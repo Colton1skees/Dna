@@ -77,10 +77,10 @@ if (genDsl)
 bool dbgCode = false;
 if (dbgCode)
 {
-    var irPath = "C:\\Users\\colton\\Downloads\\inc_failure0.ll";
+    var irPath = "C:\\Users\\colton\\Downloads\\handler.ll";
     Console.WriteLine(irPath);
     var tempNewMod = RemillUtils.LoadModuleFromFile(LLVMContextRef.Global, irPath).Value;
-    var existingFunc = tempNewMod.GetFunctions().Single(x => x.Name.Contains("Partial"));
+    var existingFunc = tempNewMod.GetFunctions().Single(x => x.Name.Contains("Translated"));
 
 
     while (true)
@@ -117,7 +117,7 @@ if (dbgCode)
         var compiledPath3 = ClangCompiler.Compile("compile.ll");
 
         Console.WriteLine("Loading into IDA.");
-        var exePath3 = IDALoader.Load(compiledPath3);
+        var exePath3 = IDALoader.Load(compiledPath3, true);
 
 
 

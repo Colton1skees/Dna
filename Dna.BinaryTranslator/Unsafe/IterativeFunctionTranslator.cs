@@ -106,7 +106,7 @@ namespace Dna.BinaryTranslator.Unsafe
                 // Strip away as much of the remill runtime as possible.
                 // This includes replacing intrinsics with concrete implementations,
                 // as well as things like assuming that all calls are fastcall.
-                liftedFunction = StripRuntime(liftedFunction);
+                liftedFunction = StripRuntime(dna, ctx, arch, liftedFunction);
 
                 liftedFunction.GlobalParent.WriteToLlFile("translatedFunction.ll");
                 Console.WriteLine("Compiling to an exe.");
@@ -184,7 +184,7 @@ namespace Dna.BinaryTranslator.Unsafe
 
             (var liftedFunction, var blockMapping, var filterFunctions) = CfgTranslator.Translate(dna.Binary.BaseAddress, arch, RemillArch.GetDefaultSemanticsSearchPath(), ctx, new BinaryFunction(encodedCfg, scopeTableTree, solvedTables.AsReadOnly()), fallthroughFromIps, CallHandlingKind.Normal);
             liftedFunction = FunctionIsolator.IsolateFunctionIntoNewModuleWithSehSupport(arch, liftedFunction, filterFunctions.Select(x => x.LiftedFilterFunction).ToList().AsReadOnly()).function;
-            liftedFunction = StripRuntime(liftedFunction);
+            liftedFunction = StripRuntime(dna, ctx, arch, liftedFunction);
 
             liftedFunction.GlobalParent.WriteToLlFile("translatedFunction.ll");
             Console.WriteLine("Compiling to an exe.");
@@ -214,7 +214,7 @@ namespace Dna.BinaryTranslator.Unsafe
             return (cfg, fallthroughFromIps);
         }
 
-        private LLVMValueRef StripRuntime(LLVMValueRef function)
+        public static LLVMValueRef StripRuntime(IDna dna, LLVMContextRef ctx, RemillArch arch, LLVMValueRef function)
         {
             // Apply concrete implementations to all simple.
             // E.g. __remill_memory_read() and __remill_memory_write().
@@ -274,14 +274,14 @@ namespace Dna.BinaryTranslator.Unsafe
 
             for (int x = 0; x < 2; x++)
             {
-                function.GlobalParent.WriteToLlFile("translatedFunction.ll");
+               // function.GlobalParent.WriteToLlFile("translatedFunction.ll");
 
                 // Optimize the routine.
                 for (int i = 0; i < 5; i++)
                 {
                     if (i > 2)
                     {
-                        function.GlobalParent.WriteToLlFile("translatedFunction.ll");
+                        //function.GlobalParent.WriteToLlFile("translatedFunction.ll");
 
                         /*
                         var tgts = function.GetInstructions()
@@ -289,12 +289,12 @@ namespace Dna.BinaryTranslator.Unsafe
                             .Select(x => x.GetOperand(0)).ToList();
                         */
 
-                        var tgts = function.GetInstructions().Where(x => x.InstructionOpcode == LLVMOpcode.LLVMAdd && x.ToString().Contains("add i64 %1, %or.i.i.i")).ToList();
+                        //var tgts = function.GetInstructions().Where(x => x.InstructionOpcode == LLVMOpcode.LLVMAdd && x.ToString().Contains("add i64 %1, %or.i.i.i")).ToList();
 
-                        foreach (var tgt in tgts)
-                            tgt.ReplaceAllUsesWith(LLVMValueRef.CreateConstInt(tgt.TypeOf, 0));
+                        //foreach (var tgt in tgts)
+                         //   tgt.ReplaceAllUsesWith(LLVMValueRef.CreateConstInt(tgt.TypeOf, 0));
 
-                        PassPipeline.Run(dna.Binary, function, false, false);
+                        //PassPipeline.Run(dna.Binary, function, false, false);
                     }
 
 
@@ -312,6 +312,7 @@ namespace Dna.BinaryTranslator.Unsafe
                 }
 
 
+                /*
                 function.GlobalParent.WriteToLlFile("translatedFunction.ll");
 
                 var newMod = ClangCompiler.Optimize(function.GlobalParent, "translatedFunction.ll", true);
@@ -321,6 +322,62 @@ namespace Dna.BinaryTranslator.Unsafe
                 function.GlobalParent.WriteToLlFile("translatedFunction.ll");
 
                 var idk = ClangCompiler.Compile("translatedFunction.ll");
+                */
+            }
+
+            return function;
+        }
+
+        public static LLVMValueRef StripRuntimeVmp(IDna dna, LLVMContextRef ctx, RemillArch arch, LLVMValueRef function)
+        {
+            // Apply concrete implementations to all simple.
+            // E.g. __remill_memory_read() and __remill_memory_write().
+            var runtime = UnsafeRuntimeImplementer.Implement(function.GlobalParent);
+            function.GlobalParent.WriteToLlFile("translatedFunction.ll");
+
+
+            //var compiledPath3 = ClangCompiler.Compile("translatedFunction.ll");
+            //var loaded3 = IDALoader.Load(compiledPath3);
+
+            // Create a new function which doesn't take a state structure pointer.
+            // Instead it takes all root registers as `noalias ptr` arguments.
+            var parameterizedStateStruct = ParameterizedStateStructure.CreateFromFunction(arch, function, false, true);
+
+            // Set the function variable to the output function. This is required,
+            // since parameterization requires creating a completely new function
+            // while inlining the original function.
+            // Note: The old function is also destroyed(deleted) at this point.
+            function = parameterizedStateStruct.OutputFunction;
+
+            // Replace the remill return and error intrinsics with
+            // functions that allow more strong optimization.
+            ErrorAndReturnImplementer.Implement(function);
+
+            // Eliminate all remill_jump calls
+            var jumpIntrinsic = function.GlobalParent.GetNamedFunction("__remill_jump");
+            var callers = RemillUtils.CallersOf(jumpIntrinsic).Where(x => x.InstructionParent.Parent == function).ToList();
+            foreach (var caller in callers)
+                caller.InstructionEraseFromParent();
+
+            // Create a single @memory pointer.
+            var memoryPtr = runtime.MemoryPointer;
+            var builder = LLVMBuilderRef.Create(ctx);
+            builder.Position(function.EntryBasicBlock, function.EntryBasicBlock.FirstInstruction);
+            var dominatingLoad = builder.BuildLoad2(ctx.GetPtrType(), memoryPtr.Value, "mem");
+
+            var targets = function.GetInstructions().Where(x => x.InstructionOpcode == LLVMOpcode.LLVMLoad && x.GetOperand(0) == memoryPtr && x != dominatingLoad).ToList();
+            if (targets.Any())
+            {
+                foreach (var other in targets)
+                {
+                    other.ReplaceAllUsesWith(dominatingLoad);
+                    other.InstructionEraseFromParent();
+                }
+            }
+
+            for (int x = 0; x < 2; x++)
+            {
+                OptimizationApi.OptimizeModule(function.GlobalParent, function, false, false, 0, false, 0, false);
             }
 
             return function;
