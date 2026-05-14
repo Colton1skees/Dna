@@ -55,7 +55,7 @@ namespace Dna.Passes
 
         public static bool Run3(LLVMValueRef function)
         {
-            var distinct = function.GetInstructions().Select(x => x.InstructionOpcode).Distinct().ToList();
+            var distinct = function.GetInstructions().Select(x => x.InstructionOpcode).Distinct().Where(x => !opcodesToClone.Contains(x)).ToList();
 
             //var notSupported = distinct.Where(x => !opcodesToClone.Contains(x)).ToList();
 

@@ -46,6 +46,7 @@ namespace Dna.Passes
                 changed |= TryDistributeSelect(inst);
                 changed |= TryRewriteVmpShifts(inst);
                 changed |= TrySinkLoadOfSelect(inst);
+                changed |= TryRewriteSignExtI1(inst);
             }
 
             return changed;
@@ -116,13 +117,22 @@ namespace Dna.Passes
 
         }
 
-        private static readonly LLVMOpcode[] Opcodes = { LLVMOpcode.LLVMAdd, LLVMOpcode.LLVMSub, LLVMOpcode.LLVMMul, LLVMOpcode.LLVMAnd, LLVMOpcode.LLVMOr, LLVMOpcode.LLVMXor, LLVMOpcode.LLVMLShr, LLVMOpcode.LLVMAShr };
+        private static readonly LLVMOpcode[] Opcodes = { LLVMOpcode.LLVMAdd, LLVMOpcode.LLVMSub, LLVMOpcode.LLVMMul, LLVMOpcode.LLVMAnd, LLVMOpcode.LLVMOr, LLVMOpcode.LLVMXor, LLVMOpcode.LLVMLShr, LLVMOpcode.LLVMAShr, LLVMOpcode.LLVMCall };
+
+        private static readonly string[] Whitelist = { "llvm.bswap" };
 
         private bool TryDistributeSelect(LLVMValueRef inst)
         {
             var opcode = inst.InstructionOpcode;
             if (Array.IndexOf(Opcodes, opcode) == -1)
                 return false;
+
+            if (opcode == LLVMOpcode.LLVMCall)
+            {
+                var name = inst.GetCallInstTarget().Name;
+                if (!Whitelist.Any(x => name.StartsWith(x)))
+                    return false;
+            }
 
             // Get the operands
             var op1 = inst.GetOperand(0);
@@ -364,6 +374,23 @@ namespace Dna.Passes
             return true;
         }
 
+
+        private bool TryRewriteSignExtI1(LLVMValueRef inst)
+        {
+            if (inst.InstructionOpcode != LLVMOpcode.LLVMSExt)
+                return false;
+            var type = inst.TypeOf;
+            if (type.Kind != LLVMTypeKind.LLVMIntegerTypeKind)
+                return false;
+            if (inst.GetOperand(0).TypeOf.IntWidth != 1)
+                return false;
+
+            builder.PositionBefore(inst);
+            var select = builder.BuildSelect(inst.GetOperand(0), LLVMValueRef.CreateConstInt(type, ulong.MaxValue), LLVMValueRef.CreateConstInt(type, 0));
+            Replace(inst, select);
+
+            return true;
+        }
 
         private void Replace(LLVMValueRef from, LLVMValueRef to)
         {

@@ -240,25 +240,38 @@ namespace Dna.BinaryTranslator.VMProtect.Rewrite
         }
 
         // Identify the VIP by a load of some constant address, followed by a store of that address to some register
-        // %24 = getelementptr inbounds i8, ptr %mem, i64 5368736796
-        // store i64 5368736796, ptr %out_RSI, align 8
+  
         private RemillRegister GetBytecodeRegister(VmpParameterizedStateStructure stateStruct, HandlerLifter lifter, ulong vmenterRip)
         {
-            return arch.GetRegisterByName("RBP");
+            // RBP is the right one
+            //return arch.GetRegisterByName("RBP");
             // Lift the VMEnter
             var lifted = lifter.LiftHandler(vmenterRip, true);
+
+            //PassPipeline.Run(dna.Binary, lifted);
+
+
 
             lifted.GlobalParent.PrintToFile("translatedFunction.ll");
 
             // Get all constant addresses being used as pointers
             var gepConstants = lifted.GetInstructions()
-                .Where(x => x.InstructionOpcode == LLVMOpcode.LLVMGetElementPtr && x.OperandCount == 2 && x.GetOperand(1).Kind == LLVMValueKind.LLVMConstantIntValueKind)
+                .Where(x => x.InstructionOpcode == LLVMOpcode.LLVMGetElementPtr && x.OperandCount == 2 && x.GetOperand(1).Kind == LLVMValueKind.LLVMConstantIntValueKind && dna.Binary.IsConstantData(x.GetOperand(1).ConstIntZExt))
                 .Select(x => x.GetOperand(1));
 
-            // Get all stores 
-            var destRegArg = lifted.GetInstructions()
-                .Single(x => x.InstructionOpcode == LLVMOpcode.LLVMStore && x.GetOperand(1).Kind == LLVMValueKind.LLVMArgumentValueKind && gepConstants.Contains(x.GetOperand(0)))
-                .GetOperand(1);
+            var constStores = lifted.GetInstructions().Where(x => x.InstructionOpcode == LLVMOpcode.LLVMStore && x.GetOperand(0).Kind == LLVMValueKind.LLVMConstantIntValueKind && dna.Binary.IsConstantData(x.GetOperand(0).ConstIntZExt)).ToList();
+
+            // %24 = getelementptr inbounds i8, ptr %mem, i64 5368736796
+            // store i64 5368736796, ptr %out_RSI, align 8
+            LLVMValueRef targetStore = constStores
+                .SingleOrDefault(x => x.GetOperand(1).Kind == LLVMValueKind.LLVMArgumentValueKind && gepConstants.Contains(x.GetOperand(0)));
+
+            // Otherwise look for a unique bytecode address that is not stored anywhere else
+            if (targetStore.Handle == 0)
+                targetStore = constStores.Single(x => x.GetOperand(1).Kind == LLVMValueKind.LLVMArgumentValueKind && constStores.Count(y => x.GetOperand(0) == y.GetOperand(0)) == 1);
+            
+
+            var destRegArg = targetStore.GetOperand(1);
 
             var destIdx = Array.IndexOf(lifted.GetParams(), destRegArg);
 
@@ -611,12 +624,11 @@ namespace Dna.BinaryTranslator.VMProtect.Rewrite
     
      
             var (stripped, stateStruct) = IterativeFunctionTranslator.StripRuntimeVmp(dna, ctx, arch, liftedFunction);
+            liftedFunction.Handle = 0;
 
             stripped.GlobalParent.PrintToFile("translatedFunction.ll");
             // liftedFunction.Handle = 0;
 
-            if (RemillUtils.CallersOf(stripped.GlobalParent.GetNamedFunction("dna_return")).Count != 0)
-                Debugger.Break();
 
             if (handlerRip == 0x1400060EF)
             {
@@ -695,7 +707,11 @@ namespace Dna.BinaryTranslator.VMProtect.Rewrite
         // To make optimization a bit easier we modify the VMEnter to allocate a huge amount of stack space and delete all of the stack expansion loops.
         private void EliminateStackExpansionLoop(LLVMValueRef function, ulong handlerRip)
         {
-        
+            if (handlerRip == 0x1400E3C7D)
+            {
+                function.GlobalParent.PrintToFile("translatedFunction.ll");
+                Debugger.Break();
+            }
             var hasCycles = () =>
             {
                 var entryBlock = function.EntryBasicBlock;
@@ -708,27 +724,12 @@ namespace Dna.BinaryTranslator.VMProtect.Rewrite
                 return b0Cyclic || b1Cyclic;
             };
 
-            /*
+            
             // Get a bitmask indicating which branches lead to a cycle
-            var getCycles = () =>
+            var getCycles = (LLVMBasicBlockRef b0, LLVMBasicBlockRef b1) =>
             {
-                var exitInsts = function.GetBlocks()
-                .Select(x => x.Terminator)
-                .Where(x => x.InstructionOpcode == LLVMOpcode.LLVMBr && x.OperandCount == 3 && IsStackExpansionPredicate(x))
-                .ToList();
-
-                if (exitInsts.Count != 1)
-                {
-                    if (hasCycles())
-                        Debugger.Break();
-                    return 0u;
-                }
-
-                var entryBlock = exitInsts.Single().InstructionParent;
-
-                var b0 = entryBlock.LastInstruction.GetOperand(1).AsBasicBlock();
+ 
                 var b0Cyclic = ReachesCycle(b0, new(), new());
-                var b1 = entryBlock.LastInstruction.GetOperand(2).AsBasicBlock();
                 var b1Cyclic = ReachesCycle(b1, new(), new());
 
                 uint r = 0;
@@ -737,6 +738,7 @@ namespace Dna.BinaryTranslator.VMProtect.Rewrite
                 return r;
             };
 
+            /*
             // If neither has a cycle, there is no stack expansion.
             if (getCycles() == 0)
                 return;
@@ -767,9 +769,11 @@ namespace Dna.BinaryTranslator.VMProtect.Rewrite
             }
             */
 
+
+
             var exitInsts = function.GetBlocks()
                 .Select(x => x.Terminator)
-                .Where(x => x.InstructionOpcode == LLVMOpcode.LLVMBr && x.OperandCount == 3 && IsStackExpansionPredicate(x))
+                .Where(x => x.InstructionOpcode == LLVMOpcode.LLVMBr && x.OperandCount == 3 && IsStackExpansionPredicate(x) && getCycles(x.GetOperand(1).AsBasicBlock(), x.GetOperand(2).AsBasicBlock()) == 1)
                 .ToList();
 
             if (exitInsts.Count == 0)
@@ -789,21 +793,19 @@ namespace Dna.BinaryTranslator.VMProtect.Rewrite
                 return false;
             if (cond.ICmpPredicate != LLVMIntPredicate.LLVMIntUGT)
                 return false;
-            if (!IsAddImm(cond.GetOperand(0), 224) && !IsAddImm(cond.GetOperand(1), 224))
+            if (!IsAddImm(cond.GetOperand(0)) && !IsAddImm(cond.GetOperand(1)))
                 return false;
             
             return true;
         }
 
-        private static bool IsAddImm(LLVMValueRef x, ulong imm)
+        private static bool IsAddImm(LLVMValueRef x)
         {
             if (x.Kind != LLVMValueKind.LLVMInstructionValueKind)
                 return false;
             if (x.InstructionOpcode != LLVMOpcode.LLVMAdd)
                 return false;
             if (x.GetOperand(1).Kind != LLVMValueKind.LLVMConstantIntValueKind)
-                return false;
-            if (x.GetOperand(1).ConstIntZExt != imm)
                 return false;
 
             return true;

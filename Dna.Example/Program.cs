@@ -74,10 +74,10 @@ if (genDsl)
 //LazyLLVMFixes.InstallValueToStringBugFix(RemillUtils.LLVMValueToString);
 
 
-bool dbgCode = false;
+bool dbgCode = true;
 if (dbgCode)
 {
-    var irPath = "C:\\Users\\colton\\Downloads\\fail3.ll";
+    var irPath = "C:\\Users\\colton\\Downloads\\fail4.ll";
     Console.WriteLine(irPath);
     var tempNewMod = RemillUtils.LoadModuleFromFile(LLVMContextRef.Global, irPath).Value;
     var existingFunc = tempNewMod.GetFunctions().Single(x => x.Name.Contains("Part"));
@@ -100,7 +100,8 @@ if (dbgCode)
 
         } 
 
-        var vmpPath = @"C:\Users\colton\Downloads\DNA Assets\vmptest.vmp.bin";
+        // Note: Need to update this path on different samples
+        var vmpPath = @"C:\Users\colton\Desktop\PRIV_BINARIES\vmp3_private_tlb.vmp.exe";
         var vmpBin = WindowsBinary.From(vmpPath);
         var vmpDna = new Dna.Dna(vmpBin);
 
@@ -109,10 +110,11 @@ if (dbgCode)
         PassPipeline.Run(vmpBin, existingFunc);
         //MbaDeobfuscationPass.Run(existingFunc);
         PassPipeline.Run(vmpBin, existingFunc);
-
+        PassPipeline.Run(vmpBin, existingFunc);
 
         tempNewMod.PrintToFile("instcombine.ll");
         tempNewMod.PrintToFile(("compile.ll"));
+        tempNewMod.PrintToFile(("translatedFunction.ll"));
 
         var compiledPath3 = ClangCompiler.Compile("compile.ll");
 
@@ -145,8 +147,10 @@ if (useVmp)
     vmpPath = @"C:\Users\colton\Downloads\DNA Assets\vmptest.vmp.bin";
     vmpAddr = 0x140001030;
 
+
     vmpPath = @"C:\Users\colton\Desktop\PRIV_BINARIES\vmp3_private_tlb.vmp.exe";
-    vmpAddr = 0x1400032FA;
+    vmpAddr = 0x1400032FA; // x+y
+    vmpAddr = 0x14000335E; // 3 if/else statements with additions
 
 
 
