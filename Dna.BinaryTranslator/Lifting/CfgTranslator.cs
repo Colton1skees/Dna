@@ -39,6 +39,11 @@ namespace Dna.BinaryTranslator.Lifting
         /// VM at the correct point.
         /// </summary>
         Vmexit = 1,
+
+        /// <summary>
+        /// Using this call handling kind, CALL instructions will be lifted as `push + jmp`
+        /// </summary>
+        Jmp = 2,
     }
 
     public class CfgTranslator
@@ -185,6 +190,8 @@ namespace Dna.BinaryTranslator.Lifting
                         LiftFallthroughCall(llvmBlock);
                     else if (callHandlingKind == CallHandlingKind.Vmexit)
                         LiftVmexitCall(llvmBlock, inst);
+                    else
+                        LiftJmpCall(blockMapping, llvmBlock, inst);
                 }
 
                 else if (flow.IsRet())
@@ -208,7 +215,7 @@ namespace Dna.BinaryTranslator.Lifting
             // So in the cases of fallthrough edges, we update the LLVM basic block's terminator instruction to unconditionally
             // jump to fallthrough targets if one exists.
             bool isVmexitCall = exitFlow.IsCall() && callHandlingKind == CallHandlingKind.Vmexit;
-            bool isFallthrough = !isVmexitCall && !(exitFlow.IsRet() || exitFlow.IsBranch()) && block.OutgoingEdges.Any();
+            bool isFallthrough = !isVmexitCall && !(exitFlow.IsRet() || exitFlow.IsBranch() || (exitFlow.IsCall() && callHandlingKind == CallHandlingKind.Jmp)) && block.OutgoingEdges.Any();
             if (isFallthrough)
             {
                 Console.WriteLine(exitInst);
@@ -279,6 +286,15 @@ namespace Dna.BinaryTranslator.Lifting
             // used later on as a vm re-entry key.
             var key = LLVMValueRef.CreateConstInt(LLVMTypeRef.Int64, nativeCallInst.IP);
             callInst.SetOperand(2, LLVMValueRef.CreateConstIntToPtr(key, ctx.GetPtrType()));
+        }
+
+        private void LiftJmpCall(BlockMapping blockMapping, LLVMBasicBlockRef llvmBlock, Instruction branchInst)
+        {
+            // If this is an unconditional branch, insert a `br` to the dest block.
+            Debug.Assert(branchInst.HasImmediateBranchTarget());
+            var immDest = branchInst.GetImmediateBranchTarget();
+            var immDestBlock = blockMapping.Single(x => x.Key.Address == immDest).Value;
+            builder.BuildBr(immDestBlock);
         }
 
         private void LiftRet(LLVMBasicBlockRef llvmBlock) => RemillUtils.AddTerminatingTailCall(llvmBlock, arch.IntrinsicTable.FunctionReturn, arch.IntrinsicTable);

@@ -159,7 +159,7 @@ namespace Dna.BinaryTranslator.VMProtect
 
             // Load the indirect jump value.
             var int64Ty = module.Context.GetInt64Ty();
-            var indirectPc = LoadBytecodePointer(builder, registerAllocaMapping);
+            var indirectPc = LoadBytecodePointer(builder, arch.GetRegisterByName("RSI"), registerAllocaMapping);
 
             var liftedCases = new HashSet<ulong>
             {
@@ -177,7 +177,7 @@ namespace Dna.BinaryTranslator.VMProtect
                 var jmpFromAddr = block.ExitInstruction.BytecodeRip;
                 defaultBlock = translatedFunction.AppendBasicBlock($"reprove_new_edge_for_jmp_table_{jmpFromAddr.ToString("X")}");
                 builder.PositionAtEnd(defaultBlock);
-                AddCallToIndirectBranchIntrinsic(module, builder, defaultBlock, registerAllocaMapping, exitBlock, jmpFromAddr);
+                AddCallToIndirectBranchIntrinsic(module, builder, defaultBlock, arch.GetRegisterByName("RSI"), registerAllocaMapping, exitBlock, jmpFromAddr);
                 builder.PositionAtEnd(llvmBlock);
             }
 
@@ -222,34 +222,34 @@ namespace Dna.BinaryTranslator.VMProtect
                 throw new InvalidOperationException($"A basic block may only have one unsolved exit, and that exit must be at the end of the block!");
         }
 
-        public static void AddCallToIndirectBranchIntrinsic(LLVMModuleRef module, LLVMBuilderRef builder, LLVMBasicBlockRef llvmBlock, IReadOnlyDictionary<RemillRegister, LLVMValueRef> registerAllocaMapping, LLVMBasicBlockRef exitBlock, ulong exitFromRip)
+        public static void AddCallToIndirectBranchIntrinsic(LLVMModuleRef module, LLVMBuilderRef builder, LLVMBasicBlockRef llvmBlock, RemillRegister bytecodeRegister, IReadOnlyDictionary<RemillRegister, LLVMValueRef> registerAllocaMapping, LLVMBasicBlockRef exitBlock, ulong exitFromRip)
         {
             // Get or create the function.
             var int64Ty = module.Context.GetInt64Ty();
             var (prototype, intrinsicFunc) = GetOrCreateJmpIntrinsic(module);
 
             var args = new List<LLVMValueRef>();
-            args.Add(LoadBytecodePointer(builder, registerAllocaMapping));
+            args.Add(LoadBytecodePointer(builder, bytecodeRegister, registerAllocaMapping));
             args.Add(LoadNativeInstructionPointer(builder, registerAllocaMapping));
             args.Add((LLVMValueRef.CreateConstInt(int64Ty, exitFromRip)));
             var call = builder.BuildCall2(prototype, intrinsicFunc, args.ToArray());
             builder.BuildBr(exitBlock);
         }
 
-        public static LLVMValueRef LoadBytecodePointer(LLVMBuilderRef builder, IReadOnlyDictionary<RemillRegister, LLVMValueRef> registerAllocaMapping)
+        public static LLVMValueRef LoadBytecodePointer(LLVMBuilderRef builder, RemillRegister bytecodeRegister, IReadOnlyDictionary<RemillRegister, LLVMValueRef> registerAllocaMapping)
         {
             // TODO: Stop hardcoding RDI as the bytecode pointer.
-            var regPtr = registerAllocaMapping.Single(x => x.Key.Name.Contains("RSI")).Value;
+            var regPtr = registerAllocaMapping[bytecodeRegister];
 
-            // Load and return the value of the "RDI"(bytecode ptr) local variable.
+            // Load and return the value of the "RSI"(bytecode ptr) local variable.
             var regValue = builder.BuildLoad2(LLVMTypeRef.Int64, regPtr, "bytecode_ptr");
             return regValue;
         }
 
         public static LLVMValueRef LoadNativeInstructionPointer(LLVMBuilderRef builder, IReadOnlyDictionary<RemillRegister, LLVMValueRef> registerAllocaMapping)
         {
-            // TODO: Stop hardcoding RDI as the bytecode pointer.
-            var regPtr = registerAllocaMapping.Single(x => x.Key.Name.Contains("RDX")).Value;
+            // TODO: Stop hardcoding RDI as the RIP pointer.
+            var regPtr = registerAllocaMapping.Single(x => x.Key.Name.Contains("RIP")).Value;
 
             // Load and return the value of the "RDI"(bytecode ptr) local variable.
             var regValue = builder.BuildLoad2(LLVMTypeRef.Int64, regPtr, "instruction_ptr");

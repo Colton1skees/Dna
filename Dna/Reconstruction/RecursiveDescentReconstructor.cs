@@ -24,41 +24,41 @@ namespace Dna.Reconstruction
             this.dna = dna;
         }
 
-        public ControlFlowGraph<Instruction> ReconstructCfg(ulong address, Func<BasicBlock<Instruction>, IEnumerable<ulong>> pGetOutgoingEdges = null, IEnumerable<ulong> sehExceptBlockAddresses = null)
+        public ControlFlowGraph<Instruction> ReconstructCfg(ulong address, Func<BasicBlock<Instruction>, IEnumerable<ulong>> pGetOutgoingEdges = null, IEnumerable<ulong> sehExceptBlockAddresses = null, Func<ulong, bool> shouldContinue = null)
         {
             // Initialize a control flow graph with a single node,
             // starting at the provided address.
             graph = new ControlFlowGraph<Instruction>(address);
 
             // Apply recursive descent at the block start.
-            RecursivelyDescend(graph, address, pGetOutgoingEdges);
+            RecursivelyDescend(graph, address, pGetOutgoingEdges, shouldContinue);
 
             // For each SEH '__except' block, add it to the control flow graph
             // with no incoming edges. This is necessary since `__except` are valid parts of a control flow graph,
             // but they are often not reachable through recursive descent.
             foreach(var addr in sehExceptBlockAddresses ?? Enumerable.Empty<ulong>())
-                RecursivelyDescend(graph, addr, pGetOutgoingEdges);
+                RecursivelyDescend(graph, addr, pGetOutgoingEdges, shouldContinue);
 
             return graph;
         }
 
         // Apply recursive descent starting at the provided address.
-        private void RecursivelyDescend(ControlFlowGraph<Instruction> graph, ulong addr, Func<BasicBlock<Instruction>, IEnumerable<ulong>> pGetOutgoingEdges)
+        private void RecursivelyDescend(ControlFlowGraph<Instruction> graph, ulong addr, Func<BasicBlock<Instruction>, IEnumerable<ulong>> pGetOutgoingEdges, Func<ulong, bool> shouldContinue)
         {
             // Skip if the __except block was already added to the cfg.
             if (graph.Nodes.Contains(addr.ToString("X")))
                 return;
 
             // Disassemble the block.
-            var basicBlock = DisassembleBlock(graph, addr);
+            var basicBlock = DisassembleBlock(graph, addr, shouldContinue);
 
             // Recursively follow all new paths.
             var edges = GetBlockEdges(basicBlock, pGetOutgoingEdges);
             foreach (var edge in edges)
-                RecursiveHandleBlock(graph, edge, basicBlock, pGetOutgoingEdges);
+                RecursiveHandleBlock(graph, edge, basicBlock, pGetOutgoingEdges, shouldContinue);
         }
 
-        private BasicBlock<Instruction> DisassembleBlock(ControlFlowGraph<Instruction> graph, ulong address)
+        private BasicBlock<Instruction> DisassembleBlock(ControlFlowGraph<Instruction> graph, ulong address, Func<ulong, bool> shouldContinue)
         {
             BasicBlock<Instruction> block = graph.CreateBlock(address);
             block.Address = address;
@@ -70,7 +70,7 @@ namespace Dna.Reconstruction
 
                 // If the instruction is a branch or termination, then we have reached
                 // the end of the block.
-                if (currInsn.FlowControl.IsBranch() || currInsn.FlowControl.IsRet())
+                if (currInsn.FlowControl.IsBranch() || currInsn.FlowControl.IsRet() || (shouldContinue != null && !shouldContinue(address)))
                     return block;
 
                 // Since we have not reached the end of the block,
@@ -100,13 +100,13 @@ namespace Dna.Reconstruction
             if(edges.Count == 0 && pGetOutgoingEdges != null)
             {
                 var learnedEdges = pGetOutgoingEdges(block);
-                return learnedEdges == null ? new List<ulong>() : learnedEdges;
+                return learnedEdges == null ? edges : learnedEdges;
             }
 
             return edges;
         }
 
-        private Node RecursiveHandleBlock(ControlFlowGraph<Instruction> graph, ulong addrInitialBlock, Node source, Func<BasicBlock<Instruction>, IEnumerable<ulong>> pGetOutgoingEdges = null)
+        private Node RecursiveHandleBlock(ControlFlowGraph<Instruction> graph, ulong addrInitialBlock, Node source, Func<BasicBlock<Instruction>, IEnumerable<ulong>> pGetOutgoingEdges = null, Func<ulong, bool> shouldContinue = null)
         {
             // If we have already traversed this block, then we add it as an edge
             // and return.
@@ -122,7 +122,7 @@ namespace Dna.Reconstruction
             }
 
             // Extract basic block information.
-            var basicBlock = DisassembleBlock(graph, addrInitialBlock);
+            var basicBlock = DisassembleBlock(graph, addrInitialBlock, shouldContinue);
             var edges = GetBlockEdges(basicBlock, pGetOutgoingEdges);
 
             // Create a node for the block.

@@ -135,18 +135,32 @@ if (dbgCode)
 
 }
 
+
+
 bool useVmp = true;
 if (useVmp)
 {
+    var (vmpPath, vmpAddr) = ("", 0ul);
 
-    var vmpPath = @"C:\Users\colton\Downloads\DNA Assets\vmptest.vmp.bin";
+    vmpPath = @"C:\Users\colton\Downloads\DNA Assets\vmptest.vmp.bin";
+    vmpAddr = 0x140001030;
+
+    //vmpPath = @"C:\Users\colton\Desktop\PRIV_BINARIES\vmp3_private_tlb.vmp.exe";
+    //vmpAddr = 0x1400032FA;
+
+
+
     var vmpBin = WindowsBinary.From(vmpPath);
     var vmpDna = new Dna.Dna(vmpBin);
 
+
+    
+
+
     var vmpCtx = LLVMContextRef.Global;
     var vmpArch = new RemillArch(vmpCtx, RemillOsId.kOSLinux, RemillArchId.kArchAMD64_AVX512);
-    //var translator = new IterativeVmpTranslator(vmpDna, vmpArch, vmpCtx, 0x140001030);
-    var translator = new IterativeVmpExplorer(vmpDna, vmpArch, vmpCtx, 0x140001030);
+    //var translator = new IterativeVmpTranslator(vmpDna, vmpArch, vmpCtx, vmpAddr);
+    var translator = new IterativeVmpExplorer(vmpDna, vmpArch, vmpCtx, vmpAddr);
     var sw = Stopwatch.StartNew();
     var devirtedFunc = translator.Run();
     sw.Stop();

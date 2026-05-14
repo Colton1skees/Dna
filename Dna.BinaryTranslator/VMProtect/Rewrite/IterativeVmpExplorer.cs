@@ -9,6 +9,7 @@ using Dna.Extensions;
 using Dna.LLVMInterop;
 using Dna.LLVMInterop.API.LLVMBindings.IR;
 using Dna.LLVMInterop.API.LLVMBindings.Transforms.Utils;
+using Dna.LLVMInterop.API.Optimization;
 using Dna.LLVMInterop.API.Remill.Arch;
 using Dna.LLVMInterop.API.Remill.BC;
 using Dna.Relocation;
@@ -62,6 +63,36 @@ namespace Dna.BinaryTranslator.VMProtect.Rewrite
             //this.handlerCache = new VmHandlerCache(ctx);
         }
 
+        public static Func<BasicBlock<Instruction>, IEnumerable<ulong>> DescentCallback(IDna dna)
+        {
+            return (BasicBlock<Instruction> x) => { return DescentCallback(dna, x); };
+        }
+
+        public static IEnumerable<ulong> DescentCallback(IDna dna, BasicBlock<Instruction> block)
+        {
+            var inst = block.ExitInstruction;
+            if (inst.Mnemonic != Mnemonic.Call)
+                return null;
+            if (!inst.HasImmediateBranchTarget())
+                return null;
+            var target = inst.GetImmediateBranchTarget();
+            return new ulong[] { target};
+        }
+
+        public static Func<ulong, bool> ShouldContinueCallback(IDna dna)
+        {
+            return (ulong x) => { return ShouldContinueCallback(dna, x); };
+        }
+
+        public static bool ShouldContinueCallback(IDna dna, ulong ip)
+        {
+            var inst = dna.BinaryDisassembler.GetInstructionAt(ip);
+            if (inst.Mnemonic == Mnemonic.Call)
+                return false;
+
+            return true;
+        }
+
         public LLVMValueRef Run()
         {
             arch.GetOrLoadSemantics();
@@ -88,6 +119,10 @@ namespace Dna.BinaryTranslator.VMProtect.Rewrite
             LLVMValueRef liftedFunction = default;
             int ii = 0;
             var handlerLifter = new HandlerLifter(dna, ctx, arch);
+
+            var stateStruct = new VmpParameterizedStateStructure(arch, ctx, false);
+            RemillRegister bytecodeRegister = GetBytecodeRegister(stateStruct, handlerLifter, funcRip);
+
             while (true)
             {
                 Console.WriteLine($"Lifting iteration {ii++}");
@@ -96,7 +131,7 @@ namespace Dna.BinaryTranslator.VMProtect.Rewrite
                 foreach (var (rip, isVmEnter) in handlersRipsToLift)
                 {
                     //handlerLifter.LiftHandler(rip, handlers.Count == 1);
-                    var cfg = dna.RecursiveDescent.ReconstructCfg(rip);
+                    var cfg = HandlerLifter.DisHandler(dna, rip);
                     var insts = cfg.GetInstructions();
                     var count = insts.Count(x => x.Mnemonic == Iced.Intel.Mnemonic.Pop);
                     if (count > 10)
@@ -111,8 +146,8 @@ namespace Dna.BinaryTranslator.VMProtect.Rewrite
                 // Lift the partial CFG
                 //var stateStruct = handlerCache.GetLiftedHandler(handlers.First().NativeRip).ParameterizedStateStructure;
 
-                var stateStruct = new VmpParameterizedStateStructure(arch, ctx, false);
-                liftedFunction = new IterativeCfgBuilder(outModule, arch, stateStruct, vCfg, handlerLifter, vmexitHandlerRips).Run(liftedFunction, handlers.First());
+
+                liftedFunction = new IterativeCfgBuilder(outModule, arch, stateStruct, vCfg, handlerLifter, vmexitHandlerRips).Run(liftedFunction, handlers.First(), bytecodeRegister);
                 FixMemPtr(liftedFunction.GlobalParent);
 
 
@@ -204,6 +239,33 @@ namespace Dna.BinaryTranslator.VMProtect.Rewrite
             return default;
         }
 
+        // Identify the VIP by a load of some constant address, followed by a store of that address to some register
+        // %24 = getelementptr inbounds i8, ptr %mem, i64 5368736796
+        // store i64 5368736796, ptr %out_RSI, align 8
+        private RemillRegister GetBytecodeRegister(VmpParameterizedStateStructure stateStruct, HandlerLifter lifter, ulong vmenterRip)
+        {
+            // Lift the VMEnter
+            var lifted = lifter.LiftHandler(vmenterRip, true);
+
+            lifted.GlobalParent.PrintToFile("translatedFunction.ll");
+
+            // Get all constant addresses being used as pointers
+            var gepConstants = lifted.GetInstructions()
+                .Where(x => x.InstructionOpcode == LLVMOpcode.LLVMGetElementPtr && x.OperandCount == 2 && x.GetOperand(1).Kind == LLVMValueKind.LLVMConstantIntValueKind)
+                .Select(x => x.GetOperand(1));
+
+            // Get all stores 
+            var destRegArg = lifted.GetInstructions()
+                .Single(x => x.InstructionOpcode == LLVMOpcode.LLVMStore && x.GetOperand(1).Kind == LLVMValueKind.LLVMArgumentValueKind && gepConstants.Contains(x.GetOperand(0)))
+                .GetOperand(1);
+
+            var destIdx = Array.IndexOf(lifted.GetParams(), destRegArg);
+
+            var reg = stateStruct.RegisterOutputArgumentIndices.Single(x => x.Value == destIdx).Key;
+            return reg;
+
+        }
+
         private HashSet<VmHandler> GetReachableNodes(VmCfg vCfg, WorkList<VmHandler> worklist)
         {
             var seen = new HashSet<VmHandler>();
@@ -258,7 +320,7 @@ namespace Dna.BinaryTranslator.VMProtect.Rewrite
             builder = LLVMBuilderRef.Create(module.Context);
         }
 
-        public LLVMValueRef Run(LLVMValueRef translatedFunction, VmHandler entryHandler)
+        public LLVMValueRef Run(LLVMValueRef translatedFunction, VmHandler entryHandler, RemillRegister bytecodeRegister)
         {
             bool incremental = translatedFunction.Handle != 0;
             if (!incremental)
@@ -284,7 +346,7 @@ namespace Dna.BinaryTranslator.VMProtect.Rewrite
 
             var toDelete = new HashSet<LLVMValueRef>();
 
-            var blockMapping = LiftInsts(incremental, translatedFunction, exitBlock, entryHandler, registerAllocaMapping, toDelete);
+            var blockMapping = LiftInsts(incremental, translatedFunction, exitBlock, entryHandler, bytecodeRegister, registerAllocaMapping, toDelete);
 
             // If rebuilding cfg from scratch, insert jump from entry block to first VM instruction
             if (!incremental)
@@ -354,9 +416,7 @@ namespace Dna.BinaryTranslator.VMProtect.Rewrite
                 LLVMUtil.SplitBlockAt(caller.InstructionParent, caller, "split", true);
                 swtch.InstructionParent.LastInstruction.InstructionEraseFromParent();
 
-                if (false)
-                    LiftInstEdges(default, translatedFunction, exitBlock, blockMapping, registerAllocaMapping);
-
+    
                 // TODO: Split basic block before lifting edges..
                 // copy from args to local state structure.. make them no alias
                 module.PrintToFile(("translatedFunction.ll"));
@@ -372,7 +432,7 @@ namespace Dna.BinaryTranslator.VMProtect.Rewrite
             return translatedFunction;
         }
 
-        private Dictionary<VmHandler, LLVMBasicBlockRef> LiftInsts(bool incremental, LLVMValueRef function, LLVMBasicBlockRef exitBlock, VmHandler entryHandler, IReadOnlyDictionary<RemillRegister, LLVMValueRef> registerAllocaMapping, HashSet<LLVMValueRef> toDelete)
+        private Dictionary<VmHandler, LLVMBasicBlockRef> LiftInsts(bool incremental, LLVMValueRef function, LLVMBasicBlockRef exitBlock, VmHandler entryHandler, RemillRegister bytecodeRegister, IReadOnlyDictionary<RemillRegister, LLVMValueRef> registerAllocaMapping, HashSet<LLVMValueRef> toDelete)
         {
             // Create blocks for each lifted instructions
             var blockMapping = new Dictionary<VmHandler, LLVMBasicBlockRef>();
@@ -391,7 +451,7 @@ namespace Dna.BinaryTranslator.VMProtect.Rewrite
                 var liftedHandler = handlerCache.Lift(module, handler.NativeRip, handler == entryHandler);
                 var call = VmPartialBlockLifter.CallVmHandler(builder, function, liftedHandler, registerAllocaMapping, stateStruct);
              
-                LiftInstEdges(handler, function, exitBlock, blockMapping, registerAllocaMapping);
+                LiftInstEdges(handler, function, exitBlock, blockMapping, bytecodeRegister, registerAllocaMapping);
                 module.PrintToFile("translatedFunction.ll");
 
                 IterativeVmpExplorer.FixMemPtr(module);
@@ -406,7 +466,7 @@ namespace Dna.BinaryTranslator.VMProtect.Rewrite
             return blockMapping;
         }
 
-        private void LiftInstEdges(VmHandler handler, LLVMValueRef function, LLVMBasicBlockRef exitBlock, Dictionary<VmHandler, LLVMBasicBlockRef> blockMapping, IReadOnlyDictionary<RemillRegister, LLVMValueRef> registerAllocaMapping)
+        private void LiftInstEdges(VmHandler handler, LLVMValueRef function, LLVMBasicBlockRef exitBlock, Dictionary<VmHandler, LLVMBasicBlockRef> blockMapping, RemillRegister bytecodeRegister, IReadOnlyDictionary<RemillRegister, LLVMValueRef> registerAllocaMapping)
         {
             var llvmBlock = blockMapping[handler];
             bool isVmExit = vmexitHandlerRips.Contains(handler.NativeRip);
@@ -423,7 +483,7 @@ namespace Dna.BinaryTranslator.VMProtect.Rewrite
 
             // Load the indirect jump value.
             var int64Ty = module.Context.GetInt64Ty();
-            var indirectPc = VmCfgLifter.LoadBytecodePointer(builder, registerAllocaMapping);
+            var indirectPc = VmCfgLifter.LoadBytecodePointer(builder, bytecodeRegister, registerAllocaMapping);
 
             var liftedCases = new HashSet<VmHandler>();
             LLVMBasicBlockRef defaultBlock = null;
@@ -435,7 +495,7 @@ namespace Dna.BinaryTranslator.VMProtect.Rewrite
                 defaultBlock = function.AppendBasicBlock($"reprove_new_edge_for_jmp_table_{handler.BytecodeRip.ToString("X")}");
                 builder.PositionAtEnd(defaultBlock);
                 VmPartialBlockLifter.UpdateOutputRegisters(builder, function, registerAllocaMapping, stateStruct);
-                VmCfgLifter.AddCallToIndirectBranchIntrinsic(module, builder, llvmBlock, registerAllocaMapping, exitBlock, handler.BytecodeRip);
+                VmCfgLifter.AddCallToIndirectBranchIntrinsic(module, builder, llvmBlock, bytecodeRegister, registerAllocaMapping, exitBlock, handler.BytecodeRip);
                 builder.PositionAtEnd(llvmBlock);
             }
 
@@ -483,6 +543,11 @@ namespace Dna.BinaryTranslator.VMProtect.Rewrite
             cacheModule = ctx.CreateModuleWithName("HandlerCache");
         }
 
+        public static ControlFlowGraph<Instruction> DisHandler(IDna dna, ulong ip)
+        {
+            return dna.RecursiveDescent.ReconstructCfg(ip, null, null, IterativeVmpExplorer.ShouldContinueCallback(dna));
+        }
+
         public bool ContainsHandler(ulong rip)
             => handlerRipToLlvmFunction.ContainsKey(rip);
 
@@ -518,14 +583,14 @@ namespace Dna.BinaryTranslator.VMProtect.Rewrite
             return newHandler;
         }
 
-        private LLVMValueRef LiftHandler(ulong handlerRip, bool isVmEnter)
+        public LLVMValueRef LiftHandler(ulong handlerRip, bool isVmEnter)
         {
             if (handlerRipToLlvmFunction.TryGetValue(handlerRip, out var existing))
                 return existing;
 
             Console.WriteLine($"New handler: 0x{handlerRip.ToString("X")}");
 
-            var cfg = dna.RecursiveDescent.ReconstructCfg(handlerRip);
+            var cfg = HandlerLifter.DisHandler(dna, handlerRip);
 
             var scopeTable = IterativeFunctionTranslator.GetScopeTable(dna.Binary, handlerRip);
             var scopeTableTree = new ScopeTableTree(scopeTable);
@@ -537,8 +602,10 @@ namespace Dna.BinaryTranslator.VMProtect.Rewrite
 
             // Lift the function using remill.
             var encodedCfg = X86CfgEncoder.EncodeCfg(dna.Binary, cfg);
-            var (liftedFunction, blockMapping, filterFunctions) = CfgTranslator.Translate(dna.Binary.BaseAddress, arch, new BinaryFunction(encodedCfg, scopeTableTree, new List<JmpTable>()), fallthroughFromIps);
+            var (liftedFunction, blockMapping, filterFunctions) = CfgTranslator.Translate(dna.Binary.BaseAddress, arch, new BinaryFunction(encodedCfg, scopeTableTree, new List<JmpTable>()), fallthroughFromIps, CallHandlingKind.Jmp);
             liftedFunction = FunctionIsolator.IsolateFunctionIntoNewModule(arch, liftedFunction);
+
+            liftedFunction.GlobalParent.PrintToFile("translatedFunction.ll");
 
             liftedFunction.GlobalParent.Verify(LLVMVerifierFailureAction.LLVMAbortProcessAction);
      
@@ -555,8 +622,8 @@ namespace Dna.BinaryTranslator.VMProtect.Rewrite
 
             EliminateStackAlignment(stripped, stateStruct);
 
-            // Run the pass pipeline one last time
-            PassPipeline.Run(dna.Binary, stripped);
+            // Optimize one last time
+            OptimizationApi.OptimizeModule(stripped.GlobalParent, stripped, false, false, 0, false, 0, false);
 
             // Move the newly created function into the target module.
             var newHandler = FunctionIsolator.IsolateFunctionInto(cacheModule, stripped);
@@ -586,8 +653,6 @@ namespace Dna.BinaryTranslator.VMProtect.Rewrite
 
         private bool IsAndRspImm(Instruction x)
             => x.Mnemonic == Mnemonic.And && x.Op0Kind == OpKind.Register && x.Op0Register == Register.RSP && x.Op1Kind.IsImmediate() && x.GetImmediate(1) == (ulong)0xFFFFFFFFFFFFFFF0;
-
-
 
         private bool IsSubRspImm(Instruction x)
             => x.Mnemonic == Mnemonic.Sub && x.Op0Kind == OpKind.Register && x.Op0Register == Register.RSP && x.Op1Kind.IsImmediate();
