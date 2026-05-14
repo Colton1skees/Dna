@@ -145,8 +145,8 @@ if (useVmp)
     vmpPath = @"C:\Users\colton\Downloads\DNA Assets\vmptest.vmp.bin";
     vmpAddr = 0x140001030;
 
-    //vmpPath = @"C:\Users\colton\Desktop\PRIV_BINARIES\vmp3_private_tlb.vmp.exe";
-    //vmpAddr = 0x1400032FA;
+    vmpPath = @"C:\Users\colton\Desktop\PRIV_BINARIES\vmp3_private_tlb.vmp.exe";
+    vmpAddr = 0x1400032FA;
 
 
 

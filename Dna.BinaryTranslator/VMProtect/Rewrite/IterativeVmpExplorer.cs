@@ -244,6 +244,7 @@ namespace Dna.BinaryTranslator.VMProtect.Rewrite
         // store i64 5368736796, ptr %out_RSI, align 8
         private RemillRegister GetBytecodeRegister(VmpParameterizedStateStructure stateStruct, HandlerLifter lifter, ulong vmenterRip)
         {
+            return arch.GetRegisterByName("RBP");
             // Lift the VMEnter
             var lifted = lifter.LiftHandler(vmenterRip, true);
 
@@ -545,7 +546,7 @@ namespace Dna.BinaryTranslator.VMProtect.Rewrite
 
         public static ControlFlowGraph<Instruction> DisHandler(IDna dna, ulong ip)
         {
-            return dna.RecursiveDescent.ReconstructCfg(ip, null, null, IterativeVmpExplorer.ShouldContinueCallback(dna));
+            return dna.RecursiveDescent.ReconstructCfg(ip, IterativeVmpExplorer.DescentCallback(dna), null, IterativeVmpExplorer.ShouldContinueCallback(dna));
         }
 
         public bool ContainsHandler(ulong rip)
@@ -602,15 +603,20 @@ namespace Dna.BinaryTranslator.VMProtect.Rewrite
 
             // Lift the function using remill.
             var encodedCfg = X86CfgEncoder.EncodeCfg(dna.Binary, cfg);
-            var (liftedFunction, blockMapping, filterFunctions) = CfgTranslator.Translate(dna.Binary.BaseAddress, arch, new BinaryFunction(encodedCfg, scopeTableTree, new List<JmpTable>()), fallthroughFromIps, CallHandlingKind.Jmp);
+            var (liftedFunction, blockMapping, filterFunctions) = CfgTranslator.Translate(dna.Binary.BaseAddress, arch, new BinaryFunction(encodedCfg, scopeTableTree, new List<JmpTable>()), fallthroughFromIps, CallHandlingKind.VMProtect);
             liftedFunction = FunctionIsolator.IsolateFunctionIntoNewModule(arch, liftedFunction);
 
-            liftedFunction.GlobalParent.PrintToFile("translatedFunction.ll");
 
-            liftedFunction.GlobalParent.Verify(LLVMVerifierFailureAction.LLVMAbortProcessAction);
+            //liftedFunction.Handle = 0;
+    
      
             var (stripped, stateStruct) = IterativeFunctionTranslator.StripRuntimeVmp(dna, ctx, arch, liftedFunction);
+
+            stripped.GlobalParent.PrintToFile("translatedFunction.ll");
             // liftedFunction.Handle = 0;
+
+            if (RemillUtils.CallersOf(stripped.GlobalParent.GetNamedFunction("dna_return")).Count != 0)
+                Debugger.Break();
 
             if (handlerRip == 0x1400060EF)
             {

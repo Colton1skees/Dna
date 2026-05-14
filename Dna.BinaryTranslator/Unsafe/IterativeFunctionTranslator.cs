@@ -353,6 +353,14 @@ namespace Dna.BinaryTranslator.Unsafe
             // functions that allow more strong optimization.
             ErrorAndReturnImplementer.Implement(function);
 
+            // Delete dna_return calls
+            var namedFunc = function.GlobalParent.GetNamedFunction("dna_return");
+            if (namedFunc.Handle != 0)
+            {
+                foreach (var call in RemillUtils.CallersOf(namedFunc))
+                    call.InstructionEraseFromParent();
+            }
+
             // Eliminate all remill_jump calls
             var jumpIntrinsic = function.GlobalParent.GetNamedFunction("__remill_jump");
             var callers = RemillUtils.CallersOf(jumpIntrinsic).Where(x => x.InstructionParent.Parent == function).ToList();

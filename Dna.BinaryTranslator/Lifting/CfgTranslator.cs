@@ -43,7 +43,7 @@ namespace Dna.BinaryTranslator.Lifting
         /// <summary>
         /// Using this call handling kind, CALL instructions will be lifted as `push + jmp`
         /// </summary>
-        Jmp = 2,
+        VMProtect = 2,
     }
 
     public class CfgTranslator
@@ -138,6 +138,9 @@ namespace Dna.BinaryTranslator.Lifting
             // Build a mapping of <llvm cfg block name, x86 block>..
             var irBlockNameToX86 = blockMapping.ToDictionary(x => x.Value.AsValue().Name, x => x.Key);
 
+            translatedFunction.GlobalParent.Verify(LLVMVerifierFailureAction.LLVMAbortProcessAction);
+         
+
             return (translatedFunction, blockMapping, filterFunctions);
         }
 
@@ -215,7 +218,7 @@ namespace Dna.BinaryTranslator.Lifting
             // So in the cases of fallthrough edges, we update the LLVM basic block's terminator instruction to unconditionally
             // jump to fallthrough targets if one exists.
             bool isVmexitCall = exitFlow.IsCall() && callHandlingKind == CallHandlingKind.Vmexit;
-            bool isFallthrough = !isVmexitCall && !(exitFlow.IsRet() || exitFlow.IsBranch() || (exitFlow.IsCall() && callHandlingKind == CallHandlingKind.Jmp)) && block.OutgoingEdges.Any();
+            bool isFallthrough = !isVmexitCall && !(exitFlow.IsRet() || exitFlow.IsBranch() || (exitFlow.IsCall() && callHandlingKind == CallHandlingKind.VMProtect)) && block.OutgoingEdges.Any();
             if (isFallthrough)
             {
                 Console.WriteLine(exitInst);
@@ -297,7 +300,20 @@ namespace Dna.BinaryTranslator.Lifting
             builder.BuildBr(immDestBlock);
         }
 
-        private void LiftRet(LLVMBasicBlockRef llvmBlock) => RemillUtils.AddTerminatingTailCall(llvmBlock, arch.IntrinsicTable.FunctionReturn, arch.IntrinsicTable);
+        private void LiftRet(LLVMBasicBlockRef llvmBlock)
+        {
+            /*
+            // For vmprotect do nothing at RETs, the RIP should be updated
+            if (callHandlingKind != CallHandlingKind.VMProtect)
+            {
+                RemillUtils.AddTerminatingTailCall(llvmBlock, arch.IntrinsicTable.FunctionReturn, arch.IntrinsicTable);
+                return;
+            }
+
+            builder.BuildRetVoid();
+            */
+            RemillUtils.AddTerminatingTailCall(llvmBlock, arch.IntrinsicTable.FunctionReturn, arch.IntrinsicTable);
+        }
 
         private void LiftBranch(BlockMapping blockMapping, BasicBlock<Instruction> block, Instruction branchInst)
         {
@@ -319,7 +335,7 @@ namespace Dna.BinaryTranslator.Lifting
                 // First we must handle the "optimistic" case, where we concretize the RIP
                 // and assume that the source binary has been loaded at it's ideal base address.
                 var i64Ty = ctx.GetInt64Ty();
-                if (callHandlingKind == CallHandlingKind.Normal)
+                if (callHandlingKind == CallHandlingKind.Normal || callHandlingKind == CallHandlingKind.VMProtect)
                 {
                     // Insert a branch to: ite(load(remill_next_pc) == immDest ? immDest : inst.NextIP)
                     var nextPc = builder.BuildLoad2(i64Ty, RemillUtils.LoadNextProgramCounterRef(blockMapping[block]));
@@ -376,6 +392,8 @@ namespace Dna.BinaryTranslator.Lifting
                     //Debugger.Break();
                     return;
                 }
+
+                throw new InvalidOperationException($"Unhandled call type {callHandlingKind}");
             }
 
             // If we know any bounds of the jump table, then lift it as a switch.
