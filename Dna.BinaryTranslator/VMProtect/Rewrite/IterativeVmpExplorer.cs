@@ -47,7 +47,7 @@ namespace Dna.BinaryTranslator.VMProtect.Rewrite
 
         private readonly ulong funcRip;
 
-        private readonly VmHandlerCache handlerCache;
+        //private readonly VmHandlerCache handlerCache;
 
         private readonly Dictionary<ulong, ulong> bytecodeAddrToRip = new();
 
@@ -59,11 +59,12 @@ namespace Dna.BinaryTranslator.VMProtect.Rewrite
             this.arch = arch;
             this.ctx = ctx;
             this.funcRip = funcRip;
-            this.handlerCache = new VmHandlerCache(ctx);
+            //this.handlerCache = new VmHandlerCache(ctx);
         }
 
         public LLVMValueRef Run()
         {
+            arch.GetOrLoadSemantics();
             var outModule = IterativeVmpTranslator.CreateOutputModule(ctx, arch);
 
             // Append the first handler to the handler set.
@@ -94,7 +95,7 @@ namespace Dna.BinaryTranslator.VMProtect.Rewrite
                 // Identify all VmExit handlers.
                 foreach (var (rip, isVmEnter) in handlersRipsToLift)
                 {
-                    handlerLifter.LiftHandler(rip, handlers.Count == 1);
+                    //handlerLifter.LiftHandler(rip, handlers.Count == 1);
                     var cfg = dna.RecursiveDescent.ReconstructCfg(rip);
                     var insts = cfg.GetInstructions();
                     var count = insts.Count(x => x.Mnemonic == Iced.Intel.Mnemonic.Pop);
@@ -104,16 +105,20 @@ namespace Dna.BinaryTranslator.VMProtect.Rewrite
 
 
                 // Lift all native handlers to LLVM IR and cache them
-                IterativeVmpTranslator.LiftHandlersIntoCache(arch, handlerCache, dna, handlersRipsToLift);
+                //IterativeVmpTranslator.LiftHandlersIntoCache(arch, handlerCache, dna, handlersRipsToLift);
                 handlersRipsToLift.Clear();
 
                 // Lift the partial CFG
-                var stateStruct = handlerCache.GetLiftedHandler(handlers.First().NativeRip).ParameterizedStateStructure;
-                liftedFunction = new IterativeCfgBuilder(outModule, arch, stateStruct, vCfg, handlerCache, vmexitHandlerRips).Run(liftedFunction, handlers.First());
+                //var stateStruct = handlerCache.GetLiftedHandler(handlers.First().NativeRip).ParameterizedStateStructure;
+
+                var stateStruct = new VmpParameterizedStateStructure(arch, ctx, false);
+                liftedFunction = new IterativeCfgBuilder(outModule, arch, stateStruct, vCfg, handlerLifter, vmexitHandlerRips).Run(liftedFunction, handlers.First());
                 FixMemPtr(liftedFunction.GlobalParent);
 
 
                 IterativeVmpTranslator.CanonicalizeMemoryPtr(liftedFunction);
+
+                liftedFunction.GlobalParent.PrintToFile("translatedFunction.ll");
 
                 // Run our optimization pipeline
                 PassPipeline.Run(dna.Binary, liftedFunction, false);
@@ -136,7 +141,7 @@ namespace Dna.BinaryTranslator.VMProtect.Rewrite
                 foreach (var entry in bytecodePtrToRips)
                 {
                     
-                    if (bytecodeAddrToRip.TryAdd(entry.Key, entry.Value) && !handlerCache.ContainsHandler(entry.Value))
+                    if (bytecodeAddrToRip.TryAdd(entry.Key, entry.Value) && !handlerLifter.ContainsHandler(entry.Value))
                         handlersRipsToLift.Add((entry.Value, false));
                     
 
@@ -236,13 +241,13 @@ namespace Dna.BinaryTranslator.VMProtect.Rewrite
 
         private readonly VmCfg vCfg;
 
-        private readonly VmHandlerCache handlerCache;
+        private readonly HandlerLifter handlerCache;
 
         private readonly IReadOnlySet<ulong> vmexitHandlerRips;
 
         private LLVMBuilderRef builder;
 
-        public IterativeCfgBuilder(LLVMModuleRef module, RemillArch arch, VmpParameterizedStateStructure stateStruct, VmCfg vCfg, VmHandlerCache handlerCache, IReadOnlySet<ulong> vmexitHandlerRips)
+        public IterativeCfgBuilder(LLVMModuleRef module, RemillArch arch, VmpParameterizedStateStructure stateStruct, VmCfg vCfg, HandlerLifter handlerCache, IReadOnlySet<ulong> vmexitHandlerRips)
         {
             this.module = module;
             this.arch = arch;
@@ -276,13 +281,35 @@ namespace Dna.BinaryTranslator.VMProtect.Rewrite
             var exitBlock = translatedFunction.AppendBasicBlock("exit");
             builder.Position(exitBlock, exitBlock.FirstInstruction);
             builder.BuildRetVoid();
-            var blockMapping = LiftInsts(incremental, translatedFunction, exitBlock, registerAllocaMapping);
+
+            var toDelete = new HashSet<LLVMValueRef>();
+
+            var blockMapping = LiftInsts(incremental, translatedFunction, exitBlock, entryHandler, registerAllocaMapping, toDelete);
 
             // If rebuilding cfg from scratch, insert jump from entry block to first VM instruction
             if (!incremental)
             {
                 builder.PositionAtEnd(translatedFunction.EntryBasicBlock);
                 builder.BuildBr(blockMapping[entryHandler]);
+                //module.Verify(LLVMVerifierFailureAction.LLVMAbortProcessAction);
+
+                /*
+                module.PrintToFile(("translatedFunction.ll"));
+                foreach (var f in toDelete)
+                {
+                    var any = translatedFunction.GetInstructions().First(x => x.InstructionOpcode == LLVMOpcode.LLVMCall && x.GetCallInstTarget() == f);
+
+                        
+
+                    var callers2 = RemillUtils.CallersOf(f);
+                    LLVMCloning.InlineFunction(f);
+                    module.PrintToFile(("translatedFunction.ll"));
+                    f.DeleteFunction();
+                }
+                */
+
+
+                module.PrintToFile(("translatedFunction.ll"));
                 return translatedFunction;
             }
 
@@ -332,7 +359,7 @@ namespace Dna.BinaryTranslator.VMProtect.Rewrite
 
                 // TODO: Split basic block before lifting edges..
                 // copy from args to local state structure.. make them no alias
-                module.PrintToFile(ArtifactPaths.Resolve("translatedFunction.ll"));
+                module.PrintToFile(("translatedFunction.ll"));
                 //Debugger.Break();
             }
 
@@ -345,7 +372,7 @@ namespace Dna.BinaryTranslator.VMProtect.Rewrite
             return translatedFunction;
         }
 
-        private Dictionary<VmHandler, LLVMBasicBlockRef> LiftInsts(bool incremental, LLVMValueRef function, LLVMBasicBlockRef exitBlock, IReadOnlyDictionary<RemillRegister, LLVMValueRef> registerAllocaMapping)
+        private Dictionary<VmHandler, LLVMBasicBlockRef> LiftInsts(bool incremental, LLVMValueRef function, LLVMBasicBlockRef exitBlock, VmHandler entryHandler, IReadOnlyDictionary<RemillRegister, LLVMValueRef> registerAllocaMapping, HashSet<LLVMValueRef> toDelete)
         {
             // Create blocks for each lifted instructions
             var blockMapping = new Dictionary<VmHandler, LLVMBasicBlockRef>();
@@ -361,12 +388,19 @@ namespace Dna.BinaryTranslator.VMProtect.Rewrite
             foreach (var (handler, block) in blockMapping)
             {
                 builder.PositionAtEnd(block);
-                var liftedHandler = handlerCache.CloneLiftedHandlerIntoModule(handler.NativeRip, module);
+                var liftedHandler = handlerCache.Lift(module, handler.NativeRip, handler == entryHandler);
                 var call = VmPartialBlockLifter.CallVmHandler(builder, function, liftedHandler, registerAllocaMapping, stateStruct);
-                module.PrintToFile(ArtifactPaths.Resolve("translatedFunction.ll"));
+             
                 LiftInstEdges(handler, function, exitBlock, blockMapping, registerAllocaMapping);
+                module.PrintToFile("translatedFunction.ll");
+
+                IterativeVmpExplorer.FixMemPtr(module);
+             
+
                 LLVMCloning.InlineFunction(liftedHandler);
+                module.PrintToFile("translatedFunction.ll");
                 liftedHandler.DeleteFunction();
+                //toDelete.Add(liftedHandler);
             }
 
             return blockMapping;
@@ -449,10 +483,47 @@ namespace Dna.BinaryTranslator.VMProtect.Rewrite
             cacheModule = ctx.CreateModuleWithName("HandlerCache");
         }
 
-        public LLVMValueRef LiftHandler(ulong handlerRip, bool isVmEnter)
+        public bool ContainsHandler(ulong rip)
+            => handlerRipToLlvmFunction.ContainsKey(rip);
+
+        public LLVMValueRef Lift(LLVMModuleRef module, ulong handlerRip, bool isVmEnter)
+        {
+            var handler = LiftHandler(handlerRip, isVmEnter);
+            var wrapperName = handler.Name + "_from_cache";
+
+            var existingInDest = module.GetNamedFunction(wrapperName);
+            if (existingInDest.Handle != 0)
+                return existingInDest;
+
+            // Add a new function with the exact same prototype as the handler function.
+            var newHandler = cacheModule.AddFunction(wrapperName, handler.GetFunctionPrototype());
+
+            // Build a call to the original handler function, followed by a RET.
+            var builder = LLVMBuilderRef.Create(ctx);
+            var entryBb = newHandler.AppendBasicBlock("entry");
+            builder.PositionAtEnd(entryBb);
+            var call = builder.BuildCall2(handler.GetFunctionPrototype(), handler, newHandler.GetParams());
+
+
+            builder.BuildRetVoid();
+
+            // Inlines ALL calls to the handler function.
+            // TODO: Inline only the call we just created. We just need to add a pinvoke import for this.
+            LLVMCloning.InlineFunction(handler);
+
+            //cacheModule.Verify(LLVMVerifierFailureAction.LLVMAbortProcessAction);
+
+            // Move the newly created function into the target module.
+            newHandler = FunctionIsolator.IsolateFunctionInto(module, newHandler);
+            return newHandler;
+        }
+
+        private LLVMValueRef LiftHandler(ulong handlerRip, bool isVmEnter)
         {
             if (handlerRipToLlvmFunction.TryGetValue(handlerRip, out var existing))
                 return existing;
+
+            Console.WriteLine($"New handler: 0x{handlerRip.ToString("X")}");
 
             var cfg = dna.RecursiveDescent.ReconstructCfg(handlerRip);
 
@@ -467,22 +538,29 @@ namespace Dna.BinaryTranslator.VMProtect.Rewrite
             // Lift the function using remill.
             var encodedCfg = X86CfgEncoder.EncodeCfg(dna.Binary, cfg);
             var (liftedFunction, blockMapping, filterFunctions) = CfgTranslator.Translate(dna.Binary.BaseAddress, arch, new BinaryFunction(encodedCfg, scopeTableTree, new List<JmpTable>()), fallthroughFromIps);
-            liftedFunction = FunctionIsolator.IsolateFunctionIntoNewModuleWithSehSupport(arch, liftedFunction, filterFunctions.Select(x => x.LiftedFilterFunction).ToList().AsReadOnly()).function;
+            liftedFunction = FunctionIsolator.IsolateFunctionIntoNewModule(arch, liftedFunction);
 
             liftedFunction.GlobalParent.Verify(LLVMVerifierFailureAction.LLVMAbortProcessAction);
      
-            var stripped = IterativeFunctionTranslator.StripRuntimeVmp(dna, ctx, arch, liftedFunction);
-            liftedFunction.Handle = 0;
+            var (stripped, stateStruct) = IterativeFunctionTranslator.StripRuntimeVmp(dna, ctx, arch, liftedFunction);
+            // liftedFunction.Handle = 0;
+
+            if (handlerRip == 0x1400060EF)
+            {
+                Console.WriteLine(GraphFormatter.FormatGraph(cfg));
+            }
 
             // Eliminate any stack expansion in the IR
             EliminateStackExpansionLoop(stripped, handlerRip);
+
+            EliminateStackAlignment(stripped, stateStruct);
 
             // Run the pass pipeline one last time
             PassPipeline.Run(dna.Binary, stripped);
 
             // Move the newly created function into the target module.
             var newHandler = FunctionIsolator.IsolateFunctionInto(cacheModule, stripped);
-            handlerRipToLlvmFunction[handlerRip] = stripped;
+            handlerRipToLlvmFunction[handlerRip] = newHandler;
             return newHandler;
 
             //File.WriteAllText("binja.py", new LLVMToBinjaGraph(stripped).Process());
@@ -506,19 +584,76 @@ namespace Dna.BinaryTranslator.VMProtect.Rewrite
             }
         }
 
+        private bool IsAndRspImm(Instruction x)
+            => x.Mnemonic == Mnemonic.And && x.Op0Kind == OpKind.Register && x.Op0Register == Register.RSP && x.Op1Kind.IsImmediate() && x.GetImmediate(1) == (ulong)0xFFFFFFFFFFFFFFF0;
+
+
+
         private bool IsSubRspImm(Instruction x)
             => x.Mnemonic == Mnemonic.Sub && x.Op0Kind == OpKind.Register && x.Op0Register == Register.RSP && x.Op1Kind.IsImmediate();
+
+        private void EliminateStackAlignment(LLVMValueRef function, ParameterizedStateStructure stateStruct)
+        {
+            foreach(var inst in function.GetInstructions())
+            {
+                if (inst.InstructionOpcode != LLVMOpcode.LLVMAnd)
+                    continue;
+
+                if (inst.GetOperand(1).Kind != LLVMValueKind.LLVMConstantIntValueKind)
+                    continue;
+
+                var imm = inst.GetOperand(1).ConstIntZExt;
+                if (imm is not (unchecked((ulong)-16) or unchecked((ulong)-256) or 0xF or 0xFF))
+                    continue;
+
+                var rsp = stateStruct.GetRegInputParam(arch.GetRegisterByName(arch.StackPointerRegisterName), function);
+                var lhs = inst.GetOperand(0);
+
+                var matches = lhs == rsp || (lhs.InstructionOpcode == LLVMOpcode.LLVMAdd && lhs.GetOperand(0) == rsp);
+                if (!matches)
+                    continue;
+                inst.ReplaceAllUsesWith(lhs);
+
+                //function.GlobalParent.PrintToFile("translatedFunction.ll");
+
+                //Debugger.Break();
+            }
+        }
 
         // VMProtect handlers will relocate the stack to a new location if they run out of space.
         // To make optimization a bit easier we modify the VMEnter to allocate a huge amount of stack space and delete all of the stack expansion loops.
         private void EliminateStackExpansionLoop(LLVMValueRef function, ulong handlerRip)
         {
-            // Get a bitmask indicating which branches lead to a cycle
-            var getCycles = () =>
+        
+            var hasCycles = () =>
             {
                 var entryBlock = function.EntryBasicBlock;
                 if (entryBlock.LastInstruction.InstructionOpcode != LLVMOpcode.LLVMBr || entryBlock.LastInstruction.OperandCount <= 1)
+                    return false;
+                var b0 = entryBlock.LastInstruction.GetOperand(1).AsBasicBlock();
+                var b0Cyclic = ReachesCycle(b0, new(), new());
+                var b1 = entryBlock.LastInstruction.GetOperand(2).AsBasicBlock();
+                var b1Cyclic = ReachesCycle(b1, new(), new());
+                return b0Cyclic || b1Cyclic;
+            };
+
+            /*
+            // Get a bitmask indicating which branches lead to a cycle
+            var getCycles = () =>
+            {
+                var exitInsts = function.GetBlocks()
+                .Select(x => x.Terminator)
+                .Where(x => x.InstructionOpcode == LLVMOpcode.LLVMBr && x.OperandCount == 3 && IsStackExpansionPredicate(x))
+                .ToList();
+
+                if (exitInsts.Count != 1)
+                {
+                    if (hasCycles())
+                        Debugger.Break();
                     return 0u;
+                }
+
+                var entryBlock = exitInsts.Single().InstructionParent;
 
                 var b0 = entryBlock.LastInstruction.GetOperand(1).AsBasicBlock();
                 var b0Cyclic = ReachesCycle(b0, new(), new());
@@ -543,12 +678,64 @@ namespace Dna.BinaryTranslator.VMProtect.Rewrite
 
             // This should never happen. There should be only one path leading to the virtual stack expansion loop
             if (cycles == 3)
+            {
+                function.GlobalParent.PrintToFile("translatedFunction.ll");
                 throw new InvalidOperationException($"Cyclic handler at 0x{handlerRip.ToString("X")}");
+            }
 
             // Update the branch instruction accordingly.
             var terminator = function.EntryBasicBlock.LastInstruction;
             var cond = LLVMValueRef.CreateConstInt(LLVMTypeRef.Int1, cycles == 1 ? 1u : 0);
             terminator.SetOperand(0, cond);
+
+            if (handlerRip == 0x140003EC2)
+            {
+                PassPipeline.Run(dna.Binary, function);
+                function.GlobalParent.PrintToFile("translatedFunction.ll");
+                Debugger.Break();
+            }
+            */
+
+            var exitInsts = function.GetBlocks()
+                .Select(x => x.Terminator)
+                .Where(x => x.InstructionOpcode == LLVMOpcode.LLVMBr && x.OperandCount == 3 && IsStackExpansionPredicate(x))
+                .ToList();
+
+            if (exitInsts.Count == 0)
+                return;
+
+            exitInsts.Single().SetOperand(0, LLVMValueRef.CreateConstInt(LLVMTypeRef.Int1, 1));
+
+
+        }
+
+        //   %6 = add i64 %RDI, 224
+        // %.not = icmp ugt i64 % 3, %6
+        private static bool IsStackExpansionPredicate(LLVMValueRef x)
+        {
+            var cond = x.GetOperand(0);
+            if (cond.Kind != LLVMValueKind.LLVMInstructionValueKind)
+                return false;
+            if (cond.ICmpPredicate != LLVMIntPredicate.LLVMIntUGT)
+                return false;
+            if (!IsAddImm(cond.GetOperand(0), 224) && !IsAddImm(cond.GetOperand(1), 224))
+                return false;
+            
+            return true;
+        }
+
+        private static bool IsAddImm(LLVMValueRef x, ulong imm)
+        {
+            if (x.Kind != LLVMValueKind.LLVMInstructionValueKind)
+                return false;
+            if (x.InstructionOpcode != LLVMOpcode.LLVMAdd)
+                return false;
+            if (x.GetOperand(1).Kind != LLVMValueKind.LLVMConstantIntValueKind)
+                return false;
+            if (x.GetOperand(1).ConstIntZExt != imm)
+                return false;
+
+            return true;
         }
 
         private bool ReachesCycle(LLVMBasicBlockRef curr, HashSet<LLVMBasicBlockRef> visited, HashSet<LLVMBasicBlockRef> stack)

@@ -116,8 +116,8 @@ namespace Dna.BinaryTranslator.VMProtect
                 memPtr.Initializer = memoryPtrNull;
             }
 
-            jmpCall.InstructionParent.Parent.GlobalParent.PrintToFile(ArtifactPaths.Resolve("translatedFunction.ll"));
-            jmpCall.InstructionParent.Parent.GlobalParent.WriteBitcodeToFile(ArtifactPaths.Resolve("translatedFunction.bc"));
+            jmpCall.InstructionParent.Parent.GlobalParent.PrintToFile("translatedFunction.ll");
+            jmpCall.InstructionParent.Parent.GlobalParent.WriteBitcodeToFile("translatedFunction.bc");
             throw new InvalidOperationException($"Failed to solve indirect jump! {jmpCall}");
         }
 

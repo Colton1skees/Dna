@@ -57,16 +57,16 @@ namespace Dna.BinaryTranslator.VMProtect
 
         public static VmpParameterizedStateStructure CreateFromFunction(RemillArch arch, LLVMValueRef function, bool addMemoryPtr = true)
         {
-            var output = new VmpParameterizedStateStructure(arch, function, addMemoryPtr);
+            var output = new VmpParameterizedStateStructure(arch, function.GetFunctionCtx(), addMemoryPtr);
             output.Create(function);
             return output;
         }
 
-        public VmpParameterizedStateStructure(RemillArch arch, LLVMValueRef function, bool addMemoryPtr)
+        public VmpParameterizedStateStructure(RemillArch arch, LLVMContextRef ctx, bool addMemoryPtr)
         {
             this.arch = arch;
             this.addMemoryPtr = addMemoryPtr;
-            builder = LLVMBuilderRef.Create(function.GetFunctionCtx());
+            builder = LLVMBuilderRef.Create(ctx);
             rootRegisters = ArchRegisters.GetRootGprs(arch);
             RegisterArgumentIndices = ApplyParameterOrderingToRegisters(rootRegisters);
 
@@ -82,7 +82,7 @@ namespace Dna.BinaryTranslator.VMProtect
             // Create a prototype for the new function we are creating.
             // This takes all registers as integers, aswell as an optional
             // single ptr(last argument) for the remill memory pointer.
-            ParameterizedFunctionPrototype = CreateParameterizedPrototype(function.GetFunctionCtx(), arch.StateStructType, RegisterArgumentIndices, addMemoryPtr);
+            ParameterizedFunctionPrototype = CreateParameterizedPrototype(ctx, arch.StateStructType, RegisterArgumentIndices, addMemoryPtr);
         }
 
         public static LLVMTypeRef CreateParameterizedPrototype(LLVMContextRef ctx, LLVMTypeRef stateStructType, IReadOnlyDictionary<RemillRegister, int> registerArgumentIndices, bool addMemoryPtr)

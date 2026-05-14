@@ -6,7 +6,7 @@
 #include <llvm/Transforms/Utils/Cloning.h>
 #include <remill/BC/Util.h>
 #include <API/ExportDef.h>
-
+#include <iostream>
 namespace Dna::API {
 	DNA_EXPORT llvm::Type* GetFunctionType(llvm::Function* func)
 	{
@@ -29,6 +29,10 @@ namespace Dna::API {
 		{
 			llvm::InlineFunctionInfo ifi;
 			auto result = llvm::InlineFunction(*caller, ifi);
+			if (!result.isSuccess())
+			{
+				std::cout << "inlining failed for " << result.getFailureReason() << std::endl;
+			}
 		}
 
 		return nullptr;

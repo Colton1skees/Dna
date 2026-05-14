@@ -77,10 +77,10 @@ if (genDsl)
 bool dbgCode = false;
 if (dbgCode)
 {
-    var irPath = "C:\\Users\\colton\\Downloads\\handler.ll";
+    var irPath = "C:\\Users\\colton\\Downloads\\fail3.ll";
     Console.WriteLine(irPath);
     var tempNewMod = RemillUtils.LoadModuleFromFile(LLVMContextRef.Global, irPath).Value;
-    var existingFunc = tempNewMod.GetFunctions().Single(x => x.Name.Contains("Translated"));
+    var existingFunc = tempNewMod.GetFunctions().Single(x => x.Name.Contains("Part"));
 
 
     while (true)
@@ -122,6 +122,8 @@ if (dbgCode)
 
 
         //IDALoader.Load(ClangCompiler.Compile("instcombine.ll"));
+
+        File.WriteAllText("binja.py", new LLVMToBinjaGraph(existingFunc).Process());
 
         sw.Stop();
             Console.WriteLine($"Pass took {sw.ElapsedMilliseconds}ms ");
@@ -314,7 +316,7 @@ if(prototypeBounds)
 {
 
     // Compile to a .exe using clang.
-    Console.WriteLine("Compiling to an exe.........................");
+    Console.WriteLine("Compiling to an exe........................ .");
     var compiledPath3 = ClangCompiler.Compile("Vectorized.ll");
 
     Console.WriteLine("Loading into IDA.");

@@ -328,7 +328,7 @@ namespace Dna.BinaryTranslator.Unsafe
             return function;
         }
 
-        public static LLVMValueRef StripRuntimeVmp(IDna dna, LLVMContextRef ctx, RemillArch arch, LLVMValueRef function)
+        public static (LLVMValueRef, ParameterizedStateStructure) StripRuntimeVmp(IDna dna, LLVMContextRef ctx, RemillArch arch, LLVMValueRef function)
         {
             // Apply concrete implementations to all simple.
             // E.g. __remill_memory_read() and __remill_memory_write().
@@ -380,7 +380,7 @@ namespace Dna.BinaryTranslator.Unsafe
                 OptimizationApi.OptimizeModule(function.GlobalParent, function, false, false, 0, false, 0, false);
             }
 
-            return function;
+            return (function, parameterizedStateStruct);
         }
 
         private static List<JmpTable> MergeJumpTables(ulong cfgAddress, IDna dna, IReadOnlyList<JmpTable> oldTableInformation, IReadOnlyList<JmpTable> newTableInformation)

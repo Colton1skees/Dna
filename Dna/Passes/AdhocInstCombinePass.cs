@@ -116,11 +116,10 @@ namespace Dna.Passes
 
         }
 
-        private static readonly LLVMOpcode[] Opcodes = { LLVMOpcode.LLVMAdd, LLVMOpcode.LLVMSub, LLVMOpcode.LLVMAnd, LLVMOpcode.LLVMOr, LLVMOpcode.LLVMXor, LLVMOpcode.LLVMLShr, LLVMOpcode.LLVMAShr };
+        private static readonly LLVMOpcode[] Opcodes = { LLVMOpcode.LLVMAdd, LLVMOpcode.LLVMSub, LLVMOpcode.LLVMMul, LLVMOpcode.LLVMAnd, LLVMOpcode.LLVMOr, LLVMOpcode.LLVMXor, LLVMOpcode.LLVMLShr, LLVMOpcode.LLVMAShr };
 
         private bool TryDistributeSelect(LLVMValueRef inst)
         {
-            
             var opcode = inst.InstructionOpcode;
             if (Array.IndexOf(Opcodes, opcode) == -1)
                 return false;
