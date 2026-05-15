@@ -60,18 +60,18 @@ namespace Dna.BinaryTranslator.Unsafe
 
         public static ParameterizedStateStructure CreateFromFunction(RemillArch arch, LLVMValueRef function, bool addMemoryPtr = true, bool hasOutputRegisters = false, bool justRAX = false)
         {
-            var output = new ParameterizedStateStructure(arch, function, addMemoryPtr, hasOutputRegisters, justRAX);
+            var output = new ParameterizedStateStructure(arch, function.GetFunctionCtx(), addMemoryPtr, hasOutputRegisters, justRAX);
             output.Create(function);
             return output;
         }
 
-        public ParameterizedStateStructure(RemillArch arch, LLVMValueRef function, bool addMemoryPtr, bool hasOutputRegisters, bool justRAX)
+        public ParameterizedStateStructure(RemillArch arch, LLVMContextRef ctx, bool addMemoryPtr, bool hasOutputRegisters, bool justRAX)
         {
             this.arch = arch;
             this.addMemoryPtr = addMemoryPtr;
             this.hasOutputRegisters = hasOutputRegisters;
             this.justRAX = justRAX;
-            builder = LLVMBuilderRef.Create(function.GetFunctionCtx());
+            builder = LLVMBuilderRef.Create(ctx);
             rootRegisters = ArchRegisters.GetRootGprs(arch);
             RegisterArgumentIndices = ApplyParameterOrderingToRegisters(rootRegisters);
 
@@ -87,7 +87,7 @@ namespace Dna.BinaryTranslator.Unsafe
             // Create a prototype for the new function we are creating.
             // This takes all registers as integers, aswell as an optional
             // single ptr(last argument) for the remill memory pointer.
-            ParameterizedFunctionPrototype = CreateParameterizedPrototype(function.GetFunctionCtx(), RegisterArgumentIndices, addMemoryPtr, hasOutputRegisters);
+            ParameterizedFunctionPrototype = CreateParameterizedPrototype(ctx, RegisterArgumentIndices, addMemoryPtr, hasOutputRegisters);
         }
 
         private static IReadOnlyDictionary<RemillRegister, int> ApplyParameterOrderingToRegisters(IReadOnlySet<RemillRegister> unorderedRegisters)

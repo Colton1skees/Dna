@@ -181,6 +181,18 @@ namespace Dna.BinaryTranslator.Lifting
             {
                 // Decode and lift the instruction into it's llvm basic block.
                 var remillInst = DecodeInstruction(inst);
+
+
+                builder.PositionAtEnd(llvmBlock);
+                if (callHandlingKind == CallHandlingKind.VMProtect)
+                {
+                    var immConstInt2 = LLVMValueRef.CreateConstInt(LLVMTypeRef.Int64, inst.IP);
+                    var pcRef2 = RemillUtils.LoadNextProgramCounterRef(llvmBlock);
+                    //builder.BuildStore(immConstInt2, RemillUtils.LoadProgramCounterRef(llvmBlock));
+                    builder.BuildStore(immConstInt2, pcRef2);
+                }
+                
+
                 remillInst.Lifter.LiftIntoBlock(remillInst, llvmBlock);
 
                 // Post process the instruction.
@@ -197,6 +209,7 @@ namespace Dna.BinaryTranslator.Lifting
                         LiftJmpCall(blockMapping, llvmBlock, inst);
                 }
 
+                // TODO: We might not be updating RIP correctly?
                 else if (flow.IsRet())
                 {
                     LiftRet(llvmBlock);
@@ -293,6 +306,14 @@ namespace Dna.BinaryTranslator.Lifting
 
         private void LiftJmpCall(BlockMapping blockMapping, LLVMBasicBlockRef llvmBlock, Instruction branchInst)
         {
+            // On function call, remill stores the return address value to %RETURN_PC.
+            // However, it does *not* update %NEXT_PC to point to the post-call value.
+            // So to fix this, first we start off by loading the const return address from %RETURN_PC.
+            var returnPc = builder.BuildLoad2(ctx.GetInt64Ty(), RemillUtils.LoadReturnProgramCounterRef(llvmBlock));
+
+            // Then we store the return address to NEXT_PC. This allows the lifted code to have correct behavior.
+            builder.BuildStore(returnPc, RemillUtils.LoadNextProgramCounterRef(llvmBlock));
+
             // If this is an unconditional branch, insert a `br` to the dest block.
             Debug.Assert(branchInst.HasImmediateBranchTarget());
             var immDest = branchInst.GetImmediateBranchTarget();
@@ -302,6 +323,13 @@ namespace Dna.BinaryTranslator.Lifting
 
         private void LiftRet(LLVMBasicBlockRef llvmBlock)
         {
+            // this breaks everything, do not uncomment
+            /*
+            var returnPc = builder.BuildLoad2(ctx.GetInt64Ty(), RemillUtils.LoadReturnProgramCounterRef(llvmBlock));
+            // Then we store the return address to NEXT_PC. This allows the lifted code to have correct behavior.
+            builder.BuildStore(returnPc, RemillUtils.LoadNextProgramCounterRef(llvmBlock));
+            */
+
             /*
             // For vmprotect do nothing at RETs, the RIP should be updated
             if (callHandlingKind != CallHandlingKind.VMProtect)

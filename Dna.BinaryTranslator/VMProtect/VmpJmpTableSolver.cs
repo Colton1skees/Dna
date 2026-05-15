@@ -6,6 +6,7 @@ using Dna.Utilities;
 using LLVMSharp.Interop;
 using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
@@ -86,6 +87,14 @@ namespace Dna.BinaryTranslator.VMProtect
                     jmpCall.InstructionParent.Parent.GlobalParent.PrintToFile(ArtifactPaths.Resolve("translatedFunction.ll"));
                     throw new InvalidOperationException($"Failed to solve indirect jump! {jmpCall}");
                 }
+
+                foreach(var entry in bytecodePtrToRip)
+                {
+                    jmpCall.InstructionParent.Parent.GlobalParent.PrintToFile(ArtifactPaths.Resolve("translatedFunction.ll"));
+                    if (entry.Key == entry.Value)
+                        Debugger.Break();
+                }
+
             }
 
             return new(output, bytecodePtrToRip);
