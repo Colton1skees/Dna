@@ -156,6 +156,18 @@ namespace Dna.Extensions
             }
         }
 
+        public static bool Is(this LLVMValueRef inst, LLVMOpcode opcode)
+            => inst.Kind == LLVMValueKind.LLVMInstructionValueKind && inst.InstructionOpcode == opcode;
+
+        public static bool Is(this LLVMValueRef inst, params LLVMOpcode[] opcodes)
+        => opcodes.Any(x => inst.Is(x));
+
+        public static bool Is(this LLVMValueRef inst, LLVMValueKind kind)
+          => inst.Kind == kind;
+
+        public static bool IsConstant(this LLVMValueRef inst)
+            => inst.Is(LLVMValueKind.LLVMConstantIntValueKind);
+
         public static LLVMValueRef GetCallInstTarget(this LLVMValueRef callInst) => callInst.GetOperand((uint)callInst.OperandCount - 1);
 
         public static LLVMTypeRef GetFunctionPrototype(this LLVMValueRef func) => LLVMCloning.GetFunctionPrototype(func);

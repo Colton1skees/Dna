@@ -23,6 +23,7 @@ using System.Collections.Generic;
 using System.Diagnostics;
 using System.Linq;
 using System.Text;
+using System.Text.RegularExpressions;
 using System.Threading.Tasks;
 using WebAssembly.Instructions;
 using static Dna.BinaryTranslator.VMProtect.VmpJmpTableSolver;
@@ -126,6 +127,21 @@ namespace Dna.BinaryTranslator.VMProtect.Rewrite
             Dictionary<VmHandler, RemillRegister> handlerVips = new();
             handlerVips[handlers.First()] = bytecodeRegister;
 
+            handlerLifter.cacheModule.PrintToFile("translatedFunction.ll");
+            foreach(var rip in handlerLifter.handlerRipToLlvmFunction)
+            {
+                var key = rip.Key;
+                if (rip.Key == handlers.First().BytecodeRip)
+                    continue;
+            
+
+                var bar = GetVipByUsage(rip.Key, rip.Value, stateStruct);
+                if (bar == null)
+                    Debugger.Break();
+                else
+                    Console.WriteLine("Success");
+            }
+
             //handlerLifter.LiftHandler(0x140048BBD, false);
             while (true)
             {
@@ -195,7 +211,18 @@ namespace Dna.BinaryTranslator.VMProtect.Rewrite
 
                 var dests = solver.SolveRIPs(stateStruct);
 
+                var sum = String.Join(", ", stateStruct.RegisterArgumentIndices.OrderBy(x => x.Value).Select(x => $"{x.Key.Name} {x.Value}"));
+                Console.WriteLine($"[{sum}]");
+
+                foreach(var (bytecodePtr, outgoingHandlers) in dests)
+                {
+                    GetBytecodeRegister(stateStruct, handlers.First(), handlerLifter, bytecodePtr, outgoingHandlers);
+                }
+
+
                 var (newTables, bytecodePtrToRips) = solver.Solve();
+
+             
 
                 if (!newTables.Any())
                 {
@@ -305,6 +332,169 @@ namespace Dna.BinaryTranslator.VMProtect.Rewrite
             // TODO tomorrow: Hook up incremental algorithm
             Debugger.Break();
             return default;
+        }
+
+        private void GetBytecodeRegister(VmpParameterizedStateStructure stateStruct, VmHandler entryHandler, HandlerLifter handlerLifter, ulong bytecodeAddr, HashSet<ulong> outgoingHandlers)
+        {
+            var debugModule = ctx.CreateModuleWithName("debugHandlers");
+            var jmpFrom = handlerLifter.Lift(debugModule, bytecodeAddrToRip[bytecodeAddr], entryHandler.BytecodeRip == bytecodeAddr);
+            var targets = outgoingHandlers.Select(x => (x, handlerLifter.Lift(debugModule, x, x == entryHandler.BytecodeRip))).ToList();
+
+            foreach(var (rip, t) in targets)
+            {
+                var vip = GetVipByUsage(rip, t, stateStruct);
+                Console.WriteLine();
+            }
+
+            debugModule.PrintToFile("translatedFunction.ll");
+
+            Debugger.Break();
+        }
+
+        private RemillRegister GetVipByUsage(ulong rip, LLVMValueRef function, VmpParameterizedStateStructure stateStruct)
+        {
+            if (rip == 0x140096818)
+                Debugger.Break();
+            //if (rip == 0x140096818)
+            //   Debugger.Break();
+            var loads = function.GetInstructions().Where(x => x.Is(LLVMOpcode.LLVMLoad) && IsGepRegister(x.GetOperand(0))).ToList();
+
+            HashSet<LLVMValueRef> cands = new();
+            foreach(var x in loads)
+            {
+                var users = CollectUsers(x, 15);
+                var count = users.Sum(x => IsPossibleVipDecryptionInst(x));
+                if (count < 5)
+                    continue;
+
+                // add i64 %RSI, 1
+                // =>
+                // %RSI
+                var regArg = x.GetOperand(0).GetOperand(1);
+                if (regArg.Is(LLVMOpcode.LLVMAdd, LLVMOpcode.LLVMSub))
+                    regArg = regArg.GetOperands().Single(x => x.Is(LLVMValueKind.LLVMArgumentValueKind));
+
+                if (IsStoredToBase(function, regArg))
+                    continue;
+
+                
+
+                cands.Add(regArg);
+            }
+
+            // There should only be one candidate.
+            // If there are multiple, narrow down by it's access patterns.
+            if (cands.Count > 1)
+                return null;
+
+            var match = cands.SingleOrDefault();
+            if (match.Handle == 0)
+                return null;
+
+            var reg = GetReg(function, match, stateStruct);
+            return reg;
+        }
+
+        private HashSet<LLVMValueRef> CollectUsers(LLVMValueRef inst, int limit)
+        {
+            var set = new HashSet<LLVMValueRef>();
+            CollectUsers(inst, set, limit);
+            return set;
+        }
+
+        private void CollectUsers(LLVMValueRef inst, HashSet<LLVMValueRef> seen, int limit)
+        {
+            if (seen.Count >= limit)
+                return;
+
+            if (!seen.Add(inst))
+                return;
+
+            foreach (var user in inst.GetUsers())
+                CollectUsers(user, seen, limit);
+        }
+
+        private int IsPossibleVipDecryptionInst(LLVMValueRef inst)
+        {
+            if (inst.Is(LLVMOpcode.LLVMAnd, LLVMOpcode.LLVMOr, LLVMOpcode.LLVMXor))
+                return 1;
+
+            if (inst.Is(LLVMOpcode.LLVMAdd, LLVMOpcode.LLVMSub))
+                return 1;
+
+            if (inst.Is(LLVMOpcode.LLVMZExt, LLVMOpcode.LLVMSExt))
+                return 1;
+
+            if (inst.Is(LLVMOpcode.LLVMCall) && (inst.GetCallInstTarget().Name.StartsWith("llvm.fshl") || inst.GetCallInstTarget().Name.StartsWith("llvm.bswap")))
+                return 2;
+
+            return 0;
+        }
+
+        private bool IsGepRegister(LLVMValueRef gep)
+        {
+            if (!gep.Is(LLVMOpcode.LLVMGetElementPtr))
+                return false;
+            if (gep.OperandCount != 2)
+                return false;
+
+            var operand = gep.GetOperand(1);
+            if (IsAddRegister(operand))
+                return true;
+            if (gep.GetOperand(1).Kind == LLVMValueKind.LLVMArgumentValueKind)
+                return true;
+
+            return false;
+        }
+
+        private bool IsAddRegister(LLVMValueRef add)
+        {
+            if (!add.Is(LLVMOpcode.LLVMAdd, LLVMOpcode.LLVMSub))
+                return false;
+            if (!add.GetOperand(1).IsConstant())
+                return false;
+            if (add.GetOperand(0).Kind != LLVMValueKind.LLVMArgumentValueKind)
+                return false;
+            return true;
+        }
+
+        private RemillRegister GetReg(LLVMValueRef function, LLVMValueRef param, VmpParameterizedStateStructure stateStruct)
+        {
+            var index = Array.IndexOf(function.GetParams(), param);
+            return stateStruct.OrderedRegisterArguments[index];
+        }
+
+        // Returns true if `basePtr` is used as a store destination
+        private static bool IsStoredToBase(LLVMValueRef function, LLVMValueRef basePtr)
+        {
+            var stores = function.GetInstructions().Where(x => x.Is(LLVMOpcode.LLVMStore));
+            foreach(var store in stores)
+            {
+                var gep = store.GetOperand(1);
+                if (!gep.Is(LLVMOpcode.LLVMGetElementPtr))
+                    continue;
+
+                var seen = new HashSet<LLVMValueRef>();
+                foreach (var operand in gep.GetOperands())
+                    DecomposeSum(operand, seen);
+
+                if (seen.Contains(basePtr))
+                    return true;
+            }
+
+            return false;
+        }
+
+        private static void DecomposeSum(LLVMValueRef value, HashSet<LLVMValueRef> seen)
+        {
+            if (!seen.Add(value))
+                return;
+
+            if (value.Is(LLVMOpcode.LLVMAdd, LLVMOpcode.LLVMSub))
+            {
+                foreach (var operand in value.GetOperands())
+                    DecomposeSum(operand, seen);
+            }
         }
 
         // Identify the VIP by a load of some constant address, followed by a store of that address to some register
