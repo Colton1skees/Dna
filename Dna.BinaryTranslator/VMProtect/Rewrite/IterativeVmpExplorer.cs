@@ -130,11 +130,25 @@ namespace Dna.BinaryTranslator.VMProtect.Rewrite
             while (true)
             {
 
+
                 Console.WriteLine($"Lifting iteration {ii++}");
 
+                if (false && ii == 551)
+                {
+                    Console.WriteLine($"VIPs: ");
+                    foreach(var inst in vCfg.Instructions)
+                    {
+                        var incomingVip = inst.Key.BytecodeRip == funcRip ? bytecodeRegister : inst.Value.Predecessors.Select(x => handlerVips[x]).DistinctBy(x => x.Name).Single();
+                        var outgoingVip = handlerVips[inst.Key];
 
-                var join = String.Join(", ", handlerLifter.handlerRipToLlvmFunction.Keys.Select(x => "0x" + x.ToString("X")));
-                Console.WriteLine(join);
+                        Console.WriteLine($"{inst.Key.BytecodeRip.ToString("X")} {incomingVip} {outgoingVip}");
+                    }
+
+                    Debugger.Break();
+                }
+
+                //var join = String.Join(", ", handlerLifter.handlerRipToLlvmFunction.Keys.Select(x => "0x" + x.ToString("X")));
+                //Console.WriteLine(join);
        
 
                 //// Identify all VmExit handlers.
@@ -250,7 +264,9 @@ namespace Dna.BinaryTranslator.VMProtect.Rewrite
                 // Replace the CFG
                 vCfg = newCfg;
 
-               
+                var tcfg = GetCfg(vCfg, handlers.First());
+
+                //Console.WriteLine("\n\n" + GraphFormatter.FormatGraph(tcfg));
 
                 liftedFunction.GlobalParent.PrintToFile("translatedFunction.ll");
 
@@ -347,6 +363,57 @@ namespace Dna.BinaryTranslator.VMProtect.Rewrite
                 memPtr.Initializer = memoryPtrNull;
             }
         }
+
+        public static ControlFlowGraph<VmHandler> GetCfg(VmCfg vCfg, VmHandler entry)
+        {
+            var cfg = new ControlFlowGraph<VmHandler>(entry.BytecodeRip);
+
+            Dictionary<VmHandler, BasicBlock<VmHandler>> labels = new();
+            foreach (var (handler, info) in vCfg.Instructions)
+            {
+                var isEntrypoint = handler == entry;
+                var hasMultiplePredecessors = info.Predecessors.Count > 1;
+                var isCyclic = info.Predecessors.Contains(handler);
+                var isCondTarget = info.Predecessors.Any(x => vCfg.Instructions[x].Successors.Count > 1);
+
+                var isLabel = isEntrypoint || hasMultiplePredecessors || isCyclic || isCondTarget;
+                if (!isLabel)
+                    continue;
+
+                labels.Add(handler, cfg.CreateBlock(handler.BytecodeRip));
+            }
+
+            foreach (var label in labels.Keys)
+                VisitLabel(vCfg, labels, label);
+
+            return cfg;
+        }
+
+        public static void VisitLabel(VmCfg vCfg, Dictionary<VmHandler, BasicBlock<VmHandler>> labels, VmHandler handler)
+        {
+            var block = labels[handler];
+            while (true)
+            {
+                block.Instructions.Add(handler);
+
+                var succs = vCfg.Instructions[handler].Successors;
+                if (!succs.Any())
+                    break;
+
+                // Add an outgoing edges if any targets are labels
+                if (succs.Any(x => labels.ContainsKey(x)))
+                {
+                    block.AddOutgoingEdges(succs.Select(x => new BlockEdge<VmHandler>(block, labels[x])));
+                    return;
+                }
+
+                handler = succs.Single();
+            }
+        }
+            
+
+            
+           
     }
 
     public class IterativeCfgBuilder
