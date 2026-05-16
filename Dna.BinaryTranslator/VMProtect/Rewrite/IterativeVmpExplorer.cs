@@ -25,7 +25,7 @@ using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 using WebAssembly.Instructions;
-
+using static Dna.BinaryTranslator.VMProtect.VmpJmpTableSolver;
 using static Iced.Intel.AssemblerRegisters;
 
 
@@ -133,6 +133,8 @@ namespace Dna.BinaryTranslator.VMProtect.Rewrite
 
                 Console.WriteLine($"Lifting iteration {ii++}");
 
+                /*
+                // see VIPs.txt
                 if (false && ii == 551)
                 {
                     Console.WriteLine($"VIPs: ");
@@ -146,6 +148,7 @@ namespace Dna.BinaryTranslator.VMProtect.Rewrite
 
                     Debugger.Break();
                 }
+                */
 
                 //var join = String.Join(", ", handlerLifter.handlerRipToLlvmFunction.Keys.Select(x => "0x" + x.ToString("X")));
                 //Console.WriteLine(join);
@@ -172,7 +175,7 @@ namespace Dna.BinaryTranslator.VMProtect.Rewrite
                 liftedFunction = new IterativeCfgBuilder(outModule, arch, stateStruct, vCfg, handlerLifter, vmexitHandlerRips, handlerVips).Run(liftedFunction, handlers.First());
                 FixMemPtr(liftedFunction.GlobalParent);
 
-
+                liftedFunction.GlobalParent.PrintToFile("translatedFunction.ll");
                 liftedFunction.GlobalParent.Verify(LLVMVerifierFailureAction.LLVMAbortProcessAction);
 
                 IterativeVmpTranslator.CanonicalizeMemoryPtr(liftedFunction);
@@ -182,11 +185,19 @@ namespace Dna.BinaryTranslator.VMProtect.Rewrite
                 // Run our optimization pipeline
                 PassPipeline.Run(dna.Binary, liftedFunction, false);
 
+
+                liftedFunction.GlobalParent.PrintToFile("translatedFunction.ll");
                 // Solve for any unknown indirect jumps in the control flow graph.
-                var solver = new VmpJmpTableSolver(liftedFunction);
+                //var solver = new VmpJmpTableSolver(liftedFunction);
+                //var (newTables, bytecodePtrToRips) = solver.Solve();
+
+                var solver = new VmpSolver(arch, liftedFunction);
+
+                var dests = solver.SolveRIPs(stateStruct);
+
                 var (newTables, bytecodePtrToRips) = solver.Solve();
 
-                if(!newTables.Any())
+                if (!newTables.Any())
                 {
                     Console.WriteLine($"Finished devirt");
                     outModule.PrintToFile("translatedFunction.ll");
@@ -286,7 +297,6 @@ namespace Dna.BinaryTranslator.VMProtect.Rewrite
                     Console.WriteLine("Done");
                     */
                     Debugger.Break();
-
                 }
 
                 //Debugger.Break();
@@ -514,7 +524,10 @@ namespace Dna.BinaryTranslator.VMProtect.Rewrite
                 //var destBlock = blockMapping.Single(x => x.Key.BytecodeRip ==  destIp);
 
 
-                var srcIp = caller.GetOperand(2).ConstIntZExt;
+                //var srcIp = caller.GetOperand(2).ConstIntZExt;
+
+                var srcIp = caller.GetOperand((uint)caller.OperandCount - 2).ConstIntZExt;
+
                 var handler = vCfg.Instructions.Single(x => x.Key.BytecodeRip == srcIp).Key;
                 var vNode = vCfg.Instructions[handler];
 
@@ -635,7 +648,8 @@ namespace Dna.BinaryTranslator.VMProtect.Rewrite
                 defaultBlock = function.AppendBasicBlock($"reprove_new_edge_for_jmp_table_{handler.BytecodeRip.ToString("X")}");
                 builder.PositionAtEnd(defaultBlock);
                 VmPartialBlockLifter.UpdateOutputRegisters(builder, function, registerAllocaMapping, stateStruct);
-                VmCfgLifter.AddCallToIndirectBranchIntrinsic(module, builder, llvmBlock, bytecodeRegister, registerAllocaMapping, exitBlock, handler.BytecodeRip);
+                //VmCfgLifter.AddCallToIndirectBranchIntrinsic(module, builder, llvmBlock, bytecodeRegister, registerAllocaMapping, exitBlock, handler.BytecodeRip);
+                AddCallToIndirectBranchIntrinsic(module, builder, registerAllocaMapping, handler.BytecodeRip, exitBlock);
                 builder.PositionAtEnd(llvmBlock);
             }
 
@@ -661,6 +675,32 @@ namespace Dna.BinaryTranslator.VMProtect.Rewrite
                 swtch.AddCase(LLVMValueRef.CreateConstInt(module.Context.Int64Type, target.BytecodeRip), targetBlock);
             }
         }
+
+
+        public LLVMValueRef AddCallToIndirectBranchIntrinsic(LLVMModuleRef module, LLVMBuilderRef builder, IReadOnlyDictionary<RemillRegister, LLVMValueRef> registerAllocaMapping, ulong exitFromRip, LLVMBasicBlockRef exitBlock)
+        {
+            var values = stateStruct.OrderedRegisterArguments.Select(x => builder.BuildLoad2(LLVMTypeRef.Int64, registerAllocaMapping[x]))
+                .Append(LLVMValueRef.CreateConstInt(LLVMTypeRef.Int64, exitFromRip))
+                .ToArray();
+            var func = GetOrCreateJmpIntrinsic(module, stateStruct.OrderedRegisterArguments);
+            var call = builder.BuildCall2(func.GetFunctionPrototype(), func, values);
+            builder.BuildBr(exitBlock);
+            return call;
+        }
+
+        public static LLVMValueRef GetOrCreateJmpIntrinsic(LLVMModuleRef module, IReadOnlyList<RemillRegister> registers)
+        {
+            // The intrinsic accepts a list of all registers, and an additional i64 argument containing the bytecode pointer we jumped from.
+            // call(rax, rcx, ..., BYTECODE_PTR)
+            var prototype = LLVMTypeRef.CreateFunction(LLVMTypeRef.Void, registers.Select(x => LLVMTypeRef.Int64).Append(LLVMTypeRef.Int64).ToArray());
+            var func = module.GetFunctions().SingleOrDefault(x => x.Name == "vmp_branch");
+            if (func.Handle != 0)
+                return func;
+
+            func = module.AddFunction("vmp_branch", prototype);
+            return func;
+        }
+
     }
 
     public class HandlerLifter
@@ -1097,5 +1137,76 @@ namespace Dna.BinaryTranslator.VMProtect.Rewrite
             stack.Remove(curr);
             return false;
         }
+    }
+
+    public class VmpSolver
+    {
+        private readonly RemillArch arch;
+
+        private readonly LLVMValueRef function;
+
+        public VmpSolver(RemillArch arch, LLVMValueRef function)
+        {
+            this.arch = arch;
+            this.function = function;
+        }
+
+        // For each bytecode RIP, collect a set of unique handler RIPs it can branch to
+        public Dictionary<ulong, HashSet<ulong>> SolveRIPs(VmpParameterizedStateStructure stateStruct)
+        {
+            var target = GetBranchIntrinsic();
+            if (target.Handle == 0)
+                throw new InvalidOperationException("No jump tables to solve");
+
+           
+            var calls = RemillUtils.CallersOf(target);
+            var ripIndex = (uint)stateStruct.RegisterArgumentIndices[arch.GetRegisterByName(arch.ProgramCounterRegisterName)];
+
+            var output = new Dictionary<ulong, HashSet<ulong>>();
+            foreach (var call in calls)
+            {
+                var jmpFromVip = call.GetOperand((uint)call.OperandCount - 2);
+                if (jmpFromVip.Kind != LLVMValueKind.LLVMConstantIntValueKind)
+                    throw new InvalidOperationException($"Jumping from unknown VIP {jmpFromVip}");
+
+                var rips = new HashSet<ulong>();
+                var rip = call.GetOperand(ripIndex);
+                if (rip.Kind == LLVMValueKind.LLVMConstantIntValueKind)
+                {
+                    rips.Add(rip.ConstIntZExt);
+                }
+
+                else if (rip.Kind == LLVMValueKind.LLVMInstructionValueKind && rip.InstructionOpcode == LLVMOpcode.LLVMSelect)
+                {
+                    var constants = new LLVMValueRef[] { rip.GetOperand(1), rip.GetOperand(2) };
+                    if (!constants.All(x => x.Kind == LLVMValueKind.LLVMConstantIntValueKind))
+                        throw new InvalidOperationException($"Cannot solve RIP for {rip}");
+                    rips.AddRange(constants.Select(x => x.ConstIntZExt));
+                }
+
+                else
+                {
+                    throw new InvalidOperationException($"Cannot solve RIP for {rip}");
+                }
+
+                output.TryAdd(jmpFromVip.ConstIntZExt, new());
+                output[jmpFromVip.ConstIntZExt].AddRange(rips);
+
+            }
+
+            return output;
+        }
+
+        public JmpTablesWithHandlerRips Solve()
+        {
+            var targetFunc = GetBranchIntrinsic();
+            if (targetFunc.Handle == 0)
+                throw new InvalidOperationException("No jump tables to solve!");
+
+            return null;
+        }
+
+        private LLVMValueRef GetBranchIntrinsic()
+            => function.GlobalParent.GetFunctions().SingleOrDefault(x => x.Name.Contains("vmp_branch"));
     }
 }

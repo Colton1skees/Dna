@@ -236,6 +236,7 @@ namespace Dna.BinaryTranslator.VMProtect
             builder.BuildBr(exitBlock);
         }
 
+
         public static LLVMValueRef LoadBytecodePointer(LLVMBuilderRef builder, RemillRegister bytecodeRegister, IReadOnlyDictionary<RemillRegister, LLVMValueRef> registerAllocaMapping)
         {
             // TODO: Stop hardcoding RDI as the bytecode pointer.
