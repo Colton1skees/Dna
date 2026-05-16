@@ -165,6 +165,9 @@ namespace Dna.Extensions
         public static bool Is(this LLVMValueRef inst, LLVMValueKind kind)
           => inst.Kind == kind;
 
+        public static bool Is(this LLVMValueRef inst, params LLVMValueKind[] opcodes)
+        => opcodes.Any(x => inst.Is(x));
+
         public static bool IsConstant(this LLVMValueRef inst)
             => inst.Is(LLVMValueKind.LLVMConstantIntValueKind);
 
