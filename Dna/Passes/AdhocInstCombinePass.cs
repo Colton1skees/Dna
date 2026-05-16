@@ -119,7 +119,7 @@ namespace Dna.Passes
 
         private static readonly LLVMOpcode[] Opcodes = { LLVMOpcode.LLVMAdd, LLVMOpcode.LLVMSub, LLVMOpcode.LLVMMul, LLVMOpcode.LLVMAnd, LLVMOpcode.LLVMOr, LLVMOpcode.LLVMXor, LLVMOpcode.LLVMLShr, LLVMOpcode.LLVMAShr, LLVMOpcode.LLVMCall };
 
-        private static readonly string[] Whitelist = { "llvm.bswap" };
+        private static readonly string[] Whitelist = { "llvm.bswap", "llvm.fshl" };
 
         private bool TryDistributeSelect(LLVMValueRef inst)
         {

@@ -137,14 +137,14 @@ namespace Dna.BinaryTranslator.VMProtect.Rewrite
                 Console.WriteLine(join);
        
 
-                // Identify all VmExit handlers.
-                foreach (var (rip, isVmEnter) in handlersRipsToLift)
-                {
-                    //handlerLifter.LiftHandler(rip, handlers.Count == 1);
-                    var cfg = HandlerLifter.DisHandler(dna, rip);
-                    if (HandlerLifter.IsVmexit(cfg))
-                        vmexitHandlerRips.Add(rip);
-                }
+                //// Identify all VmExit handlers.
+                //foreach (var (rip, isVmEnter) in handlersRipsToLift)
+                //{
+                //    //handlerLifter.LiftHandler(rip, handlers.Count == 1);
+                //    var cfg = HandlerLifter.DisHandler(dna, rip);
+                //    if (HandlerLifter.IsVmexit(cfg))
+                //        vmexitHandlerRips.Add(rip);
+                //}
 
 
                 // Lift all native handlers to LLVM IR and cache them
@@ -158,6 +158,8 @@ namespace Dna.BinaryTranslator.VMProtect.Rewrite
                 liftedFunction = new IterativeCfgBuilder(outModule, arch, stateStruct, vCfg, handlerLifter, vmexitHandlerRips, handlerVips).Run(liftedFunction, handlers.First());
                 FixMemPtr(liftedFunction.GlobalParent);
 
+
+                liftedFunction.GlobalParent.Verify(LLVMVerifierFailureAction.LLVMAbortProcessAction);
 
                 IterativeVmpTranslator.CanonicalizeMemoryPtr(liftedFunction);
 
@@ -183,11 +185,15 @@ namespace Dna.BinaryTranslator.VMProtect.Rewrite
 
                 foreach (var entry in bytecodePtrToRips)
                 {
+                    var cfg = HandlerLifter.DisHandler(dna, entry.Value);
+                    if (HandlerLifter.IsVmexit(cfg))
+                        vmexitHandlerRips.Add(entry.Value);
 
                     if (bytecodeAddrToRip.TryAdd(entry.Key, entry.Value) && !handlerLifter.ContainsHandler(entry.Value))
                     {
-                        handlersRipsToLift.Add((entry.Value, false));
-                    
+                        //handlerLifter.LiftHandler(rip, handlers.Count == 1);
+                       
+
                     }
                     
 
@@ -244,7 +250,28 @@ namespace Dna.BinaryTranslator.VMProtect.Rewrite
                 // Replace the CFG
                 vCfg = newCfg;
 
+               
+
                 liftedFunction.GlobalParent.PrintToFile("translatedFunction.ll");
+
+                if (false && ii == 500)
+                {
+                    FixMemPtr(handlerLifter.cacheModule);
+                    handlerLifter.cacheModule.PrintToFile("cacheModule.ll");
+
+                    /*
+                    foreach(var h in handlerLifter.handlerRipToLlvmFunction.Keys)
+                    {
+                        handlerLifter.Lift(liftedFunction.GlobalParent, h, h == funcRip);
+                    }
+
+                    liftedFunction.GlobalParent.PrintToFile("allHandlers.ll");
+
+                    Console.WriteLine("Done");
+                    */
+                    Debugger.Break();
+
+                }
 
                 //Debugger.Break();
             }
@@ -423,6 +450,9 @@ namespace Dna.BinaryTranslator.VMProtect.Rewrite
                 var srcIp = caller.GetOperand(2).ConstIntZExt;
                 var handler = vCfg.Instructions.Single(x => x.Key.BytecodeRip == srcIp).Key;
                 var vNode = vCfg.Instructions[handler];
+
+
+              
  
 
                 var outgoingAddresses = vNode.Successors.OrderBy(x => x).ToList();
@@ -480,17 +510,27 @@ namespace Dna.BinaryTranslator.VMProtect.Rewrite
             foreach (var (handler, block) in blockMapping)
             {
                 builder.PositionAtEnd(block);
+
+                // Concretize the VIP register!
+                if (handler != entryHandler)
+                {
+                    var incomingVipRegister = vCfg.Instructions[handler].Predecessors.Select(x => handlerVips[x]).DistinctBy(x => x.Name).Single();
+                    builder.BuildStore(LLVMValueRef.CreateConstInt(LLVMTypeRef.Int64, handler.BytecodeRip), registerAllocaMapping[incomingVipRegister]);
+                }
+
                 var liftedHandler = handlerCache.Lift(module, handler.NativeRip, handler == entryHandler);
                 var call = VmPartialBlockLifter.CallVmHandler(builder, function, liftedHandler, registerAllocaMapping, stateStruct);
              
+
+
                 LiftInstEdges(handler, function, exitBlock, blockMapping, registerAllocaMapping);
-                module.PrintToFile("translatedFunction.ll");
+                //module.PrintToFile("translatedFunction.ll");
 
                 IterativeVmpExplorer.FixMemPtr(module);
              
 
                 LLVMCloning.InlineFunction(liftedHandler);
-                module.PrintToFile("translatedFunction.ll");
+                //module.PrintToFile("translatedFunction.ll");
                 liftedHandler.DeleteFunction();
                 //toDelete.Add(liftedHandler);
             }
@@ -564,7 +604,7 @@ namespace Dna.BinaryTranslator.VMProtect.Rewrite
 
         private readonly RemillArch arch;
 
-        private readonly LLVMModuleRef cacheModule;
+        public readonly LLVMModuleRef cacheModule;
 
         public readonly Dictionary<ulong, LLVMValueRef> handlerRipToLlvmFunction = new();
 
@@ -573,6 +613,20 @@ namespace Dna.BinaryTranslator.VMProtect.Rewrite
             this.dna = dna;
             this.ctx = ctx;
             this.arch = arch;
+
+            if (File.Exists("cacheModule.ll"))
+            {
+                cacheModule = RemillUtils.LoadModuleFromFile(LLVMContextRef.Global, "cacheModule.ll").Value;
+                foreach (var f in cacheModule.GetFunctions().Where(x => x.Name.StartsWith("Parameterized_TranslatedFrom") && !x.Name.Contains("from_cache")))
+                {
+                    var split = f.Name.Split(new string[] { "Parameterized_TranslatedFrom", "_" }, StringSplitOptions.RemoveEmptyEntries);
+                    var parsed = ulong.Parse(split[0], System.Globalization.NumberStyles.HexNumber);
+                    handlerRipToLlvmFunction[parsed] = f;
+                }
+
+                return;
+            }
+
             cacheModule = ctx.CreateModuleWithName("HandlerCache");
         }
 

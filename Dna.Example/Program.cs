@@ -77,7 +77,7 @@ if (genDsl)
 bool dbgCode = false;
 if (dbgCode)
 {
-    var irPath = "C:\\Users\\colton\\Downloads\\fail5.ll";
+    var irPath = "C:\\Users\\colton\\Downloads\\explosion_with_concrete_vip.ll";
     Console.WriteLine(irPath);
     var tempNewMod = RemillUtils.LoadModuleFromFile(LLVMContextRef.Global, irPath).Value;
     var existingFunc = tempNewMod.GetFunctions().Single(x => x.Name.Contains("Part"));
@@ -107,10 +107,10 @@ if (dbgCode)
 
 
         //MbaDeobfuscationPass.Run(existingFunc);
-        PassPipeline.Run(vmpBin, existingFunc);
+      //  PassPipeline.Run(vmpBin, existingFunc);
         //MbaDeobfuscationPass.Run(existingFunc);
-        PassPipeline.Run(vmpBin, existingFunc);
-        PassPipeline.Run(vmpBin, existingFunc);
+       // PassPipeline.Run(vmpBin, existingFunc);
+      //  PassPipeline.Run(vmpBin, existingFunc);
 
         tempNewMod.PrintToFile("instcombine.ll");
         tempNewMod.PrintToFile(("compile.ll"));
@@ -152,6 +152,9 @@ if (useVmp)
     vmpAddr = 0x1400032FA; // x+y
     vmpAddr = 0x14000335E; // 3 if/else statements with additions
 
+
+    // loop
+    vmpAddr = 0x140003710;
 
 
     var vmpBin = WindowsBinary.From(vmpPath);
