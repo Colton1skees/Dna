@@ -433,14 +433,26 @@ namespace Dna.BinaryTranslator.VMProtect.Rewrite
                 {
                     //Debugger.Break();
                     vip = otherVip;
+
+                    Console.WriteLine("Nullll");
+
+                    //handlerLifter.cacheModule.PrintToFile("translatedFunction.ll");
+
+                    //vkey = GetVkeyByUsage(rip, t, stateStruct, vip);
+                    //Debugger.Break();
+
                 }
 
                 else
                 {
                     // TODO: Solve for concrete vkey and store it
                     vkey = GetVkeyByUsage(rip, t, stateStruct, vip);
+                    Debug.Assert(vkey != null);
                 }
-                  
+
+
+
+                //handlerLifter.cacheModule.PrintToFile("translatedFunction.ll");
 
                 //
                 registers.Add((vip, vkey));
@@ -495,9 +507,6 @@ namespace Dna.BinaryTranslator.VMProtect.Rewrite
             List<RemillRegister> cands = new();
             foreach(var (reg, idx) in stateStructure.RegisterArgumentIndices)
             {
-                if (rip == 0x14012AE63 && idx == 9)
-                    Debugger.Break();
-
                 if (reg == vipReg)
                     continue;
 
@@ -532,12 +541,12 @@ namespace Dna.BinaryTranslator.VMProtect.Rewrite
                 cands.Add(reg);
             }
 
-            if (cands.Count != 1)
-                Debugger.Break();
+            //if (cands.Count != 1)
+             //   Debugger.Break();
            
    
 
-            return cands.Single();
+            return cands.SingleOrDefault();
         }
 
         private RemillRegister GetVipByUsage(ulong rip, LLVMValueRef function, VmpParameterizedStateStructure stateStruct)
@@ -958,7 +967,10 @@ namespace Dna.BinaryTranslator.VMProtect.Rewrite
                 }
 
                 var srcIp = caller.GetOperand((uint)caller.OperandCount - 2).ConstIntZExt;
-                var destReg = vCfg.Instructions[new VmHandler(srcIp, 0)].Successors.Select(x => handlerRipToRegisters[x.NativeRip]).Distinct().Single().Vip;
+                var handler = vCfg.Instructions.Single(x => x.Key.BytecodeRip == srcIp).Key;
+            
+                // You can't concretize the VIP here because it's unknown..
+                var destReg = vCfg.Instructions[handler].Successors.Select(x => handlerRipToRegisters[x.NativeRip]).Distinct().Single().Vip;
                 var destIdx = (uint)stateStruct.OrderedRegisterArguments.IndexOf(destReg);
 
                 // need to fix up bytecode ptr here
@@ -969,7 +981,6 @@ namespace Dna.BinaryTranslator.VMProtect.Rewrite
                 //var srcIp = caller.GetOperand(2).ConstIntZExt;
 
     
-                var handler = vCfg.Instructions.Single(x => x.Key.BytecodeRip == srcIp).Key;
                 var vNode = vCfg.Instructions[handler];
 
 
@@ -1052,7 +1063,7 @@ namespace Dna.BinaryTranslator.VMProtect.Rewrite
                         if (incomingVkeyRegister == null)
                         {
                             Console.WriteLine("PROBLEM");
-                            Console.ReadLine();
+                            //Console.ReadLine();
                         }
 
                         else

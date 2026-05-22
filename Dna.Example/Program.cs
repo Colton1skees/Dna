@@ -77,7 +77,7 @@ if (genDsl)
 bool dbgCode = false;
 if (dbgCode)
 {
-    var irPath = "C:\\Users\\colton\\Downloads\\explosion_with_concrete_vip.ll";
+    var irPath = "C:\\Users\\colton\\Downloads\\solve_fail.ll";
     Console.WriteLine(irPath);
     var tempNewMod = RemillUtils.LoadModuleFromFile(LLVMContextRef.Global, irPath).Value;
     var existingFunc = tempNewMod.GetFunctions().Single(x => x.Name.Contains("Part"));
@@ -96,6 +96,7 @@ if (dbgCode)
                 new AdhocInstCombinePass().InstCombine((LLVMOpaqueValue*)existingFunc.Handle, 0, 0);
                 MultiUseCloningPass.Run(existingFunc);
                 MbaDeobfuscationPass.Run(existingFunc);
+                var bar = new CombinedFixedpointOptPass(null);
             }
 
         } 
@@ -107,9 +108,9 @@ if (dbgCode)
 
 
         //MbaDeobfuscationPass.Run(existingFunc);
-      //  PassPipeline.Run(vmpBin, existingFunc);
+        PassPipeline.Run(vmpBin, existingFunc);
         //MbaDeobfuscationPass.Run(existingFunc);
-       // PassPipeline.Run(vmpBin, existingFunc);
+        PassPipeline.Run(vmpBin, existingFunc);
       //  PassPipeline.Run(vmpBin, existingFunc);
 
         tempNewMod.PrintToFile("instcombine.ll");

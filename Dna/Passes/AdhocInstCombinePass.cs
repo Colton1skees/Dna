@@ -44,6 +44,7 @@ namespace Dna.Passes
                 changed |= TryRewriteConstantShiftOfConstantSelect(inst);
                 changed |= TryRewriteTruncOfConstantSelect(inst);
                 changed |= TryDistributeSelect(inst);
+                changed |= TryKnownBitsFoldToSelect(inst);
                 changed |= TryRewriteVmpShifts(inst);
                 changed |= TrySinkLoadOfSelect(inst);
                 changed |= TryRewriteSignExtI1(inst);
@@ -117,7 +118,7 @@ namespace Dna.Passes
 
         }
 
-        private static readonly LLVMOpcode[] Opcodes = { LLVMOpcode.LLVMAdd, LLVMOpcode.LLVMSub, LLVMOpcode.LLVMMul, LLVMOpcode.LLVMAnd, LLVMOpcode.LLVMOr, LLVMOpcode.LLVMXor, LLVMOpcode.LLVMLShr, LLVMOpcode.LLVMAShr, LLVMOpcode.LLVMCall };
+        private static readonly LLVMOpcode[] Opcodes = { LLVMOpcode.LLVMAdd, LLVMOpcode.LLVMSub, LLVMOpcode.LLVMMul, LLVMOpcode.LLVMAnd, LLVMOpcode.LLVMOr, LLVMOpcode.LLVMXor,  LLVMOpcode.LLVMShl, LLVMOpcode.LLVMLShr, LLVMOpcode.LLVMAShr, LLVMOpcode.LLVMCall };
 
         private static readonly string[] Whitelist = { "llvm.bswap", "llvm.fshl" };
 
@@ -162,6 +163,30 @@ namespace Dna.Passes
 
             var res = builder.BuildSelect(selectOperand.GetOperand(0), clone0, clone1);
             Replace(inst, res);
+            return true;
+        }
+
+        private static readonly LLVMOpcode[] kbFolds = { LLVMOpcode.LLVMAdd, LLVMOpcode.LLVMSub, LLVMOpcode.LLVMMul, LLVMOpcode.LLVMAnd, LLVMOpcode.LLVMOr, LLVMOpcode.LLVMXor, LLVMOpcode.LLVMShl, LLVMOpcode.LLVMLShr, LLVMOpcode.LLVMAShr };
+
+        private bool TryKnownBitsFoldToSelect(LLVMValueRef inst)
+        {
+            if (!inst.Is(kbFolds))
+                return false;
+
+            var kb = NativeKnownBits.Get(inst, inst.GlobalParent);
+            if (kb.GetUnknownBitCount() != 1)
+                return false;
+
+            builder.PositionBefore(inst.NextInstruction);
+
+            var ty = inst.TypeOf;
+            var values = kb.AllPossibleValues().Select(x => LLVMValueRef.CreateConstInt(ty, x)).ToList();
+            var cmp = builder.BuildICmp(LLVMIntPredicate.LLVMIntEQ, inst, values[0]);
+            var select = builder.BuildSelect(cmp, values[0], values[1]);
+
+            Replace(inst, select);
+            cmp.SetOperand(0, inst);
+
             return true;
         }
 
