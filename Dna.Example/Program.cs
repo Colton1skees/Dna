@@ -129,7 +129,7 @@ if (dbgCode)
         File.WriteAllText("binja.py", new LLVMToBinjaGraph(existingFunc).Process());
 
         sw.Stop();
-            Console.WriteLine($"Pass took {sw.ElapsedMilliseconds}ms ");
+            Console.WriteLine($"Pass took {sw.ElapsedMilliseconds}ms");
         Debugger.Break();
     }
     Debugger.Break();
