@@ -15,7 +15,7 @@ namespace Dna.ControlFlow
         /// <typeparam name="T"></typeparam>
         /// <param name="graph"></param>
         /// <returns></returns>
-        public static string FormatGraph<T>(ControlFlowGraph<T> graph)
+        public static string FormatGraph<T>(ControlFlowGraph<T> graph, Func<T, string> formatInst = null)
         {
             StringBuilder stringBuilder = new StringBuilder();
             foreach(var node in graph.Nodes)
@@ -27,7 +27,7 @@ namespace Dna.ControlFlow
 
                 // Format the output.
                 stringBuilder.AppendLine(String.Format("Basic block {0} has the following outgoing edges: {1}", node.UserData.Keys.First(), strEdges));
-                stringBuilder.AppendLine(FormatBlock(node.GetBlock<T>()));
+                stringBuilder.AppendLine(FormatBlock(node.GetBlock<T>(), formatInst));
                 stringBuilder.AppendLine("");
                 stringBuilder.AppendLine("");
             }
@@ -40,13 +40,16 @@ namespace Dna.ControlFlow
         /// <typeparam name="T"></typeparam>
         /// <param name="block"></param>
         /// <returns></returns>
-        public static string FormatBlock<T>(BasicBlock<T> block)
+        public static string FormatBlock<T>(BasicBlock<T> block, Func<T, string> formatInst = null)
         {
             StringBuilder stringBuilder = new StringBuilder();
             stringBuilder.AppendLine(String.Format("BasicBlock (0x{0}):", block.Address.ToString("X")));
             foreach (var instruction in block.Instructions)
             {
-                stringBuilder.AppendLine(instruction?.ToString());
+                if (formatInst != null)
+                    stringBuilder.AppendLine(formatInst(instruction));
+                else
+                    stringBuilder.AppendLine(instruction?.ToString());
             }
             return stringBuilder.ToString();
         }
