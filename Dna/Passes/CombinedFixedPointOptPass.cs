@@ -178,10 +178,15 @@ namespace Dna.Passes
                     numIterations++;
                     localChanged = false;
 
+                    var instcombine = new AdhocInstCombinePass();
+                    instcombine.builder = builder;
+
                     var worklist = new WorkList<LLVMValueRef>(function.GetInstructions());
                     while (worklist.Count > 0)
                     {
                         var nextInstr = worklist.PopFront();
+                        if (!nextInstr.Is(LLVMValueKind.LLVMInstructionValueKind))
+                            continue;
 
                         void DoReplaceAndRemove(LLVMValueRef replaceWith)
                         {
@@ -200,12 +205,26 @@ namespace Dna.Passes
                         // Do a const-prop loop before anything else since we don't want to do redundant work.
                         unsafe
                         {
+                            var peephole = instcombine.PeepholeInst(nextInstr);
+                            if (peephole != null)
+                            {
+                                // Append all newly created instructions to the worklist, such that we visit them in RPO order(%t0, then %t1)
+                                // %t0 = add x,y
+                                // %t1 = mul %t0, 111
+                                foreach (var reversed in peephole.Insts.Reverse<LLVMValueRef>())
+                                    worklist.AddToFront(reversed);
+
+                                // Replace and remove the old input inst
+                                DoReplaceAndRemove(peephole.GetResult());
+                            }
+                            /*
                             var result = NativeConstantFoldingAPI.TrySimplify((LLVMOpaqueValue*)nextInstr.Handle);
                             if (result != null)
                             {
                                 DoReplaceAndRemove(new LLVMValueRef((nint)result));
                                 continue;
                             }
+                            */
                         }
 
                         if (nextInstr.InstructionOpcode == LLVMOpcode.LLVMLoad)

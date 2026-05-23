@@ -56,6 +56,8 @@ namespace Dna.BinaryTranslator.VMProtect
 
                 OptimizationApi.OptimizeModuleVmp(function.GlobalParent, function, false, false, 0, false, 0, false, false, 0, pStoreToLoad, pInstCombine, useCloning ? pMultiUseCloning : 0, fastPipeline);
 
+                if (fastPipeline)
+                    return function;
              
                 if (func != null && func.GetUsers().Count > 0)
                 {

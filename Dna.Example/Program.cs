@@ -109,8 +109,9 @@ if (dbgCode)
 
 
         //MbaDeobfuscationPass.Run(existingFunc);
+        tempNewMod.PrintToFile(("translatedFunction.ll"));
         PassPipeline.Run(vmpBin, existingFunc, false, false, true);
-
+        tempNewMod.PrintToFile(("translatedFunction.ll"));
         unsafe
         {
             new AdhocInstCombinePass().InstCombine((LLVMOpaqueValue*)existingFunc.Handle, 0, 0);

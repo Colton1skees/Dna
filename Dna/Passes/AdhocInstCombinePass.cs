@@ -17,12 +17,24 @@ using static System.Net.Mime.MediaTypeNames;
 
 namespace Dna.Passes
 {
+    public class PeepholeResult
+    {
+        // List of new values added by the peephole optimization
+        // Invariant: The last instruction is the result value.
+        public List<LLVMValueRef> Insts = new();
+
+        public LLVMValueRef GetResult() => Insts[Insts.Count - 1];
+
+        public void Add(params LLVMValueRef[] insts)
+            => Insts.AddRange(insts);
+    }
+
     // Peephole optimization pass for cases that InstCombine either cannot perform or choses not to due to global profitability
     public class AdhocInstCombinePass
     {
         private readonly bool debug = false;
 
-        private LLVMBuilderRef builder;
+        public LLVMBuilderRef builder;
 
         public dgAdhocInstCombinePass PtrToStoreLoadPropagation { get; }
 
@@ -34,111 +46,98 @@ namespace Dna.Passes
         public unsafe bool InstCombine(LLVMOpaqueValue* function, nint loopInfo, nint mssa)
         {
             builder = LLVMBuilderRef.Create(LLVMContextRef.Global);
-            return Run(function);
-        }
 
-        private bool Run(LLVMValueRef function)
-        {
-            bool changed = false;
-            foreach(var inst in function.GetInstructions().ToList())
+            LLVMValueRef f = function;
+            bool changed = true;
+            changed = false;
+            foreach (var inst in f.GetInstructions().ToList())
             {
-                changed |= TrySimplifyInstruction(inst);
-                changed |= TryRewriteBinaryOperator(inst);
-                changed |= TryRewriteConstantShiftOfConstantSelect(inst);
-                changed |= TryRewriteTruncOfConstantSelect(inst);
-                changed |= TryDistributeSelect(inst);
-                changed |= TryKnownBitsFoldToSelect(inst);
-                changed |= TryRewriteVmpShifts(inst);
-                changed |= TrySinkLoadOfSelect(inst);
-                changed |= TryRewriteSignExtI1(inst);
-                changed |= TryRewriteTruncAnd(inst);
-                changed |= TryRewriteZextTrunc(inst);
-                changed |= TryRewriteDisjointOr(inst);
+                var curr = inst;
+                while (curr != null)
+                {
+                    var peephole = PeepholeInst(curr);
+                    if (peephole == null)
+                    {
+                        curr = null;
+                        break;
+                    }
+
+                    changed = true;
+                    curr.ReplaceAllUsesWith(peephole.GetResult());
+                    curr = peephole.GetResult();
+                }
             }
 
             return changed;
         }
 
-        private bool TryRewriteBinaryOperator(LLVMValueRef inst)
+        public PeepholeResult PeepholeInst(LLVMValueRef inst)
         {
-            bool isOr = inst.InstructionOpcode == LLVMOpcode.LLVMOr;
-            bool isXor = inst.InstructionOpcode == LLVMOpcode.LLVMXor;
-            bool isAnd = inst.InstructionOpcode == LLVMOpcode.LLVMAnd;
-            bool isAdd = inst.InstructionOpcode == LLVMOpcode.LLVMAdd;
-            bool isSub = inst.InstructionOpcode == LLVMOpcode.LLVMSub;
-            if (!isOr && !isXor && !isAnd && !isAdd && !isSub)
-                return false;
+            Debug.Assert(inst.Is(LLVMValueKind.LLVMInstructionValueKind));
 
-            // Get the operators being ORed.
-            var op1 = inst.GetOperand(0);
-            var op2 = inst.GetOperand(1);
+            PeepholeResult changed = null;
+            changed = TrySimplifyInstruction(inst);
+            if (changed != null)
+                return changed;
 
-            Func<LLVMValueRef, LLVMValueRef, LLVMValueRef> lambda = null;
-            if (isOr)
-                lambda = (op1, op2) => builder.BuildOr(op1, op2);
-            else if (isXor)
-                lambda = (op1, op2) => builder.BuildXor(op1, op2);
-            else if (isAnd)
-                lambda = (op1, op2) => builder.BuildAnd(op1, op2);
-            else if (isAdd)
-                lambda = (op1, op2) => builder.BuildAdd(op1, op2);
-            else if (isSub)
-                lambda = (op1, op2) => builder.BuildSub(op1, op2);
-            else
-                throw new InvalidOperationException($"Unknown opkind in TryRewriteBinaryOperator!");
+            changed = TryRewriteTruncOfConstantSelect(inst);
+            if (changed != null)
+                return changed;
 
+            changed = TryDistributeSelect(inst);
+            if (changed != null)
+                return changed;
 
-            // If the second operand is a select between two constants:
-            if (IsSelectOfTwoConstants(op2) && op1.Kind == LLVMValueKind.LLVMConstantIntValueKind)
-            {
-                // Get the constants being selected from.
-                var (ignore, c1, c2) = AsSelectOfTwoConstants(op2);
-                builder.PositionBefore(inst);
+            changed = TryKnownBitsFoldToSelect(inst);
+            if (changed != null)
+                return changed;
 
-                var evaluated1 = lambda(op1, c1);
-                var evaluated2 = lambda(op1, c2);
-                var select = builder.BuildSelect(op2.GetOperand(0), evaluated1, evaluated2);
-                Replace(inst, select);
-                return true;
-            }
+            changed = TryRewriteVmpShifts(inst);
+            if (changed != null)
+                return changed;
 
-            // If vice versa, swap the operands.
-            else if(IsSelectOfTwoConstants(op1) && op2.Kind == LLVMValueKind.LLVMConstantIntValueKind)
-            {
-                // Get the constants being selected from.
-                var (ignore, c1, c2) = AsSelectOfTwoConstants(op1);
-                builder.PositionBefore(inst);
+            changed = TrySinkLoadOfSelect(inst);
+            if (changed != null)
+                return changed;
 
-                var evaluated1 = lambda(op2, c1);
-                var evaluated2 = lambda(op2, c2);
-                var select = builder.BuildSelect(op1.GetOperand(0), evaluated1, evaluated2);
-                Replace(inst, select);
-                return true;
-            }
+            changed = TryRewriteSignExtI1(inst);
+            if (changed != null)
+                return changed;
 
-            // Early exit.
-            else
-            {
-                return false;
-            }
+            changed = TryRewriteTruncAnd(inst);
+            if (changed != null)
+                return changed;
 
+            changed = TryRewriteZextTrunc(inst);
+            if (changed != null)
+                return changed;
+
+            changed = TryRewriteDisjointOr(inst);
+            if (changed != null)
+                return changed;
+
+            changed = TryRewriteInverseShifts(inst);
+            if (changed != null)
+                return changed;
+
+            return null;
         }
 
         private static readonly LLVMOpcode[] Opcodes = { LLVMOpcode.LLVMAdd, LLVMOpcode.LLVMSub, LLVMOpcode.LLVMMul, LLVMOpcode.LLVMAnd, LLVMOpcode.LLVMOr, LLVMOpcode.LLVMXor,  LLVMOpcode.LLVMShl, LLVMOpcode.LLVMLShr, LLVMOpcode.LLVMAShr, LLVMOpcode.LLVMCall };
 
         private static readonly string[] Whitelist = { "llvm.bswap", "llvm.fshl" };
 
-        private bool TryDistributeSelect(LLVMValueRef inst)
+        private PeepholeResult TryDistributeSelect(LLVMValueRef inst)
         {
             var opcode = inst.InstructionOpcode;
             if (Array.IndexOf(Opcodes, opcode) == -1)
-                return false;
+                return null;
 
             if (opcode == LLVMOpcode.LLVMCall)
             {
                 var name = inst.GetCallInstTarget().Name;
                 if (!Whitelist.Any(x => name.StartsWith(x)))
-                    return false;
+                    return null;
             }
 
             // Get the operands
@@ -147,133 +146,72 @@ namespace Dna.Passes
 
             // At least one operand must be a select of two constants
             if (!IsSelect(op1) && !IsSelect(op2))
-                return false;
+                return null;
 
             var selectIndex = IsSelect(op1) ? 0 : 1;
             var selectOperand = selectIndex == 0 ? op1 : op2;
             var otherIndex = IsSelect(op1) ? 1 : 0;
             var otherOperand = otherIndex == 0 ? op1 : op2;
 
-            var clone0 = inst.InstructionClone;
-            builder.PositionBefore(inst.NextInstruction);
-            builder.Insert(clone0);
-            clone0.Name = inst.Name;
-
-            var clone1 = inst.InstructionClone;
-            builder.PositionBefore(clone0.NextInstruction);
-            builder.Insert(clone1);
-            clone1.Name = clone0.Name;
+            var clone0 = Clone(inst);
+            var clone1 = Clone(inst);
 
             clone0.SetOperand((uint)selectIndex, selectOperand.GetOperand(1));
             clone1.SetOperand((uint)selectIndex, selectOperand.GetOperand(2));
 
             var res = builder.BuildSelect(selectOperand.GetOperand(0), clone0, clone1);
-            Replace(inst, res);
-            return true;
+
+            var peephole = new PeepholeResult();
+            peephole.Add(clone0, clone1, res);
+            return peephole;
         }
 
         private static readonly LLVMOpcode[] kbFolds = { LLVMOpcode.LLVMAdd, LLVMOpcode.LLVMSub, LLVMOpcode.LLVMMul, LLVMOpcode.LLVMAnd, LLVMOpcode.LLVMOr, LLVMOpcode.LLVMXor, LLVMOpcode.LLVMShl, LLVMOpcode.LLVMLShr, LLVMOpcode.LLVMAShr };
 
-        private bool TryKnownBitsFoldToSelect(LLVMValueRef inst)
+        private PeepholeResult TryKnownBitsFoldToSelect(LLVMValueRef inst)
         {
             if (!inst.Is(kbFolds))
-                return false;
+                return null;
 
             var kb = NativeKnownBits.Get(inst, inst.GlobalParent);
             if (kb.GetUnknownBitCount() != 1)
-                return false;
+                return null;
+
+            var users = inst.GetUsers().ToList();
+            if (users.All(x => x.Is(LLVMOpcode.LLVMICmp)))
+                return null;
+
+            // Clone the source instruction
+            var clone = Clone(inst);
 
             builder.PositionBefore(inst.NextInstruction);
 
             var ty = inst.TypeOf;
             var values = kb.AllPossibleValues().Select(x => LLVMValueRef.CreateConstInt(ty, x)).ToList();
-            var cmp = builder.BuildICmp(LLVMIntPredicate.LLVMIntEQ, inst, values[0]);
+            var cmp = builder.BuildICmp(LLVMIntPredicate.LLVMIntEQ, clone, values[0]);
             var select = builder.BuildSelect(cmp, values[0], values[1]);
 
-            Replace(inst, select);
-            cmp.SetOperand(0, inst);
-
-            return true;
+            var peephole = new PeepholeResult();
+            peephole.Add(clone, cmp, select);
+            return peephole;
         }
 
-        /// <summary>
-        /// Try to match the pattern of:
-        ///     %v1 = select i1 %t0, i64 64, i64 0
-        ///     %v2 = lshr i64 %v1, 3
-        ///     
-        /// and rewrite it as:
-        ///     %v1 = lshr i64 64, i64 3
-        ///     %v2 = lshr i64 0, 3
-        ///     %v3 = select i1 %t0, i64 %v1, i64%v2
-        private bool TryRewriteConstantShiftOfConstantSelect(LLVMValueRef inst)
-        {
-            // Skip if this is not a logical shift right.
-            bool isLshr = inst.InstructionOpcode == LLVMOpcode.LLVMLShr;
-            bool isAshr = inst.InstructionOpcode == LLVMOpcode.LLVMAShr;
-            bool isShl = inst.InstructionOpcode == LLVMOpcode.LLVMShl;
-            bool isAdd = inst.InstructionOpcode == LLVMOpcode.LLVMAdd;
-            bool isOr = false;
-            //bool isAdd = false;
-            if (!isLshr && !isAshr && !isShl && !isAdd && !isOr)
-                return false;
-
-            // Skip if we are not shifting by a constant amount.
-            var constantShiftBy = inst.GetOperand(1);
-            if (constantShiftBy.Kind != LLVMValueKind.LLVMConstantIntValueKind)
-                return false;
-
-            // Skip if the first operand is not a select.
-            var select = inst.GetOperand(0);
-            if (select.Kind != LLVMValueKind.LLVMInstructionValueKind || select.InstructionOpcode != LLVMOpcode.LLVMSelect)
-                return false;
-
-            // If this is not a select between two constants, skip it.
-            var (isConstant, selectOp1, selectOp2) = AsSelectOfTwoConstants(select);
-            if(!isConstant)
-                return false;
-
-            // We found a match, rewrite it.
-            builder.PositionBefore(inst);
-
-            Func<LLVMValueRef, LLVMValueRef, LLVMValueRef> lambda = null;
-            if (isLshr)
-                lambda = (op1, op2) => builder.BuildLShr(op1, op2);
-            else if (isAshr)
-                lambda = (op1, op2) => builder.BuildAShr(op1, op2);
-            else if (isShl)
-                lambda = (op1, op2) => builder.BuildShl(op1, op2);
-            else if (isAdd)
-                lambda = (op1, op2) => builder.BuildAdd(op1, op2);
-            else if (isOr)
-                lambda = (op1, op2) => builder.BuildOr(op1, op2);
-            else
-                throw new InvalidOperationException($"Unknown opkind in TryRewriteConstantShiftOfConstantSelect!");
-
-            var v1 = lambda(selectOp1, constantShiftBy);
-            var v2 = lambda(selectOp2, constantShiftBy);
-            var newSelect = builder.BuildSelect(select.GetOperand(0), v1, v2);
-
-            Replace(inst, newSelect);
-
-            return true;
-        }
-
-        private bool TryRewriteTruncOfConstantSelect(LLVMValueRef inst)
+        private PeepholeResult TryRewriteTruncOfConstantSelect(LLVMValueRef inst)
         {
             bool isTrunc = inst.InstructionOpcode == LLVMOpcode.LLVMTrunc;
             bool isZext = inst.InstructionOpcode == LLVMOpcode.LLVMZExt;
             if (!isTrunc && !isZext)
-                return false;
+                return null;
 
             // Skip if the first operand is not a select.
             var select = inst.GetOperand(0);
             if (select.Kind != LLVMValueKind.LLVMInstructionValueKind || select.InstructionOpcode != LLVMOpcode.LLVMSelect)
-                return false;
+                return null;
 
             // If this is not a select between two constants, skip it.
             var (isConstant, selectOp1, selectOp2) = AsSelectOfTwoConstants(select);
             if (!isConstant)
-                return false;
+                return null;
 
             // We found a match, rewrite it.
             builder.PositionBefore(inst);
@@ -290,9 +228,9 @@ namespace Dna.Passes
             var v2 = lambda(selectOp2);
             var newSelect = builder.BuildSelect(select.GetOperand(0), v1, v2);
 
-            Replace(inst, newSelect);
-
-            return true;
+            var peephole = new PeepholeResult();
+            peephole.Add(v1, v2, newSelect);
+            return peephole;
         }
 
 
@@ -338,57 +276,59 @@ namespace Dna.Passes
         // %188 = lshr i64 %load3552, 8
         // %189 = and i64 %188, 255
         // %196 = mul nuw nsw i64 %189, 1099511628032
-        private bool TryRewriteVmpShifts(LLVMValueRef inst)
+        private PeepholeResult TryRewriteVmpShifts(LLVMValueRef inst)
         {
             if (inst.InstructionOpcode != LLVMOpcode.LLVMMul && inst.InstructionOpcode != LLVMOpcode.LLVMShl)
-                return false;
+                return null;
 
             var coeff = inst.GetOperand(1);
             if (coeff.Kind != LLVMValueKind.LLVMConstantIntValueKind)
-                return false;
+                return null;
 
             if (inst.InstructionOpcode == LLVMOpcode.LLVMShl)
                 coeff = LLVMValueRef.CreateConstInt(inst.TypeOf, 1ul << (ushort)coeff.ConstIntZExt);
 
             var andInst = inst.GetOperand(0);
             if (andInst.Kind != LLVMValueKind.LLVMInstructionValueKind || andInst.InstructionOpcode != LLVMOpcode.LLVMAnd)
-                return false;
+                return null;
             var mask = andInst.GetOperand(1);
             if (mask.Kind != LLVMValueKind.LLVMConstantIntValueKind)
-                return false;
+                return null;
 
             var shiftInst = andInst.GetOperand(0);
             if (shiftInst.Kind != LLVMValueKind.LLVMInstructionValueKind || shiftInst.InstructionOpcode != LLVMOpcode.LLVMLShr || shiftInst.GetOperand(1).Kind != LLVMValueKind.LLVMConstantIntValueKind)
-                return false;
+                return null;
 
             var shift = shiftInst.GetOperand(1);
             if ((coeff.ConstIntZExt & ModuloReducer.GetMask((uint)shift.ConstIntZExt)) != 0)
-                return false;
+                return null;
 
             var newMask = mask.ConstIntZExt << (ushort)shift.ConstIntZExt;
             var newCoeff = coeff.ConstIntZExt >> (ushort)shift.ConstIntZExt;
 
             builder.PositionBefore(inst);
-            var result = builder.BuildAnd(shiftInst.GetOperand(0), LLVMValueRef.CreateConstInt(shiftInst.TypeOf, newMask));
-            result = builder.BuildMul(result, LLVMValueRef.CreateConstInt(result.TypeOf, newCoeff));
-            Replace(inst, result);
-            return true;
+            var t0 = builder.BuildAnd(shiftInst.GetOperand(0), LLVMValueRef.CreateConstInt(shiftInst.TypeOf, newMask));
+            var t1 = builder.BuildMul(t0, LLVMValueRef.CreateConstInt(t0.TypeOf, newCoeff));
+
+            var peephole = new PeepholeResult();
+            peephole.Add(t0, t1);
+            return peephole;
         }
 
         // %154 = select i1 %124, i64 %2, i64 %3
         // %getelementptr3551 = getelementptr inbounds i8, ptr %load, i64 %154
         // %load3552 = load i64, ptr %getelementptr3551, align 8
-        private bool TrySinkLoadOfSelect(LLVMValueRef inst)
+        private PeepholeResult TrySinkLoadOfSelect(LLVMValueRef inst)
         {
             if (inst.InstructionOpcode != LLVMOpcode.LLVMLoad)
-                return false;
+                return null;
             var gep = inst.GetOperand(0);
             if (gep.Kind != LLVMValueKind.LLVMInstructionValueKind || gep.InstructionOpcode != LLVMOpcode.LLVMGetElementPtr)
-                return false;
+                return null;
 
             var select = gep.GetOperand(1);
             if (select.Kind != LLVMValueKind.LLVMInstructionValueKind || select.InstructionOpcode != LLVMOpcode.LLVMSelect)
-                return false;
+                return null;
 
 
             builder.PositionBefore(inst);
@@ -398,105 +338,155 @@ namespace Dna.Passes
             var ptr1 = builder.BuildInBoundsGEP2(gep.TypeOf, gep.GetOperand(0), new LLVMValueRef[] { select.GetOperand(2) });
             var load1 = builder.BuildLoad2(inst.TypeOf, ptr1);
 
-          
             var replacement = builder.BuildSelect(select.GetOperand(0), load0, load1);
-            Replace(inst, replacement);
 
-            return true;
+            var peephole = new PeepholeResult();
+            peephole.Add(ptr0, load0, ptr1, load1, replacement);
+            return peephole;
         }
 
 
-        private bool TryRewriteSignExtI1(LLVMValueRef inst)
+        private PeepholeResult TryRewriteSignExtI1(LLVMValueRef inst)
         {
             if (inst.InstructionOpcode != LLVMOpcode.LLVMSExt)
-                return false;
+                return null;
             var type = inst.TypeOf;
             if (type.Kind != LLVMTypeKind.LLVMIntegerTypeKind)
-                return false;
+                return null;
             if (inst.GetOperand(0).TypeOf.IntWidth != 1)
-                return false;
+                return null;
 
             builder.PositionBefore(inst);
             var select = builder.BuildSelect(inst.GetOperand(0), LLVMValueRef.CreateConstInt(type, ulong.MaxValue), LLVMValueRef.CreateConstInt(type, 0));
-            Replace(inst, select);
 
-            return true;
+            var peephole = new PeepholeResult();
+            peephole.Add(select);
+            return peephole;
         }
 
         // %163 = and i64 %3, 255
         // %164 = trunc i64 %163 to i8
-        private bool TryRewriteTruncAnd(LLVMValueRef trunc)
+        private PeepholeResult TryRewriteTruncAnd(LLVMValueRef trunc)
         {
             if (!trunc.Is(LLVMOpcode.LLVMTrunc))
-                return false;
+                return null;
             var and = trunc.GetOperand(0);
 
             // and x, 255
             if (!and.Is(LLVMOpcode.LLVMAnd))
-                return false;
+                return null;
             if (!and.GetOperand(1).TryGetConstant(out var andMask))
-                return false;
+                return null;
 
             var truncWidth = trunc.TypeOf.IntWidth;
             var andWidth = BitOperations.TrailingZeroCount(~andMask);
 
             bool isSubset = truncWidth <= andWidth;
             if (!isSubset)
-                return false;
+                return null;
 
             var src = and.GetOperand(0);
-            trunc.SetOperand(0, src);
-            return true;
+            //trunc.SetOperand(0, src);
+            builder.PositionBefore(trunc);
+            var replacement = builder.BuildTrunc(src, trunc.TypeOf);
+
+            var peephole = new PeepholeResult();
+            peephole.Add(replacement);
+            return peephole;
         }
 
 
         //   %3581 = trunc i64 %3017 to i8
         // %3582 = zext i8 %3581 to i64
-        private bool TryRewriteZextTrunc(LLVMValueRef zext)
+        private PeepholeResult TryRewriteZextTrunc(LLVMValueRef zext)
         {
             if (!zext.Is(LLVMOpcode.LLVMZExt))
-                return false;
+                return null;
             var trunc = zext.GetOperand(0);
             if (!trunc.Is(LLVMOpcode.LLVMTrunc))
-                return false;
+                return null;
 
             var src = trunc.GetOperand(0);
             if (src.TypeOf.IntWidth != zext.TypeOf.IntWidth)
-                return false;
+                return null;
 
             var truncMask = ModuloReducer.GetMask(trunc.TypeOf.IntWidth);
             builder.PositionBefore(zext);
             var replacement = builder.BuildAnd(src, LLVMValueRef.CreateConstInt(zext.TypeOf, truncMask));
-            zext.ReplaceAllUsesWith(replacement);
-            return true;
+            //zext.ReplaceAllUsesWith(replacement);
+            //return true;
+
+            var peephole = new PeepholeResult();
+            peephole.Add(replacement);
+            return peephole;
         }
 
-        private bool TryRewriteDisjointOr(LLVMValueRef or)
+        private PeepholeResult TryRewriteDisjointOr(LLVMValueRef or)
         {
             if (!or.Is(LLVMOpcode.LLVMOr))
-                return false;
+                return null;
             var children = new LLVMValueRef[] { or.GetOperand(0), or.GetOperand(1) };
             if (!children.All(x => x.Is(LLVMOpcode.LLVMAnd) && x.GetOperand(1).IsConstant()))
-                return false;
+                return null;
 
             var src = children[0].GetOperand(0);
             if (src != children[1].GetOperand(0))
-                return false;
+                return null;
 
+            builder.PositionBefore(or);
             var combinedMask = children[0].GetOperand(1).ConstIntZExt | children[1].GetOperand(1).ConstIntZExt;
             var replacement = builder.BuildAnd(src, LLVMValueRef.CreateConstInt(src.TypeOf, combinedMask));
-            Replace(or, replacement);
-            return true;
+            //Replace(or, replacement);
+            //return true;
+
+            var peephole = new PeepholeResult();
+            peephole.Add(replacement);
+            return peephole;
         }
 
-        private bool TrySimplifyInstruction(LLVMValueRef inst)
+        // %206 = lshr i64 %6, 56
+        // %207 = shl i64 %206, 56
+        private PeepholeResult TryRewriteInverseShifts(LLVMValueRef shl)
         {
+            if (!shl.Is(LLVMOpcode.LLVMShl))
+                return null;
+            var lshr = shl.GetOperand(0);
+            if (!lshr.Is(LLVMOpcode.LLVMLShr))
+                return null;
+
+            var immediates = new LLVMValueRef[] { shl.GetOperand(1), lshr.GetOperand(1) };
+            if (!immediates.All(x => x.IsConstant()))
+                return null;
+
+            if (immediates[0].ConstIntZExt != immediates[1].ConstIntZExt)
+                return null;
+
+            ulong mask = ModuloReducer.GetMask(shl.TypeOf.IntWidth);
+            var shiftBy = (ushort)immediates[0].ConstIntZExt;
+            mask >>= shiftBy;
+            mask <<= shiftBy;
+
+            builder.PositionBefore(shl);
+            var replacement = builder.BuildAnd(lshr.GetOperand(0), LLVMValueRef.CreateConstInt(shl.TypeOf, mask));
+
+            var peephole = new PeepholeResult();
+            peephole.Add(replacement);
+            return peephole;
+        }
+
+        private PeepholeResult TrySimplifyInstruction(LLVMValueRef inst)
+        {
+            if (!inst.Is(LLVMValueKind.LLVMInstructionValueKind))
+                return null;
+
             var simplified = ConstantFoldingAPI.TrySimplify(inst);
             if (simplified.Handle == 0)
-                return false;
+                return null;
 
-            Replace(inst, simplified);
-            return true;
+            var peephole = new PeepholeResult();
+            peephole.Add(simplified);
+            //Replace(inst, simplified);
+            return peephole;
         }
 
         private void Replace(LLVMValueRef from, LLVMValueRef to)
@@ -506,6 +496,15 @@ namespace Dna.Passes
 
             from.ReplaceAllUsesWith(to);
             //from.InstructionEraseFromParent();
+        }
+
+        private LLVMValueRef Clone(LLVMValueRef inst)
+        {
+            var clone0 = inst.InstructionClone;
+            builder.PositionBefore(inst.NextInstruction);
+            builder.Insert(clone0);
+            clone0.Name = inst.Name;
+            return clone0;
         }
     }
 }
