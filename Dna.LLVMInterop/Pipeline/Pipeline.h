@@ -1342,69 +1342,27 @@ namespace Dna::Pipeline
 	}
 }
 
-void OptimizeVmpModule(llvm::Module* module,
-	llvm::Function* f,
-	bool aggressiveUnroll,
-	bool runClassifyingAliasAnalysis,
-	Dna::Passes::tGetAliasResult getAliasResult,
-	bool runConstantConcretization,
-	Dna::Passes::tReadBinaryContents readBinaryContents,
-	bool runStructuring,
-	bool justGVN,
-	Dna::Passes::tStructureFunction structureFunction,
-	Dna::Passes::tEliminateStackVars eliminateStackVars,
-	Dna::Passes::tEliminateStackVars adhocInstCombine,
-	Dna::Passes::tEliminateStackVars multiUseCloning)
-{
-	/*
-	const char* argv[7] = { "mesa", "-simplifycfg-sink-common=false",
-	"-memdep-block-number-limit=10000000",
-	"-dse-memoryssa-defs-per-block-limit=10000000",
-	"-dse-memoryssa-scanlimit=10000000",
-	"-dse-memoryssa-partial-store-limit=10000000",
-	"-memdep-block-scan-limit=500"
+inline bool initialized = false;
+
+void Initialize() {
+	if (initialized)
+		return;
+
+	const char* argv[14] = { "mesa", "-simplifycfg-sink-common=false",
+"-memdep-block-number-limit=10000000",
+"-dse-memoryssa-defs-per-block-limit=10000000",
+"-gvn-max-num-deps=25000000",
+"-dse-memoryssa-scanlimit=900000000",
+"-dse-memoryssa-partial-store-limit=90000000",
+"-gvn-max-block-speculations=90000000",
+"-memdep-block-scan-limit=1000000000",
+"-unroll-count=3",
+"-unroll-threshold=100000000",
+"-enable-store-refinement=0",
+"-memssa-check-limit=99999999",
+"-memssa-check-limit=99999999"
 	};
-	llvm::cl::ParseCommandLineOptions(7, argv);
-	*/
-
-	justGVN = false;
-	if (justGVN)
-	{
-		const char* argv[13] = { "mesa", "-simplifycfg-sink-common=false",
-				"-memdep-block-number-limit=10000000",
-				"-dse-memoryssa-defs-per-block-limit=10000000",
-				"-gvn-max-num-deps=100000000",
-				"-dse-memoryssa-scanlimit=10000000",
-				"-dse-memoryssa-partial-store-limit=10000000",
-				"-gvn-max-block-speculations=10000000",
-				"-memdep-block-scan-limit=28000",
-				"-unroll-count=1500",
-				"-unroll-threshold=100000000",
-				"-enable-store-refinement=1"
-		};
-		llvm::cl::ParseCommandLineOptions(12, argv);
-	}
-
-	else
-
-	{
-		const char* argv[14] = { "mesa", "-simplifycfg-sink-common=false",
-	"-memdep-block-number-limit=10000000",
-	"-dse-memoryssa-defs-per-block-limit=10000000",
-	"-gvn-max-num-deps=25000000",
-	"-dse-memoryssa-scanlimit=900000000",
-	"-dse-memoryssa-partial-store-limit=90000000",
-	"-gvn-max-block-speculations=90000000",
-	"-memdep-block-scan-limit=1000000000",
-	"-unroll-count=3",
-	"-unroll-threshold=100000000",
-	"-enable-store-refinement=0",
-	"-memssa-check-limit=99999999",
-	"-memssa-check-limit=99999999"
-		};
-		llvm::cl::ParseCommandLineOptions(14, argv);
-	}
-
+	llvm::cl::ParseCommandLineOptions(14, argv);
 
 	// Initialize passes.
 	llvm::PassRegistry& Registry = *llvm::PassRegistry::getPassRegistry();
@@ -1420,77 +1378,6 @@ void OptimizeVmpModule(llvm::Module* module,
 	llvm::initializeDependenceAnalysisWrapperPassPass(Registry);
 	//llvm::initializeIPSCCPLegacyPassPass(Registry);
 	initializeTarget(Registry);
-
-	// Create pass managers.
-	llvm::FunctionPassManager FPM;
-	//llvm::PassManagerBuilder PMB;
-	llvm::legacy::PassManager module_manager;
-	llvm::LoopAnalysisManager LAM;
-	llvm::FunctionAnalysisManager FAM;
-	llvm::CGSCCAnalysisManager CGAM;
-	llvm::ModulePassManager MPM;
-	llvm::ModuleAnalysisManager MAM;
-	llvm::LoopPassManager LPM;
-	llvm::PassBuilder PB;
-	// Configure pipeline.
-//	PMB.OptLevel = 3;
-//	PMB.SizeLevel = 2;
-//	PMB.DisableUnrollLoops = true; //!Guide.RunLoopPasses;
-//	PMB.SLPVectorize = false;
-//	PMB.LoopVectorize = false;
-
-
-	/*
-	const char* args[2] = { "-dse-memoryssa-defs-per-block-limit=1000000", "-earlycse-mssa-optimization-cap=1000000" };
-	llvm::cl::ParseCommandLineOptions(2, args);
-
-	const char* args4[2] = { "test4", "-dse-memoryssa-defs-per-block-limit=1000000" };
-	llvm::cl::ParseCommandLineOptions(2, args4);
-
-	const char* args5[2] = { "test5", "-dse-memoryssa-partial-store-limit=1000000" };
-	llvm::cl::ParseCommandLineOptions(2, args5);
-
-	const char* args6[2] = { "test6", "-dse-memoryssa-path-check-limit=1000000" };
-	llvm::cl::ParseCommandLineOptions(2, args6);
-
-	const char* args7[2] = { "test7", "-dse-memoryssa-scanlimit=1000000" };
-	llvm::cl::ParseCommandLineOptions(2, args7);
-
-	const char* args8[2] = { "test8", "-dse-memoryssa-walklimit=1000000" };
-	llvm::cl::ParseCommandLineOptions(2, args8);
-
-	const char* args9[2] = { "test9", "-dse-memoryssa-otherbb-cost=2" };
-	llvm::cl::ParseCommandLineOptions(2, args9);
-
-	const char* args13[2] = { "test13", "-gvn-max-num-deps=100000000" };
-	llvm::cl::ParseCommandLineOptions(2, args13);
-
-	const char* args14[2] = { "test14", "-gvn-max-block-speculations=10000000" };
-	llvm::cl::ParseCommandLineOptions(2, args14);
-
-	const char* args15[2] = { "test15", "-gvn-max-num-visited-insts=1000000" };
-	llvm::cl::ParseCommandLineOptions(2, args15);
-	*/
-	//const char* args10[2] = { "test10", "memdep-block-number-limit=10000" };
-	//llvm::cl::ParseCommandLineOptions(2, args10);
-
-
-	/*
-	const char* args99999[11] = {
-		"foo"
-		"-memdep-block-number-limit=10000",
-		"-dse-memoryssa-defs-per-block-limit=1000000",
-		"-gvn-max-num-deps=100000000",
-		"-dse-memoryssa-scanlimit=1000000",
-		"-dse-memoryssa-otherbb-cost=2",
-		"-dse-memoryssa-partial-store-limit=1000000",
-		"-gvn-max-block-speculations=1000000",
-		"-memdep-block-scan-limit=1000000",
-		"-unroll-count=1500",
-		"-unroll-threshold=100000000"
-	};
-	llvm::cl::ParseCommandLineOptions(11, args99999);
-	*/
 
 
 	const char* argv67[12] = { "mesa", "-simplifycfg-sink-common=false",
@@ -1508,6 +1395,82 @@ void OptimizeVmpModule(llvm::Module* module,
 
 	llvm::cl::ParseCommandLineOptions(12, argv67);
 
+
+}
+
+void OptimizeVmpModule(llvm::Module* module,
+	llvm::Function* f,
+	bool aggressiveUnroll,
+	bool runClassifyingAliasAnalysis,
+	Dna::Passes::tGetAliasResult getAliasResult,
+	bool runConstantConcretization,
+	Dna::Passes::tReadBinaryContents readBinaryContents,
+	bool runStructuring,
+	bool justGVN,
+	Dna::Passes::tStructureFunction structureFunction,
+	Dna::Passes::tEliminateStackVars eliminateStackVars,
+	Dna::Passes::tEliminateStackVars adhocInstCombine,
+	Dna::Passes::tEliminateStackVars multiUseCloning, 
+	bool fastPipeline)
+{
+	Initialize();
+
+
+
+	// Create pass managers.
+	llvm::FunctionPassManager FPM;
+	//llvm::PassManagerBuilder PMB;
+	llvm::legacy::PassManager module_manager;
+	llvm::LoopAnalysisManager LAM;
+	llvm::FunctionAnalysisManager FAM;
+	llvm::CGSCCAnalysisManager CGAM;
+	llvm::ModulePassManager MPM;
+	llvm::ModuleAnalysisManager MAM;
+	llvm::LoopPassManager LPM;
+	llvm::PassBuilder PB;
+	
+
+	if (fastPipeline) {
+		FPM.addPass(llvm::SROAPass({}));
+		FPM.addPass(llvm::EarlyCSEPass(true));
+
+		if (eliminateStackVars != nullptr)
+		{
+			FPM.addPass(Dna::Passes::OpaqueStackVarEliminationPass(eliminateStackVars));
+		}
+		FPM.addPass(llvm::SCCPPass());
+		FPM.addPass(llvm::InstSimplifyPass());
+		FPM.addPass(llvm::SimplifyCFGPass());
+		FPM.addPass(llvm::ADCEPass());
+
+
+		try
+		{
+			FAM.registerPass([&] { return PB.buildDefaultAAPipeline(); });
+			PB.registerModuleAnalyses(MAM);
+			PB.registerCGSCCAnalyses(CGAM);
+			PB.registerFunctionAnalyses(FAM);
+			PB.registerLoopAnalyses(LAM);
+			PB.crossRegisterProxies(LAM, FAM, CGAM, MAM);
+
+			//MPM.addPass(createModuleToFunctionPassAdaptor(std::move(FPM)));
+
+			FPM.addPass(createFunctionToLoopPassAdaptor<LoopPassManager>(
+				std::move(LPM), /*UseMemorySSA=*/true,
+				/*UseBlockFrequencyInfo=*/true));
+
+
+			FPM.run(*f, FAM);
+		}
+
+		catch (...)
+		{
+			printf("Exception in pass pipeline!\n");
+
+		}
+
+		return;
+	}
 
 	FPM.addPass(llvm::SROAPass({}));
 	FPM.addPass(llvm::SCCPPass());
@@ -1741,7 +1704,8 @@ DNA_EXPORT void OptimizeModuleVmp(llvm::Module* module,
 	Dna::Passes::tStructureFunction structureFunction,
 	Dna::Passes::tEliminateStackVars eliminateStackVars,
 	Dna::Passes::tEliminateStackVars adhocInstCombine,
-	Dna::Passes::tEliminateStackVars multiUseCloning)
+	Dna::Passes::tEliminateStackVars multiUseCloning,
+	bool fastPipeline)
 {
-	OptimizeVmpModule(module, f, aggressiveUnroll, runClassifyingAliasAnalysis, getAliasResult, runConstantConcretization, readBinaryContents, runStructuring, justGVN, structureFunction, eliminateStackVars, adhocInstCombine, multiUseCloning);
+	OptimizeVmpModule(module, f, aggressiveUnroll, runClassifyingAliasAnalysis, getAliasResult, runConstantConcretization, readBinaryContents, runStructuring, justGVN, structureFunction, eliminateStackVars, adhocInstCombine, multiUseCloning, fastPipeline);
 }

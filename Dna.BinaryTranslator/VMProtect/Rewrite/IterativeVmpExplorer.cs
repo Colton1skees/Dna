@@ -1,4 +1,5 @@
-﻿using Dna.BinaryTranslator.JmpTables;
+﻿using Dna.Binary;
+using Dna.BinaryTranslator.JmpTables;
 using Dna.BinaryTranslator.Lifting;
 using Dna.BinaryTranslator.Unsafe;
 using Dna.BinaryTranslator.X86;
@@ -24,6 +25,7 @@ using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.Linq;
+using System.Runtime.InteropServices;
 using System.Text;
 using System.Text.RegularExpressions;
 using System.Threading.Tasks;
@@ -224,8 +226,8 @@ namespace Dna.BinaryTranslator.VMProtect.Rewrite
                 liftedFunction.GlobalParent.PrintToFile("translatedFunction.ll");
 
                 // Run our optimization pipeline
-                PassPipeline.Run(dna.Binary, liftedFunction, false);
-
+                //PassPipeline.Run(dna.Binary, liftedFunction, false);
+                VmpPassPipeline.Run(dna.Binary, liftedFunction);
 
                 liftedFunction.GlobalParent.PrintToFile("translatedFunction.ll");
                 // Solve for any unknown indirect jumps in the control flow graph.
@@ -302,8 +304,8 @@ namespace Dna.BinaryTranslator.VMProtect.Rewrite
                         newCfg.AddEdge(handler, getHandler(succ));
                 }
 
-                if (ii == 529)
-                    Debugger.Break();
+                //if (ii == 529)
+                 //   Debugger.Break();
 
                 // Get all newly added nodes & nodes with new predecessors
                 bool isRebuildRequired = false;
@@ -401,8 +403,6 @@ namespace Dna.BinaryTranslator.VMProtect.Rewrite
             var prevRip = bytecodeAddrToRip[bytecodeAddr];
             var jmpFrom = handlerLifter.Lift(debugModule, prevRip, entryHandler.BytecodeRip == bytecodeAddr);
             var targets = outgoingHandlers.Select(x => (x, handlerLifter.Lift(debugModule, x, x == entryHandler.BytecodeRip))).ToList();
-
-            handlerLifter.cacheModule.PrintToFile("translatedFunction.ll");
 
             HashSet<(RemillRegister, RemillRegister)> registers = new();
             foreach(var (rip, t) in targets)
@@ -1098,9 +1098,6 @@ namespace Dna.BinaryTranslator.VMProtect.Rewrite
         {
             var llvmBlock = blockMapping[handler];
 
-            if (handler.NativeRip == 0x1400e6773)
-                Debugger.Break();
-
             bool isVmExit = vmexitHandlerRips.Contains(handler.NativeRip);
             var info = vCfg.Instructions[handler];
             bool isComplete = info.Metadata.IsComplete;
@@ -1312,12 +1309,7 @@ namespace Dna.BinaryTranslator.VMProtect.Rewrite
             // This is where the VIP gets swapped from RSI to r9
             // Notably RSI is set to some BS + a binary offset
 
-            if (handlerRip == 0x140048BBD)
-            {
-                //GetBytecodeRegister(cfg, stateStruct, stripped, false, arch.GetRegisterByName("RSI"));
-                Debugger.Break();
-            }
-
+   
             // Eliminate any stack expansion in the IR
             EliminateStackExpansionLoop(stripped, handlerRip);
 
@@ -1503,11 +1495,6 @@ namespace Dna.BinaryTranslator.VMProtect.Rewrite
         // To make optimization a bit easier we modify the VMEnter to allocate a huge amount of stack space and delete all of the stack expansion loops.
         private void EliminateStackExpansionLoop(LLVMValueRef function, ulong handlerRip)
         {
-            if (handlerRip == 0x140090F0D)
-            {
-                function.GlobalParent.PrintToFile("translatedFunction.ll");
-                Debugger.Break();
-            }
             var hasCycles = () =>
             {
                 var entryBlock = function.EntryBasicBlock;
@@ -1890,5 +1877,35 @@ namespace Dna.BinaryTranslator.VMProtect.Rewrite
 
         private LLVMValueRef GetBranchIntrinsic()
             => function.GlobalParent.GetFunctions().SingleOrDefault(x => x.Name.Contains("vmp_branch"));
+    }
+
+    // TODO: Implement check. Is vip/vkey solvable, bail if early
+    public static class VmpPassPipeline
+    {
+        public static void Run(IBinary bin, LLVMValueRef function)
+        {
+            var mod = function.GlobalParent;
+            var func = mod.GetFunctions().FirstOrDefault(func => func.Name == "vmp_branch");
+            var callers = func == null ? new List<LLVMValueRef>() : RemillUtils.CallersOf(func).Where(x => x.InstructionParent.Parent == function);
+
+            int iter = 0;
+            while(iter < 5)
+            {
+
+                var optimizeFast = () =>
+                {
+                    var storeToLoad = new CombinedFixedpointOptPass(bin);
+                    var pStoreToLoad = Marshal.GetFunctionPointerForDelegate(storeToLoad.PtrToStoreLoadPropagation);
+                    OptimizationApi.OptimizeModuleVmp(function.GlobalParent, function, false, false, 0, false, 0, false, false, 0, pStoreToLoad, 0, 0, fastPipeline: true);
+                };
+
+                for (int i = 0; i < 2; i++)
+                {
+                    optimizeFast();
+                }
+
+                iter++;
+            }
+        }
     }
 }

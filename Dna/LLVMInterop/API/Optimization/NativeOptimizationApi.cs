@@ -27,7 +27,8 @@ namespace Dna.LLVMInterop
             nint ptrStructureFunction,
             nint ptrEliminateStackVars,
             nint adhocInstCombine,
-            nint multiUseCloning);
+            nint multiUseCloning,
+            bool fastPipeline);
 
         [DllImport("Dna.LLVMInterop", CallingConvention = CallingConvention.Cdecl)]
         public unsafe static extern IntPtr OptimizeLLVMModule(LLVMOpaqueModule* module,

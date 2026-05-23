@@ -24,7 +24,8 @@ namespace Dna.LLVMInterop.API.Optimization
             nint ptrStructureFunction = 0,
             nint ptrEliminateStackVars = 0,
             nint adhocInstCombine = 0,
-            nint multiUseCloning = 0)
+            nint multiUseCloning = 0,
+            bool fastPipeline = false)
         {
             NativeOptimizationApi.OptimizeModuleVmp(module,
                 function,
@@ -38,7 +39,7 @@ namespace Dna.LLVMInterop.API.Optimization
                 ptrStructureFunction,
                 ptrEliminateStackVars,
                 adhocInstCombine,
-                multiUseCloning);
+                multiUseCloning, fastPipeline);
         }
 
         public static unsafe void OptimizeModule(LLVMModuleRef module,
