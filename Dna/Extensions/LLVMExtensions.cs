@@ -171,6 +171,17 @@ namespace Dna.Extensions
         public static bool IsConstant(this LLVMValueRef inst)
             => inst.Is(LLVMValueKind.LLVMConstantIntValueKind);
 
+
+        public static bool TryGetConstant(this LLVMValueRef inst, out ulong constant)
+        {
+            constant = 0;
+            if (!inst.IsConstant())
+                return false;
+
+            constant = inst.ConstIntZExt;
+            return true;
+        }
+
         public static LLVMValueRef GetCallInstTarget(this LLVMValueRef callInst) => callInst.GetOperand((uint)callInst.OperandCount - 1);
 
         public static LLVMTypeRef GetFunctionPrototype(this LLVMValueRef func) => LLVMCloning.GetFunctionPrototype(func);

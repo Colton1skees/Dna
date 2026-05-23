@@ -17,7 +17,7 @@ namespace Dna.BinaryTranslator.VMProtect
 {
     public class PassPipeline
     {
-        public static LLVMValueRef Run(IBinary bin, LLVMValueRef function, bool dbg = false, bool useCloning = true)
+        public static LLVMValueRef Run(IBinary bin, LLVMValueRef function, bool dbg = false, bool useCloning = true, bool fastPipeline = false)
         {
             if(dbg)
             {
@@ -54,7 +54,7 @@ namespace Dna.BinaryTranslator.VMProtect
                 //if (i != 0 && i % 2 != 0)
                 //    MbaDeobfuscationPass.Run(function);
 
-                OptimizationApi.OptimizeModuleVmp(function.GlobalParent, function, false, false, 0, false, 0, false, false, 0, pStoreToLoad, pInstCombine, useCloning ? pMultiUseCloning : 0);
+                OptimizationApi.OptimizeModuleVmp(function.GlobalParent, function, false, false, 0, false, 0, false, false, 0, pStoreToLoad, pInstCombine, useCloning ? pMultiUseCloning : 0, fastPipeline);
 
              
                 if (func != null && func.GetUsers().Count > 0)

@@ -7,11 +7,13 @@ using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.Linq;
+using System.Numerics;
 using System.Security.Cryptography;
 using System.Text;
 using System.Threading.Tasks;
 using WebAssembly.Instructions;
 using static Dna.LLVMInterop.NativePassApi;
+using static System.Net.Mime.MediaTypeNames;
 
 namespace Dna.Passes
 {
@@ -40,6 +42,7 @@ namespace Dna.Passes
             bool changed = false;
             foreach(var inst in function.GetInstructions().ToList())
             {
+                changed |= TrySimplifyInstruction(inst);
                 changed |= TryRewriteBinaryOperator(inst);
                 changed |= TryRewriteConstantShiftOfConstantSelect(inst);
                 changed |= TryRewriteTruncOfConstantSelect(inst);
@@ -48,6 +51,9 @@ namespace Dna.Passes
                 changed |= TryRewriteVmpShifts(inst);
                 changed |= TrySinkLoadOfSelect(inst);
                 changed |= TryRewriteSignExtI1(inst);
+                changed |= TryRewriteTruncAnd(inst);
+                changed |= TryRewriteZextTrunc(inst);
+                changed |= TryRewriteDisjointOr(inst);
             }
 
             return changed;
@@ -414,6 +420,82 @@ namespace Dna.Passes
             var select = builder.BuildSelect(inst.GetOperand(0), LLVMValueRef.CreateConstInt(type, ulong.MaxValue), LLVMValueRef.CreateConstInt(type, 0));
             Replace(inst, select);
 
+            return true;
+        }
+
+        // %163 = and i64 %3, 255
+        // %164 = trunc i64 %163 to i8
+        private bool TryRewriteTruncAnd(LLVMValueRef trunc)
+        {
+            if (!trunc.Is(LLVMOpcode.LLVMTrunc))
+                return false;
+            var and = trunc.GetOperand(0);
+
+            // and x, 255
+            if (!and.Is(LLVMOpcode.LLVMAnd))
+                return false;
+            if (!and.GetOperand(1).TryGetConstant(out var andMask))
+                return false;
+
+            var truncWidth = trunc.TypeOf.IntWidth;
+            var andWidth = BitOperations.TrailingZeroCount(~andMask);
+
+            bool isSubset = truncWidth <= andWidth;
+            if (!isSubset)
+                return false;
+
+            var src = and.GetOperand(0);
+            trunc.SetOperand(0, src);
+            return true;
+        }
+
+
+        //   %3581 = trunc i64 %3017 to i8
+        // %3582 = zext i8 %3581 to i64
+        private bool TryRewriteZextTrunc(LLVMValueRef zext)
+        {
+            if (!zext.Is(LLVMOpcode.LLVMZExt))
+                return false;
+            var trunc = zext.GetOperand(0);
+            if (!trunc.Is(LLVMOpcode.LLVMTrunc))
+                return false;
+
+            var src = trunc.GetOperand(0);
+            if (src.TypeOf.IntWidth != zext.TypeOf.IntWidth)
+                return false;
+
+            var truncMask = ModuloReducer.GetMask(trunc.TypeOf.IntWidth);
+            builder.PositionBefore(zext);
+            var replacement = builder.BuildAnd(src, LLVMValueRef.CreateConstInt(zext.TypeOf, truncMask));
+            zext.ReplaceAllUsesWith(replacement);
+            return true;
+        }
+
+        private bool TryRewriteDisjointOr(LLVMValueRef or)
+        {
+            if (!or.Is(LLVMOpcode.LLVMOr))
+                return false;
+            var children = new LLVMValueRef[] { or.GetOperand(0), or.GetOperand(1) };
+            if (!children.All(x => x.Is(LLVMOpcode.LLVMAnd) && x.GetOperand(1).IsConstant()))
+                return false;
+
+            var src = children[0].GetOperand(0);
+            if (src != children[1].GetOperand(0))
+                return false;
+
+            var combinedMask = children[0].GetOperand(1).ConstIntZExt | children[1].GetOperand(1).ConstIntZExt;
+            var replacement = builder.BuildAnd(src, LLVMValueRef.CreateConstInt(src.TypeOf, combinedMask));
+            Replace(or, replacement);
+            return true;
+        }
+
+        private bool TrySimplifyInstruction(LLVMValueRef inst)
+        {
+            var simplified = ConstantFoldingAPI.TrySimplify(inst);
+            if (simplified.Handle == 0)
+                return false;
+
+            Replace(inst, simplified);
             return true;
         }
 

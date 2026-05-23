@@ -1432,14 +1432,14 @@ void OptimizeVmpModule(llvm::Module* module,
 
 	if (fastPipeline) {
 		FPM.addPass(llvm::SROAPass({}));
-		FPM.addPass(llvm::EarlyCSEPass(true));
+		//FPM.addPass(llvm::EarlyCSEPass(true));
 
 		if (eliminateStackVars != nullptr)
 		{
 			FPM.addPass(Dna::Passes::OpaqueStackVarEliminationPass(eliminateStackVars));
 		}
-		FPM.addPass(llvm::SCCPPass());
-		FPM.addPass(llvm::InstSimplifyPass());
+		//FPM.addPass(llvm::SCCPPass());
+		//FPM.addPass(llvm::InstSimplifyPass());
 		FPM.addPass(llvm::SimplifyCFGPass());
 		FPM.addPass(llvm::ADCEPass());
 

@@ -74,10 +74,11 @@ if (genDsl)
 //LazyLLVMFixes.InstallValueToStringBugFix(RemillUtils.LLVMValueToString);
 
 
-bool dbgCode = false;
+bool dbgCode = true;
 if (dbgCode)
 {
-    var irPath = "C:\\Users\\colton\\Downloads\\solve_fail.ll";
+    var irPath = "C:\\Users\\colton\\Downloads\\instcombine_fail2.ll";
+    var t = File.ReadAllText(irPath);
     Console.WriteLine(irPath);
     var tempNewMod = RemillUtils.LoadModuleFromFile(LLVMContextRef.Global, irPath).Value;
     var existingFunc = tempNewMod.GetFunctions().Single(x => x.Name.Contains("Part"));
@@ -108,10 +109,17 @@ if (dbgCode)
 
 
         //MbaDeobfuscationPass.Run(existingFunc);
-        PassPipeline.Run(vmpBin, existingFunc);
+        PassPipeline.Run(vmpBin, existingFunc, false, false, true);
+
+        unsafe
+        {
+            new AdhocInstCombinePass().InstCombine((LLVMOpaqueValue*)existingFunc.Handle, 0, 0);
+            new AdhocInstCombinePass().InstCombine((LLVMOpaqueValue*)existingFunc.Handle, 0, 0);
+        }
         //MbaDeobfuscationPass.Run(existingFunc);
-        PassPipeline.Run(vmpBin, existingFunc);
-      //  PassPipeline.Run(vmpBin, existingFunc);
+        tempNewMod.PrintToFile(("translatedFunction.ll"));
+        PassPipeline.Run(vmpBin, existingFunc, false, false, true);
+        //  PassPipeline.Run(vmpBin, existingFunc);
 
         tempNewMod.PrintToFile("instcombine.ll");
         tempNewMod.PrintToFile(("compile.ll"));
@@ -119,7 +127,7 @@ if (dbgCode)
 
         var compiledPath3 = ClangCompiler.Compile("compile.ll");
 
-        Console.WriteLine("Loading into IDA.");
+        Console.WriteLine("Loading into IDA.  ");
         var exePath3 = IDALoader.Load(compiledPath3, true);
 
 
@@ -129,7 +137,7 @@ if (dbgCode)
         File.WriteAllText("binja.py", new LLVMToBinjaGraph(existingFunc).Process());
 
         sw.Stop();
-            Console.WriteLine($"Pass took {sw.ElapsedMilliseconds}ms");
+            Console.WriteLine($"Pass took {sw.ElapsedMilliseconds}ms ");
         Debugger.Break();
     }
     Debugger.Break();

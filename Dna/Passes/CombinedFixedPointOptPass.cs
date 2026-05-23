@@ -62,12 +62,12 @@ namespace Dna.Passes
             return Run(function, new LoopInfo(loopInfo), new MemorySSA(mssa));
         }
 
-        private BaseWithOffset GetCanonicalBasePlusOffset(LLVMValueRef current)
+        private BaseWithOffset GetCanonicalBasePlusOffset(LLVMValueRef currentBase)
         {
-            var currentBase = current;
             ulong currentOffset = 0;
 
             bool cont = true;
+
             while (cont)
             {
                 switch (currentBase.InstructionOpcode)
@@ -166,25 +166,30 @@ namespace Dna.Passes
             var globalMemPtr = function.GlobalParent.GetGlobals().First(x => x.Name.Contains("memory"));
             this.memPtr = function.EntryBasicBlock.GetInstructions().SingleOrDefault(x => x.InstructionOpcode == LLVMOpcode.LLVMLoad && x.GetOperand(0) == globalMemPtr);
 
+            function.GlobalParent.PrintToFile("translatedFunction.ll");
+
             // Process each instruction.
+            int numIterations = 0;
             using (var updater = new MemorySSAUpdater(mssa))
             {
                 var localChanged = true;
                 while (localChanged)
                 {
+                    numIterations++;
                     localChanged = false;
 
                     var worklist = new WorkList<LLVMValueRef>(function.GetInstructions());
                     while (worklist.Count > 0)
                     {
-                        var nextInstr = worklist.PopBack();
+                        var nextInstr = worklist.PopFront();
 
                         void DoReplaceAndRemove(LLVMValueRef replaceWith)
                         {
                             Debug.Assert(replaceWith != nextInstr);
 
                             updater.RemoveMemoryAccess(nextInstr);
-                            worklist.AddRangeToFront(nextInstr.GetUsers().Where(sel => sel.Handle != nextInstr.Handle));
+                            var users = nextInstr.GetUsers().Where(sel => sel.Handle != nextInstr.Handle).ToList();
+                            worklist.AddRangeToFront(users);
 
                             nextInstr.ReplaceAllUsesWith(replaceWith);
                             nextInstr.InstructionEraseFromParent();
@@ -195,7 +200,7 @@ namespace Dna.Passes
                         // Do a const-prop loop before anything else since we don't want to do redundant work.
                         unsafe
                         {
-                            var result = NativeConstantFoldingAPI.TryConstantFold((LLVMOpaqueValue*)nextInstr.Handle);
+                            var result = NativeConstantFoldingAPI.TrySimplify((LLVMOpaqueValue*)nextInstr.Handle);
                             if (result != null)
                             {
                                 DoReplaceAndRemove(new LLVMValueRef((nint)result));
@@ -218,6 +223,8 @@ namespace Dna.Passes
                 }
             }
 
+
+            Console.WriteLine($"Worklist converged in {numIterations} iterations!");
             return true;
         }
 
