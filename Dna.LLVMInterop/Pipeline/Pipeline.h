@@ -1409,7 +1409,7 @@ void OptimizeVmpModule(llvm::Module* module,
 	bool justGVN,
 	Dna::Passes::tStructureFunction structureFunction,
 	Dna::Passes::tEliminateStackVars eliminateStackVars,
-	Dna::Passes::tEliminateStackVars adhocInstCombine,
+	Dna::Passes::tStructureFunction adhocInstCombine,
 	Dna::Passes::tEliminateStackVars multiUseCloning, 
 	bool fastPipeline)
 {
@@ -1703,7 +1703,7 @@ DNA_EXPORT void OptimizeModuleVmp(llvm::Module* module,
 	bool justGVN,
 	Dna::Passes::tStructureFunction structureFunction,
 	Dna::Passes::tEliminateStackVars eliminateStackVars,
-	Dna::Passes::tEliminateStackVars adhocInstCombine,
+	Dna::Passes::tStructureFunction adhocInstCombine,
 	Dna::Passes::tEliminateStackVars multiUseCloning,
 	bool fastPipeline)
 {

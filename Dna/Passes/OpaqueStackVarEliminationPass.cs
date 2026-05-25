@@ -15,7 +15,7 @@ namespace Dna.Passes
 {
     public class OpaqueStackVarEliminationPass
     {
-        public dgCombinedFixedpointPass PtrEliminateStackVars { get; }
+        public dgOpaqueStackVarElimination PtrEliminateStackVars { get; }
 
         private LLVMValueRef function;
 
@@ -27,7 +27,7 @@ namespace Dna.Passes
 
         public unsafe OpaqueStackVarEliminationPass()
         {
-            PtrEliminateStackVars = new dgCombinedFixedpointPass(StackVarElimination);
+            PtrEliminateStackVars = new dgOpaqueStackVarElimination(StackVarElimination);
         }
 
         private unsafe bool StackVarElimination(LLVMOpaqueValue* function, nint loopInfo, nint mssa)

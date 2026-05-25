@@ -67,7 +67,7 @@
 #include <llvm/Analysis/MemorySSA.h>
 #include <Passes/ClassifyingAliasAnalysisPass.h>
 namespace Dna::Passes {
-	typedef bool(__cdecl* tStructureFunction)(llvm::Function* func, llvm::LoopInfo* loopInfo, llvm::MemorySSA* memSsa);
+	typedef bool(__cdecl* tStructureFunction)(llvm::Function* func, llvm::LoopInfo* loopInfo, llvm::MemorySSA* memSsa, llvm::SimplifyQuery* simplifyQuery);
 
 	struct ControlFlowStructuringPass : public PassInfoMixin<ControlFlowStructuringPass>
 	{
@@ -91,12 +91,19 @@ namespace Dna::Passes {
 			llvm::LoopInfo& LI = fam.getResult<llvm::LoopAnalysis>(F);
 			llvm::MemorySSA& mssa = fam.getResult<llvm::MemorySSAAnalysis>(F).getMSSA();
 			mssa.ensureOptimizedUses();
-			printf("structuring.");
-			bool changed = structureFunction(&F, &LI, &mssa);
-			if (changed)
-				return PreservedAnalyses::none();
 
-			return PreservedAnalyses::all();
+			const auto& DL = F.getParent()->getDataLayout();
+			const auto& TLI = fam.getResult<llvm::TargetLibraryAnalysis>(F);
+			auto& AC = fam.getResult<llvm::AssumptionAnalysis>(F);
+			auto& DT = fam.getResult<llvm::DominatorTreeAnalysis>(F);
+
+			llvm::SimplifyQuery SQ(DL, &TLI, &DT, &AC);
+
+			bool changed = structureFunction(&F, &LI, &mssa, &SQ);
+			if (changed)
+				return llvm::PreservedAnalyses::none();
+
+			return llvm::PreservedAnalyses::all();
 		}
 	};
 

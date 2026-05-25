@@ -288,6 +288,7 @@ namespace Dna.Passes.Mba
             if (inst.GetUsers().Any(x => x.InstructionOpcode == LLVMOpcode.LLVMPHI))
                 return def;
 
+            /*
             var knownBits = NativeKnownBits.Get(inst, function.GlobalParent);
             var oldDef = def;
             if (knownBits.GetKnownBitCount() > 0)
@@ -302,6 +303,7 @@ namespace Dna.Passes.Mba
 
             substMapping[inst] = oldDef;
             return def;
+            */
         }
 
         private static AstIdx Shl(AstCtx ctx, AstIdx a, AstIdx b)

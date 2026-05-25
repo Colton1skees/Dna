@@ -9,6 +9,7 @@ using System.Diagnostics;
 using System.Linq;
 using System.Numerics;
 using System.Reflection.Emit;
+using System.Runtime.InteropServices.Marshalling;
 using System.Security.Cryptography;
 using System.Text;
 using System.Threading.Tasks;
@@ -28,6 +29,9 @@ namespace Dna.Passes
 
         public void Add(params LLVMValueRef[] insts)
             => Insts.AddRange(insts);
+
+        public void Add(IReadOnlyList<LLVMValueRef> insts)
+           => Insts.AddRange(insts);
     }
 
     // Peephole optimization pass for cases that InstCombine either cannot perform or choses not to due to global profitability
@@ -44,7 +48,7 @@ namespace Dna.Passes
             PtrToStoreLoadPropagation = new dgAdhocInstCombinePass(InstCombine);
         }
 
-        public unsafe bool InstCombine(LLVMOpaqueValue* function, nint loopInfo, nint mssa)
+        public unsafe bool InstCombine(LLVMOpaqueValue* function, nint loopInfo, nint mssa, nint simplifyQuery)
         {
             //return false;
             builder = LLVMBuilderRef.Create(LLVMContextRef.Global);
@@ -54,12 +58,13 @@ namespace Dna.Passes
 
             bool changed = true;
             changed = false;
+            var sq = new SimplifyQuery(simplifyQuery);
             foreach (var inst in f.GetInstructions().ToList())
             {
                 var curr = inst;
                 while (curr != null)
                 {
-                    var peephole = PeepholeInst(curr);
+                    var peephole = PeepholeInst(curr, sq);
                     if (peephole == null)
                     {
                         curr = null;
@@ -77,43 +82,27 @@ namespace Dna.Passes
             return changed;
         }
 
-        public PeepholeResult PeepholeInst(LLVMValueRef inst)
+        public PeepholeResult PeepholeInst(LLVMValueRef inst, SimplifyQuery simplifyQuery)
         {
             if (inst.TypeOf.IntWidth > 64)
                 return null;
 
-            if (inst.Is(LLVMOpcode.LLVMPHI))
-                return null;
-            if (inst.InstructionOpcode == LLVMOpcode.LLVMStore || inst.InstructionOpcode == LLVMOpcode.LLVMLoad)
-                return null;
-
-            if (!inst.Is(LLVMValueKind.LLVMInstructionValueKind, LLVMValueKind.LLVMConstantIntValueKind))
-                Debugger.Break();
-
             if (!inst.Is(LLVMValueKind.LLVMInstructionValueKind))
                 return null;
 
-            ConstantFoldingAPI.DropPoisonGeneratingFlags(inst);
+            var opc = inst.InstructionOpcode;
+            if (inst.InstructionOpcode == LLVMOpcode.LLVMStore || inst.InstructionOpcode == LLVMOpcode.LLVMLoad || inst.InstructionOpcode == LLVMOpcode.LLVMPHI)
+                return null;
 
-            if (inst.TypeOf.Kind != LLVMTypeKind.LLVMIntegerTypeKind || inst.TypeOf.IntWidth > 64)
-            {
-                if (!inst.Is(LLVMOpcode.LLVMBr, LLVMOpcode.LLVMSwitch, LLVMOpcode.LLVMRet, LLVMOpcode.LLVMGetElementPtr, LLVMOpcode.LLVMCall))
-                    Debugger.Break();
-            }
-
-            Debug.Assert(inst.Is(LLVMValueKind.LLVMInstructionValueKind));
 
             PeepholeResult changed = null;
-
-            if (inst.Is(LLVMOpcode.LLVMShl, LLVMOpcode.LLVMLShr, LLVMOpcode.LLVMAShr) && inst.GetOperand(1).Is(LLVMValueKind.LLVMConstantIntValueKind) && inst.ConstIntZExt >= inst.TypeOf.IntWidth)
-                Debugger.Break();
 
             //changed = TrySimplifyInstruction(inst);
             //if (changed != null)
             //    return changed;
 
-
-            if (inst.Is(LLVMOpcode.LLVMShl, LLVMOpcode.LLVMLShr, LLVMOpcode.LLVMAShr))
+            /*
+            if (opc == LLVMOpcode.LLVMShl || opc == LLVMOpcode.LLVMAShr || opc == LLVMOpcode.LLVMShl)
             {
                 var rhs = inst.GetOperand(1);
 
@@ -129,16 +118,13 @@ namespace Dna.Passes
                     builder.PositionBefore(inst);
                     var and = builder.BuildAnd(rhs, LLVMValueRef.CreateConstInt(inst.TypeOf, safeMask));
                     inst.SetOperand(1, and);
-
-
                 }
             }
-
+            */
 
             changed = TryRewriteTruncOfConstantSelect(inst);
             if (changed != null)
                 return changed;
-
 
             changed = TryDistributeSelect(inst);
             if (changed != null)
@@ -149,7 +135,7 @@ namespace Dna.Passes
                 return changed;
 
 
-            changed = TryKnownBitsFoldToSelect(inst);
+            changed = TryKnownBitsFoldToSelect(inst, simplifyQuery);
             if (changed != null)
                 return changed;
 
@@ -366,12 +352,12 @@ return peephole;
             return peephole;
         }
 
-        private PeepholeResult TryKnownBitsFoldToSelect(LLVMValueRef inst)
+        private PeepholeResult TryKnownBitsFoldToSelect(LLVMValueRef inst, SimplifyQuery simplifyQuery)
         {
             if (!inst.Is(kbFolds))
                 return null;
 
-            var kb = NativeKnownBits.Get(inst, inst.GlobalParent);
+            var kb = NativeKnownBits.Get(inst, simplifyQuery);
             if (kb.GetUnknownBitCount() != 1)
                 return null;
 

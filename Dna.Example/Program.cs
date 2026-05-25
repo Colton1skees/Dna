@@ -94,7 +94,7 @@ if (dbgCode)
             //existingFunc.GlobalParent.PrintToFile("instcombine.ll");
             if (false)
             {
-                new AdhocInstCombinePass().InstCombine((LLVMOpaqueValue*)existingFunc.Handle, 0, 0);
+                new AdhocInstCombinePass().InstCombine((LLVMOpaqueValue*)existingFunc.Handle, 0, 0, 0);
                 MultiUseCloningPass.Run(existingFunc);
                 MbaDeobfuscationPass.Run(existingFunc);
                 var bar = new CombinedFixedpointOptPass(null);
@@ -114,8 +114,8 @@ if (dbgCode)
         tempNewMod.PrintToFile(("translatedFunction.ll"));
         unsafe
         {
-            new AdhocInstCombinePass().InstCombine((LLVMOpaqueValue*)existingFunc.Handle, 0, 0);
-            new AdhocInstCombinePass().InstCombine((LLVMOpaqueValue*)existingFunc.Handle, 0, 0);
+            new AdhocInstCombinePass().InstCombine((LLVMOpaqueValue*)existingFunc.Handle, 0, 0, 0);
+            new AdhocInstCombinePass().InstCombine((LLVMOpaqueValue*)existingFunc.Handle, 0, 0, 0);
         }
         //MbaDeobfuscationPass.Run(existingFunc);
         tempNewMod.PrintToFile(("translatedFunction.ll"));

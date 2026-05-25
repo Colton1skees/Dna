@@ -15,13 +15,13 @@ namespace Dna.LLVMInterop
         public unsafe delegate bool dgStructureFunction(LLVMOpaqueValue* function, nint loopInfo, nint mssa);
 
         [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
-        public unsafe delegate bool dgCombinedFixedpointPass(LLVMOpaqueValue* function, nint loopInfo, nint mssa);
+        public unsafe delegate bool dgCombinedFixedpointPass(LLVMOpaqueValue* function, nint loopInfo, nint mssa, nint simplifyQuery);
 
         [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
-        public unsafe delegate bool dgAdhocInstCombinePass(LLVMOpaqueValue* function, nint loopInfo, nint mssa);
+        public unsafe delegate bool dgAdhocInstCombinePass(LLVMOpaqueValue* function, nint loopInfo, nint mssa, nint simplifyQuery);
 
         [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
-        public unsafe delegate bool dgMultiUseCloningPass(LLVMOpaqueValue* function, nint loopInfo, nint mssa);
+        public unsafe delegate bool dgMultiUseCloningPass(LLVMOpaqueValue* function, nint loopInfo, nint mssa, nint simplifyQuery);
 
         [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
         public unsafe delegate bool dgOpaqueStackVarElimination(LLVMOpaqueValue* function, nint loopInfo, nint mssa);

@@ -28,7 +28,7 @@ namespace Dna.Passes
             PtrToStoreLoadPropagation = new dgMultiUseCloningPass(MultiUseCloning);
         }
 
-        private unsafe bool MultiUseCloning(LLVMOpaqueValue* function, nint loopInfo, nint mssa)
+        private unsafe bool MultiUseCloning(LLVMOpaqueValue* function, nint loopInfo, nint mssa, nint simplifyQuery)
         {
             return Run(function);
         }

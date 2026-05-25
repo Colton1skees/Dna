@@ -1,4 +1,5 @@
-﻿using LLVMSharp;
+﻿using Dna.Passes;
+using LLVMSharp;
 using LLVMSharp.Interop;
 using System;
 using System.Collections.Generic;
@@ -70,19 +71,17 @@ namespace Dna.LLVMInterop.API.LLVMBindings.Analysis
             return arr;
         }
 
-        public static NativeKnownBits Get(LLVMValueRef inst, LLVMModuleRef module)
+        public static NativeKnownBits Get(LLVMValueRef inst, SimplifyQuery simplifyQuery)
         {
             unsafe
             {
-                var targetData = LLVM.GetModuleDataLayout(module);
-
                 NativeKnownBits kb = new();
-                GetKnownBits(inst.Handle, targetData, &kb);
+                GetKnownBits(inst.Handle, &kb, (OpaqueSimplifyQuery*)simplifyQuery.handle);
                 return kb;
             }
         }
 
         [DllImport("Dna.LLVMInterop", CallingConvention = CallingConvention.Cdecl)]
-        public unsafe static extern LLVMOpaqueTargetData* GetKnownBits(nint instruction, LLVMOpaqueTargetData* targetData, NativeKnownBits* outVal);
+        public unsafe static extern LLVMOpaqueTargetData* GetKnownBits(nint instruction, NativeKnownBits* outVal, OpaqueSimplifyQuery* simplifyQuery);
     }
 }

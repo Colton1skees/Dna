@@ -1,5 +1,6 @@
 #pragma once
 
+#include "llvm/ADT/PostOrderIterator.h"
 #include <llvm/IR/CFG.h>
 #include <API/ImmutableManagedVector.h>
 #include <API/ExportDef.h>
@@ -7,6 +8,27 @@
 using namespace llvm;
 
 namespace Dna::API {
+
+	DNA_EXPORT ImmutableManagedVector* Function_GetRpoInstructions(llvm::Function* function, llvm::Instruction** outInstructions)
+	{
+		auto rpoInstructions = new std::vector<llvm::Instruction*>();
+
+		rpoInstructions->reserve(function->getInstructionCount());
+
+		llvm::ReversePostOrderTraversal<llvm::Function*> RPOT(function);
+
+		for (llvm::BasicBlock* BB : RPOT) 
+		{
+			for (llvm::Instruction& I : *BB) 
+			{
+				rpoInstructions->push_back(&I);
+			}
+		}
+
+		return ImmutableManagedVector::NonCopyingFrom(rpoInstructions);
+	}
+
+
 	DNA_EXPORT unsigned int BasicBlock_GetPredSize(llvm::BasicBlock* block)
 	{
 		return llvm::pred_size(block);

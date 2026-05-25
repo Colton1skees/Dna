@@ -3,6 +3,7 @@ using Dna.ControlFlow;
 using Dna.DataStructures;
 using Dna.Extensions;
 using Dna.LLVMInterop.API.LLVMBindings.Analysis;
+using Dna.LLVMInterop.API.LLVMBindings.IR;
 using Dna.Passes;
 using Dna.Passes.Matchers;
 using LLVMSharp.Interop;
@@ -22,6 +23,21 @@ using StoreOffsetMapping = System.Collections.Generic.Dictionary<long, (LLVMShar
 
 namespace Dna.Passes
 {
+    public struct OpaqueSimplifyQuery
+    {
+        nint handle;
+    }
+
+    public class SimplifyQuery
+    {
+        public nint handle;
+
+        public SimplifyQuery(nint handle)
+        {
+            this.handle = handle;
+        }
+    }
+
     public record BaseWithOffset(LLVMValueRef Base, ulong Offset);
     public record ClobberingStore(MemoryUseOrDef UseOrDef, BaseWithOffset BaseOffsetPair);
     public record LoadReplacement(LLVMValueRef ToReplace, LLVMValueRef Replacement);
@@ -56,10 +72,10 @@ namespace Dna.Passes
             PtrToStoreLoadPropagation = new dgCombinedFixedpointPass(StoreToLoadPropagation);
         }
 
-        private unsafe bool StoreToLoadPropagation(LLVMOpaqueValue* function, nint loopInfo, nint mssa)
+        private unsafe bool StoreToLoadPropagation(LLVMOpaqueValue* function, nint loopInfo, nint mssa, nint simplifyQuery)
         {
             builder = LLVMBuilderRef.Create(LLVMContextRef.Global);
-            return Run(function, new LoopInfo(loopInfo), new MemorySSA(mssa));
+            return Run(function, new LoopInfo(loopInfo), new MemorySSA(mssa), new SimplifyQuery(simplifyQuery));
         }
 
         private BaseWithOffset GetCanonicalBasePlusOffset(LLVMValueRef currentBase)
@@ -161,15 +177,13 @@ namespace Dna.Passes
             return new BaseWithOffset(currentBase, currentOffset);
         }
 
-        private bool Run(LLVMValueRef function, LoopInfo loopInfo, MemorySSA mssa)
+        private bool Run(LLVMValueRef function, LoopInfo loopInfo, MemorySSA mssa, SimplifyQuery simplifyQuery)
         {
             this.function = function;
             this.mssa = mssa;
 
             var globalMemPtr = function.GlobalParent.GetGlobals().First(x => x.Name.Contains("memory"));
             this.memPtr = function.EntryBasicBlock.GetInstructions().SingleOrDefault(x => x.InstructionOpcode == LLVMOpcode.LLVMLoad && x.GetOperand(0) == globalMemPtr);
-
-            function.GlobalParent.PrintToFile("translatedFunction.ll");
 
             // Process each instruction.
             int numIterations = 0;
@@ -184,7 +198,10 @@ namespace Dna.Passes
                     var instcombine = new AdhocInstCombinePass();
                     instcombine.builder = LLVMBuilderRef.Create(function.GetFunctionCtx());
 
-                    var worklist = new WorkList<LLVMValueRef>(function.GetInstructions());
+                    if (numIterations == 3)
+                        Debugger.Break();
+
+                    var worklist = new WorkList<LLVMValueRef>(LLVMUtil.GetRpoInstructions(function));
                     while (worklist.Count > 0)
                     {
                         var nextInstr = worklist.PopFront();
@@ -196,6 +213,7 @@ namespace Dna.Passes
 
                         bool TryReplaceAndRemove(LLVMValueRef replaceWith)
                         {
+                            Console.WriteLine($"    replacing {nextInstr} with {replaceWith}");
                             if (replaceWith.Handle == 0 || replaceWith.Handle == nextInstr.Handle)
                                 return false;
 
@@ -213,44 +231,34 @@ namespace Dna.Passes
                             return true;
                         }
 
+                        bool TryReplaceAndRemove2(PeepholeResult peephole)
+                        {
+                            if (peephole == null)
+                                return false;
+
+                            var replacement = peephole.GetResult();
+                            if (replacement.Handle == 0 || replacement.Handle == nextInstr.Handle)
+                                return false;
+
+                            if (peephole.Insts.Any(x => x.Is(LLVMValueKind.LLVMInstructionValueKind) && x.GetOperands().Contains(nextInstr)))
+                                return false;
+
+                            //// Append all newly created instructions to the worklist, such that we visit them in RPO order(%t0, then %t1)
+                            //// %t0 = add x,y
+                            //// %t1 = mul %t0, 111
+                            foreach (var reversed in peephole.Insts.Where(x => x.Handle != nextInstr.Handle).Reverse<LLVMValueRef>())
+                                worklist.AddToFront(reversed);
+
+                            // Replace and remove the old input inst
+                            return TryReplaceAndRemove(replacement);
+
+                        }
+
+
+
                         // Do a const-prop loop before anything else since we don't want to do redundant work.
                         unsafe
                         {
-                            
-                            var peephole = instcombine.PeepholeInst(nextInstr);
-        
-                            if (peephole != null)
-                            {
-                  
-                                
-                                var replacement = peephole.GetResult();
-                                if (replacement.Handle == 0 || replacement.Handle == nextInstr.Handle)
-                                    continue;
-
-                                if (peephole.Insts.Any(x => x.Is(LLVMValueKind.LLVMInstructionValueKind) && x.GetOperands().Contains(nextInstr)))
-                                    continue;
-
-                                //// Append all newly created instructions to the worklist, such that we visit them in RPO order(%t0, then %t1)
-                                //// %t0 = add x,y
-                                //// %t1 = mul %t0, 111
-                                //foreach (var reversed in peephole.Insts.Where(x => x.Handle != nextInstr.Handle).Reverse<LLVMValueRef>())
-                                //    worklist.AddToFront(reversed);
-
-                                foreach (var inst in peephole.Insts.Where(x => x.Is(LLVMValueKind.LLVMInstructionValueKind)))
-                                    ConstantFoldingAPI.DropPoisonGeneratingFlags(inst);
-
-                                if (peephole.Insts.Any(x => x.TypeOf.Kind != LLVMTypeKind.LLVMIntegerTypeKind))
-                                    Debugger.Break();
-
-
-                                // Replace and remove the old input inst
-                                TryReplaceAndRemove(replacement);
-                                
-
-                                continue;
-                            }
-                            
-                            
                             var result = NativeConstantFoldingAPI.TryConstantFold((LLVMOpaqueValue*)nextInstr.Handle);
                             if (result != null)
                             {
@@ -258,8 +266,10 @@ namespace Dna.Passes
                                 TryReplaceAndRemove(new LLVMValueRef((nint)result));
                                 continue;
                             }
-                            
 
+                            var peephole = instcombine.PeepholeInst(nextInstr, simplifyQuery);
+                            if (TryReplaceAndRemove2(peephole))
+                                continue;
                         }
 
                         if (nextInstr.InstructionOpcode == LLVMOpcode.LLVMLoad)
@@ -267,7 +277,7 @@ namespace Dna.Passes
                             var repl = ProcessLoad(nextInstr, updater);
                             if (repl != null)
                             {
-                                TryReplaceAndRemove(repl);
+                                TryReplaceAndRemove2(repl);
                                 continue;
                             }
                         }
@@ -313,7 +323,7 @@ namespace Dna.Passes
             }
         }
 
-        private LLVMValueRef ProcessLoad(LLVMValueRef loadInst, MemorySSAUpdater updater)
+        private PeepholeResult ProcessLoad(LLVMValueRef loadInst, MemorySSAUpdater updater)
         {
             /*
             if(loadInst.ToString().Contains("%136 = load i32, ptr %39, align 4"))
@@ -555,8 +565,14 @@ namespace Dna.Passes
 
                 // Ok, we were able to propagate both load destinations to other loads.
                 var selectCond = baseWithConstantSelect.SelectOfTwoConstantIndices.GetOperand(0);
-                var combined = builder.BuildSelect(selectCond, solution1, solution2);
-                return combined;
+                var combined = builder.BuildSelect(selectCond, solution1.GetResult(), solution2.GetResult());
+
+
+                var peephole = new PeepholeResult();
+                peephole.Add(solution1.Insts);
+                peephole.Add(solution2.Insts);
+                peephole.Add(combined);
+                return peephole;
             }
             
 
@@ -578,7 +594,7 @@ namespace Dna.Passes
             return results;
         }
 
-        private LLVMValueRef CreateFullReplacementOfLoad(LLVMValueRef loadInst, StoreOffsetMapping storeOffsetMapping)
+        private PeepholeResult CreateFullReplacementOfLoad(LLVMValueRef loadInst, StoreOffsetMapping storeOffsetMapping)
         {
             // Position the builder immediately before the load instruction.
             builder.PositionBefore(loadInst);
@@ -589,6 +605,7 @@ namespace Dna.Passes
             var destTy = loadInst.TypeOf;
             LLVMValueRef last = LLVMValueRef.CreateConstInt(destTy, 0);
             var byteType = LLVMTypeRef.Int8;
+            var peephole = new PeepholeResult();
             foreach (var handledByte in storeOffsetMapping.OrderBy(x => x.Key))
             {
                 // Get the LLVMValueRef that this byte is coming form.
@@ -597,27 +614,33 @@ namespace Dna.Passes
                 // Shift the isolated byte down to the very bottom byte position.
                 var lshrBy = LLVMValueRef.CreateConstInt(srcValue.TypeOf, 8 * (handledByte.Value.byteIndex));
                 var shifted = builder.BuildLShr(srcValue, lshrBy);
+                peephole.Add(shifted);
 
                 // Isolate out only the last byte.
                 var byteMask = LLVMValueRef.CreateConstInt(srcValue.TypeOf, 255);
                 var isolated = builder.BuildAnd(shifted, byteMask);
+                peephole.Add(isolated);
                 isolated = builder.BuildTrunc(isolated, byteType);
+                peephole.Add(isolated);
 
                 // Upcast the value to the size of the load.
                 isolated = builder.BuildZExt(isolated, loadInst.TypeOf);
+                peephole.Add(isolated);
 
                 // Left shift the isolated byte back into it's correct position(relative to the load).
                 var shlBy = LLVMValueRef.CreateConstInt(destTy, 8 * (ulong)(handledByte.Key));
                 var orMask = builder.BuildShl(isolated, shlBy);
+                peephole.Add(orMask);
 
                 // Bitwise OR the isolated byte back into the target.
                 last = builder.BuildOr(last, orMask);
+                peephole.Add(last);
             }
 
-            return last;
+            return peephole;
         }
 
-        private LLVMValueRef ProcessBinaryLoad(LLVMValueRef loadInst)
+        private PeepholeResult ProcessBinaryLoad(LLVMValueRef loadInst)
         {
             // Type check
             if (loadInst.TypeOf.Kind != LLVMTypeKind.LLVMIntegerTypeKind)
@@ -665,10 +688,12 @@ namespace Dna.Passes
             Debug.Assert(words.Count != 0);
 
             var constantInt = LLVMValueRef.CreateConstIntOfArbitraryPrecision(loadInst.TypeOf, words.ToArray());
-            return constantInt;
+            var peephole = new PeepholeResult();
+            peephole.Add(constantInt);
+            return peephole;
         }
 
-        private LLVMValueRef TryProcessAsLoadOfTwoPossibleAddresses(LLVMValueRef gep, LLVMValueRef loadInst)
+        private PeepholeResult TryProcessAsLoadOfTwoPossibleAddresses(LLVMValueRef gep, LLVMValueRef loadInst)
         {
             // If this is not a select, return.
             var selectPtr = gep.GetOperand(1);
@@ -681,6 +706,7 @@ namespace Dna.Passes
             if (!BinaryAccessMatcher.IsConstantWithinBinarySection(bin, op1) || !BinaryAccessMatcher.IsConstantWithinBinarySection(bin, op2))
                 return null;
 
+            var peephole = new PeepholeResult();
             builder.PositionBefore(loadInst);
 
             // Construct loads for both constant sections.
@@ -691,7 +717,8 @@ namespace Dna.Passes
             var load2 = builder.BuildLoad2(loadInst.TypeOf, gep2);
 
             var select = builder.BuildSelect(selectPtr.GetOperand(0), load1, load2);
-            return select;
+            peephole.Add(gep1, gep2, load1, load2, select);
+            return peephole;
         }
     }
 }

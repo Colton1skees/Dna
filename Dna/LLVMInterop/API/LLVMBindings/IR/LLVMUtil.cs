@@ -11,6 +11,19 @@ namespace Dna.LLVMInterop.API.LLVMBindings.IR
     // Misc LLVM wrappers 
     public static class LLVMUtil
     {
+        public static unsafe IReadOnlyList<LLVMValueRef> GetRpoInstructions(LLVMValueRef func)
+        {
+            // Get an unmanaged vector ptr,.
+            var vecPtr = LLVMUtilApi.Function_GetRpoInstructions(func);
+
+            // Convert the ptr to a typed managed vector.
+            var managedVec = new ManagedVector<LLVMValueRef>((nint)vecPtr,
+                (nint ptr) => new LLVMValueRef(ptr));
+
+            // Return the read only list.
+            return managedVec.Items;
+        }
+
         public static unsafe uint GetBlockPredessorsCount(LLVMBasicBlockRef block) => LLVMUtilApi.BasicBlock_GetPredSize(block);
 
         public static unsafe IReadOnlyList<LLVMBasicBlockRef> GetBlockPredecessors(LLVMBasicBlockRef block)

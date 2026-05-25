@@ -15,8 +15,8 @@ struct RestrictedKnownBits {
 	uint64_t One;
 };
 
-DNA_EXPORT void GetKnownBits(llvm::Instruction* instruction, llvm::DataLayout* dataLayout, RestrictedKnownBits* out) {
-	auto KB = llvm::computeKnownBits(instruction, *dataLayout);
+DNA_EXPORT void GetKnownBits(llvm::Instruction* instruction, RestrictedKnownBits* out, llvm::SimplifyQuery* sq) {
+	auto KB = llvm::computeKnownBits(instruction, sq->DL, 0, sq->AC, sq->CxtI, sq->DT);
 	out->Zero = KB.Zero.getZExtValue();
 	out->One = KB.One.getZExtValue();
 }

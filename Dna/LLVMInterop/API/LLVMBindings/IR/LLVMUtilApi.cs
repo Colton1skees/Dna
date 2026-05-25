@@ -12,6 +12,9 @@ namespace Dna.LLVMInterop.API.LLVMBindings
     public static class LLVMUtilApi
     {
         [DllImport("Dna.LLVMInterop", CallingConvention = CallingConvention.Cdecl)]
+        public unsafe static extern OpaqueManagedVector<LLVMOpaqueValue>* Function_GetRpoInstructions(LLVMOpaqueValue* func);
+
+        [DllImport("Dna.LLVMInterop", CallingConvention = CallingConvention.Cdecl)]
         public unsafe static extern uint BasicBlock_GetPredSize(LLVMOpaqueBasicBlock* block);
 
         [DllImport("Dna.LLVMInterop", CallingConvention = CallingConvention.Cdecl)]

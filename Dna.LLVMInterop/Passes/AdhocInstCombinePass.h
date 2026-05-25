@@ -68,14 +68,15 @@
 #include <llvm/Analysis/MemorySSA.h>
 #include <Passes/ClassifyingAliasAnalysisPass.h>
 #include <Passes/OpaqueStackVarEliminationPass.h>
+#include <Passes/ControlFlowStructuringPass.h>
 namespace Dna::Passes {
 	struct AdhocInstCombinePass : public llvm::PassInfoMixin<OpaqueStackVarEliminationPass>
 	{
 		static char ID;
 
-		tEliminateStackVars structureFunction;
+		tStructureFunction structureFunction;
 
-		explicit AdhocInstCombinePass(tEliminateStackVars structureFunction)
+		explicit AdhocInstCombinePass(tStructureFunction structureFunction)
 		{
 			this->structureFunction = structureFunction;
 		}
@@ -88,7 +89,14 @@ namespace Dna::Passes {
 
 		llvm::PreservedAnalyses run(llvm::Function& F, llvm::FunctionAnalysisManager& fam)
 		{
-			bool changed = structureFunction(&F, nullptr, nullptr);
+
+			const auto& DL = F.getParent()->getDataLayout();
+			const auto& TLI = fam.getResult<llvm::TargetLibraryAnalysis>(F);
+			auto& AC = fam.getResult<llvm::AssumptionAnalysis>(F);
+			auto& DT = fam.getResult<llvm::DominatorTreeAnalysis>(F);
+
+			llvm::SimplifyQuery SQ(DL, &TLI, &DT, &AC);
+			bool changed = structureFunction(&F, nullptr, nullptr, &SQ);
 			if (changed)
 				return llvm::PreservedAnalyses::none();
 

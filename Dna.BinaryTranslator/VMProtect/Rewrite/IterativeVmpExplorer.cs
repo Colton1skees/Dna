@@ -215,13 +215,13 @@ namespace Dna.BinaryTranslator.VMProtect.Rewrite
                    
                 }
             }
-
+            var sw = Stopwatch.StartNew();
             //handlerLifter.LiftHandler(0x140048BBD, false);
             while (true)
             {
 
 
-                Console.WriteLine($"Lifting iteration {ii++}");
+                Console.WriteLine($"Lifting iteration {ii++} at {sw.ElapsedMilliseconds}ms");
                 Console.WriteLine($"{numFast} / {numFast + numHeavy} solvers finished");
 
                 serialize();
@@ -447,7 +447,7 @@ namespace Dna.BinaryTranslator.VMProtect.Rewrite
                     return $"0x{x.BytecodeRip.ToString("X")} {vCfg.Instructions[x].Metadata.IsComplete}";
                 };
 
-                Console.WriteLine("\n\n" + GraphFormatter.FormatGraph(tCfg, printInst));
+                //Console.WriteLine("\n\n" + GraphFormatter.FormatGraph(tCfg, printInst));
 
                 //liftedFunction.GlobalParent.PrintToFile("translatedFunction.ll");
 
