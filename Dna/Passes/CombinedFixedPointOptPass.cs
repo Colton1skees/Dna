@@ -79,8 +79,11 @@ namespace Dna.Passes
                             var op0 = currentBase.GetOperand(0);
                             var op1 = currentBase.GetOperand(1);
 
-                            Debug.Assert(!(op0.Kind == LLVMValueKind.LLVMConstantIntValueKind && op1.Kind == LLVMValueKind.LLVMConstantIntValueKind));
-                            Debug.Assert(op1.TypeOf.IntWidth <= 64);
+                            var bothConstant = (op0.Kind == LLVMValueKind.LLVMConstantIntValueKind && op1.Kind == LLVMValueKind.LLVMConstantIntValueKind);
+                            if (bothConstant)
+                                return null;
+                            //Debug.Assert(!bothConstant);
+                            //Debug.Assert(op1.TypeOf.IntWidth <= 64);
 
                             if (op1.Kind == LLVMValueKind.LLVMConstantIntValueKind)
                             {
@@ -173,26 +176,33 @@ namespace Dna.Passes
             using (var updater = new MemorySSAUpdater(mssa))
             {
                 var localChanged = true;
-                while (localChanged)
+                while (localChanged && numIterations < 10)
                 {
                     numIterations++;
                     localChanged = false;
 
                     var instcombine = new AdhocInstCombinePass();
-                    instcombine.builder = builder;
+                    instcombine.builder = LLVMBuilderRef.Create(function.GetFunctionCtx());
 
                     var worklist = new WorkList<LLVMValueRef>(function.GetInstructions());
                     while (worklist.Count > 0)
                     {
                         var nextInstr = worklist.PopFront();
+                        if (!nextInstr.Is(LLVMValueKind.LLVMInstructionValueKind, LLVMValueKind.LLVMConstantIntValueKind))
+                            Debugger.Break();
+
                         if (!nextInstr.Is(LLVMValueKind.LLVMInstructionValueKind))
                             continue;
 
-                        void DoReplaceAndRemove(LLVMValueRef replaceWith)
+                        bool TryReplaceAndRemove(LLVMValueRef replaceWith)
                         {
-                            Debug.Assert(replaceWith != nextInstr);
+                            if (replaceWith.Handle == 0 || replaceWith.Handle == nextInstr.Handle)
+                                return false;
 
-                            updater.RemoveMemoryAccess(nextInstr);
+                            var memoryAccess = mssa.GetMemoryAccess(nextInstr);
+                            if (memoryAccess.Handle != 0)
+                                updater.RemoveMemoryAccess(nextInstr);
+
                             var users = nextInstr.GetUsers().Where(sel => sel.Handle != nextInstr.Handle).ToList();
                             worklist.AddRangeToFront(users);
 
@@ -200,39 +210,64 @@ namespace Dna.Passes
                             nextInstr.InstructionEraseFromParent();
 
                             localChanged = true;
+                            return true;
                         }
 
                         // Do a const-prop loop before anything else since we don't want to do redundant work.
                         unsafe
                         {
+                            
                             var peephole = instcombine.PeepholeInst(nextInstr);
+        
                             if (peephole != null)
                             {
-                                // Append all newly created instructions to the worklist, such that we visit them in RPO order(%t0, then %t1)
-                                // %t0 = add x,y
-                                // %t1 = mul %t0, 111
-                                foreach (var reversed in peephole.Insts.Reverse<LLVMValueRef>())
-                                    worklist.AddToFront(reversed);
+                  
+                                
+                                var replacement = peephole.GetResult();
+                                if (replacement.Handle == 0 || replacement.Handle == nextInstr.Handle)
+                                    continue;
+
+                                if (peephole.Insts.Any(x => x.Is(LLVMValueKind.LLVMInstructionValueKind) && x.GetOperands().Contains(nextInstr)))
+                                    continue;
+
+                                //// Append all newly created instructions to the worklist, such that we visit them in RPO order(%t0, then %t1)
+                                //// %t0 = add x,y
+                                //// %t1 = mul %t0, 111
+                                //foreach (var reversed in peephole.Insts.Where(x => x.Handle != nextInstr.Handle).Reverse<LLVMValueRef>())
+                                //    worklist.AddToFront(reversed);
+
+                                foreach (var inst in peephole.Insts.Where(x => x.Is(LLVMValueKind.LLVMInstructionValueKind)))
+                                    ConstantFoldingAPI.DropPoisonGeneratingFlags(inst);
+
+                                if (peephole.Insts.Any(x => x.TypeOf.Kind != LLVMTypeKind.LLVMIntegerTypeKind))
+                                    Debugger.Break();
+
 
                                 // Replace and remove the old input inst
-                                DoReplaceAndRemove(peephole.GetResult());
-                            }
-                            /*
-                            var result = NativeConstantFoldingAPI.TrySimplify((LLVMOpaqueValue*)nextInstr.Handle);
-                            if (result != null)
-                            {
-                                DoReplaceAndRemove(new LLVMValueRef((nint)result));
+                                TryReplaceAndRemove(replacement);
+                                
+
                                 continue;
                             }
-                            */
+                            
+                            
+                            var result = NativeConstantFoldingAPI.TryConstantFold((LLVMOpaqueValue*)nextInstr.Handle);
+                            if (result != null)
+                            {
+                                Debug.Assert(!worklist.Contains(nextInstr));
+                                TryReplaceAndRemove(new LLVMValueRef((nint)result));
+                                continue;
+                            }
+                            
+
                         }
 
                         if (nextInstr.InstructionOpcode == LLVMOpcode.LLVMLoad)
                         {
-                            var repl = ProcessLoad(nextInstr);
+                            var repl = ProcessLoad(nextInstr, updater);
                             if (repl != null)
                             {
-                                DoReplaceAndRemove(repl);
+                                TryReplaceAndRemove(repl);
                                 continue;
                             }
                         }
@@ -242,6 +277,7 @@ namespace Dna.Passes
                 }
             }
 
+            mssa.Validate();
 
             Console.WriteLine($"Worklist converged in {numIterations} iterations!");
             return true;
@@ -277,7 +313,7 @@ namespace Dna.Passes
             }
         }
 
-        private LLVMValueRef ProcessLoad(LLVMValueRef loadInst)
+        private LLVMValueRef ProcessLoad(LLVMValueRef loadInst, MemorySSAUpdater updater)
         {
             /*
             if(loadInst.ToString().Contains("%136 = load i32, ptr %39, align 4"))
@@ -310,6 +346,8 @@ namespace Dna.Passes
             Debug.Assert(loadSize <= 8);
 
             var loadBaseAndOffset = GetCanonicalBasePlusOffset(loadInst.GetOperand(0));
+            if (loadBaseAndOffset == null)
+                return null;
             var loadOffset = loadBaseAndOffset.Offset;
 
 
@@ -481,26 +519,26 @@ namespace Dna.Passes
                 // Create the loads
                 LLVMValueRef load1 = null;
                 LLVMValueRef load2 = null;
-                using (var updater = new MemorySSAUpdater(mssa))
-                {
-                    load1 = builder.BuildLoad2(loadInst.TypeOf, gep1);
-                    load2 = builder.BuildLoad2(loadInst.TypeOf, gep2);
+       
+                
+                load1 = builder.BuildLoad2(loadInst.TypeOf, gep1);
+                load2 = builder.BuildLoad2(loadInst.TypeOf, gep2);
 
-                    // Update MSSA to be aware of the second load.
-                    // Note that we set the insert point to be right before the original load.
-                    var insertPoint2 = mssa.GetMemoryAccess(loadInst);
-                    var mssaLoad2 = updater.CreateMemoryAccessBefore(load2, null, insertPoint2);
-                    updater.InsertUse(mssaLoad2, false);
+                // Update MSSA to be aware of the second load.
+                // Note that we set the insert point to be right before the original load.
+                var insertPoint2 = mssa.GetMemoryAccess(loadInst);
+                var mssaLoad2 = updater.CreateMemoryAccessBefore(load2, null, insertPoint2);
+                updater.InsertUse(mssaLoad2, false);
 
-                    // Update MSSA to be aware of the first load.
-                    // Note that because the loads are in the order of "load1, load2, original" (and we only have the createbefore api implemented),
-                    // we set the insert point of the first load to be before the second load.
-                    var insertPoint1 = mssa.GetMemoryAccess(load2);
-                    var mssaLoad1 = updater.CreateMemoryAccessBefore(load1, null, insertPoint1);
-                    updater.InsertUse(mssaLoad1, false);
-                }
+                // Update MSSA to be aware of the first load.
+                // Note that because the loads are in the order of "load1, load2, original" (and we only have the createbefore api implemented),
+                // we set the insert point of the first load to be before the second load.
+                var insertPoint1 = mssa.GetMemoryAccess(load2);
+                var mssaLoad1 = updater.CreateMemoryAccessBefore(load1, null, insertPoint1);
+                updater.InsertUse(mssaLoad1, false);
+                
 
-                var solution1 = ProcessLoad(load1);
+                var solution1 = ProcessLoad(load1, updater);
                 if(solution1 == null)
                 {
                     Console.WriteLine("Bailing out: First memory location could not be resolved to another load.");
@@ -508,7 +546,7 @@ namespace Dna.Passes
                 }
 
                 // Try to solve the second load.
-                var solution2 = ProcessLoad(load2);
+                var solution2 = ProcessLoad(load2, updater);
                 if (solution2 == null)
                 {
                     Console.WriteLine("Bailing out: Second memory location could not be resolved to another load.");

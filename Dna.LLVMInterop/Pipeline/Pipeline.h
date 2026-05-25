@@ -1442,7 +1442,7 @@ void OptimizeVmpModule(llvm::Module* module,
 		//FPM.addPass(llvm::InstSimplifyPass());
 		FPM.addPass(llvm::SimplifyCFGPass());
 		FPM.addPass(llvm::ADCEPass());
-
+		FPM.addPass(llvm::SimplifyCFGPass());
 
 		try
 		{

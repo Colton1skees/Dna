@@ -52,5 +52,9 @@ namespace Dna.LLVMInterop.API.LLVMBindings.Analysis
         [DllImport("Dna.LLVMInterop", CallingConvention = CallingConvention.Cdecl, EntryPoint = "MemorySSA_MayAlias")]
         [return: MarshalAs(UnmanagedType.U1)]
         public unsafe static extern bool MayAlias(LLVMOpaqueMemorySSA* memSsa, LLVMOpaqueMemoryUseOrDef* use, LLVMOpaqueMemoryUseOrDef* def);
+
+
+        [DllImport("Dna.LLVMInterop", CallingConvention = CallingConvention.Cdecl, EntryPoint = "MemorySSA_Validate")]
+        public unsafe static extern void Validate(LLVMOpaqueMemorySSA* memSsa);
     }
 }

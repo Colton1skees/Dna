@@ -8,6 +8,7 @@ using Dna.ControlFlow.Extensions;
 using Dna.DataStructures;
 using Dna.Extensions;
 using Dna.LLVMInterop;
+using Dna.LLVMInterop.API.LLVMBindings.Analysis;
 using Dna.LLVMInterop.API.LLVMBindings.IR;
 using Dna.LLVMInterop.API.LLVMBindings.Transforms.Utils;
 using Dna.LLVMInterop.API.Optimization;
@@ -156,6 +157,36 @@ namespace Dna.BinaryTranslator.VMProtect.Rewrite
             handlerRipToRegisters[handlers.First().NativeRip] = new HandlerData(bytecodeRegister, bytecodeRegister);
             handlerVips[handlers.First()] = bytecodeRegister;
 
+            bool optHeavy = false;
+
+            var serialize = () =>
+            {
+                var sb = new StringBuilder();
+                var handlers = vCfg.Instructions.Keys.OrderBy(x => x.BytecodeRip);
+                foreach(var handler in handlers)
+                {
+                    sb.AppendLine($"0x{handler.BytecodeRip.ToString("X")}:");
+                    sb.AppendLine($"    NativeRIP: {handler.NativeRip.ToString("X")}");
+
+                    //var regs = handlerRipToRegisters[handler.BytecodeRip];
+                    if (handlerRipToRegisters.TryGetValue(handler.NativeRip, out var regs))
+                    {
+                        var vipName = regs.Vip == null ? "null" : regs.Vip.Name;
+                        var vkeyName = regs.Vkey == null ? "null" : regs.Vkey.Name;
+                        sb.AppendLine($"    VIP: {vipName}");
+                        sb.AppendLine($"    VKEY: {vkeyName}");
+                    }
+
+                    ulong? vkeyImm = handlerToVkey.TryGetValue(handler, out var existing) ? existing : null;
+                    sb.AppendLine($"    VKEY_IMM: {vkeyImm}");
+
+                    var succs = vCfg.Instructions[handler].Successors.Select(x => x.BytecodeRip.ToString("X"));
+                    sb.AppendLine($"    SUCCS: {String.Join(", ", succs)}");
+                }
+
+                File.WriteAllText($"iter/{ii}_groundTruth.txt", sb.ToString());
+            };
+
             // For each handler RIP, store the vip/vkey
 
             if (false)
@@ -193,6 +224,8 @@ namespace Dna.BinaryTranslator.VMProtect.Rewrite
                 Console.WriteLine($"Lifting iteration {ii++}");
                 Console.WriteLine($"{numFast} / {numFast + numHeavy} solvers finished");
 
+                serialize();
+                    
                 /*
                 // see VIPs.txt
                 if (false && ii == 551)
@@ -273,7 +306,20 @@ namespace Dna.BinaryTranslator.VMProtect.Rewrite
                 var (newTables, bytecodePtrToRips) = solver.Solve(handlerRipToRegisters, stateStruct);
                 */
 
-              
+
+                //if (ii == 107)
+                //{
+                //    handlerLifter.cacheModule.PrintToFile("dbgHandlers.ll");
+                //    liftedFunction.GlobalParent.PrintToFile("translatedFunction.ll");
+                //    Debugger.Break();
+                //}
+
+                if (optHeavy)
+                {
+                    OptimizeHeavy(liftedFunction);
+                    optHeavy = false;
+                }
+
                 var solution = OptimizeAndSolve(stateStruct, stateStruct2, liftedFunction, handlerLifter, handlerRipToRegisters);
                 if (solution is Err<InvalidOperationException> err)
                 {
@@ -282,6 +328,8 @@ namespace Dna.BinaryTranslator.VMProtect.Rewrite
                 }
 
                 var (newTables, bytecodePtrToRips) = solution.Ok();
+
+                Console.WriteLine($"Target handler RIPs: {String.Join(" ", bytecodePtrToRips.Select(x => x.Value.rip.ToString("X")))}");
 
                 if (!newTables.Any())
                 {
@@ -376,17 +424,30 @@ namespace Dna.BinaryTranslator.VMProtect.Rewrite
                     
                 }
 
+                var (oldCfg, oldLabels) = GetCfg(vCfg, handlers.First());
+
+                var (tCfg, tLabels) = GetCfg(newCfg, handlers.First());
+
+                if (!oldLabels.Keys.ToHashSet().SetEquals(tLabels.Keys))
+                {
+                    Console.WriteLine($"Iteration {ii} requires full opt");
+                    //OptimizeHeavy(liftedFunction);
+                    //Debugger.Break();
+
+                    optHeavy = true;
+                }
+             
+
                 // Replace the CFG
                 vCfg = newCfg;
 
-                var tcfg = GetCfg(vCfg, handlers.First());
-
+            
                 var printInst = (VmHandler x) =>
                 {
                     return $"0x{x.BytecodeRip.ToString("X")} {vCfg.Instructions[x].Metadata.IsComplete}";
                 };
 
-                Console.WriteLine("\n\n" + GraphFormatter.FormatGraph(tcfg, printInst));
+                Console.WriteLine("\n\n" + GraphFormatter.FormatGraph(tCfg, printInst));
 
                 //liftedFunction.GlobalParent.PrintToFile("translatedFunction.ll");
 
@@ -426,8 +487,15 @@ namespace Dna.BinaryTranslator.VMProtect.Rewrite
 
         static int numFast = 0;
         static int numHeavy = 0;
+
+        static int si = 0;
+
         private Result<JmpTablesWithHandlerRips2, InvalidOperationException> OptimizeAndSolve(VmpParameterizedStateStructure stateStruct, ParameterizedStateStructure stateStruct2, LLVMValueRef function, HandlerLifter handlerLifter, Dictionary<ulong, HandlerData> handlerRipToRegisters)
         {
+            si++;
+            foreach (var inst in function.GetInstructions())
+                ConstantFoldingAPI.DropPoisonGeneratingFlags(inst);
+
             var solve = () => TrySolve(stateStruct, stateStruct2, function, handlerLifter, handlerRipToRegisters);
 
             int iter = 0;
@@ -440,22 +508,13 @@ namespace Dna.BinaryTranslator.VMProtect.Rewrite
                     OptimizationApi.OptimizeModuleVmp(function.GlobalParent, function, false, false, 0, false, 0, false, false, 0, pStoreToLoad, 0, 0, fastPipeline: true);
                 };
 
-                var optimizeHeavy = () =>
+                
+
+                if (si % 15 == 0)
                 {
-                    var storeToLoad = new CombinedFixedpointOptPass(dna.Binary);
-                    var pStoreToLoad = Marshal.GetFunctionPointerForDelegate(storeToLoad.PtrToStoreLoadPropagation);
-
-                    var instCombine = new AdhocInstCombinePass();
-                    var pInstCombine = Marshal.GetFunctionPointerForDelegate(instCombine.PtrToStoreLoadPropagation);
-
-                    var multiUseCloning = new MultiUseCloningPass();
-                    var pMultiUseCloning = Marshal.GetFunctionPointerForDelegate(multiUseCloning.PtrToStoreLoadPropagation);
-
-                    //if (i != 0 && i % 2 != 0)
-                    //    MbaDeobfuscationPass.Run(function);
-                    bool useCloning = true;
-                    OptimizationApi.OptimizeModuleVmp(function.GlobalParent, function, false, false, 0, false, 0, false, false, 0, pStoreToLoad, pInstCombine, useCloning ? pMultiUseCloning : 0);
-                };
+                    OptimizeHeavy(function);
+                    si++;
+                }
 
                 // In most cases we solve for the VIPs using a simple and cheap pipeline.
                 for (int i = 0; i < 1; i++)
@@ -470,7 +529,7 @@ namespace Dna.BinaryTranslator.VMProtect.Rewrite
                     return ok0;
                 }
 
-                optimizeHeavy();
+                OptimizeHeavy(function);
                 numHeavy += 1;
                 if (solution is Ok<JmpTablesWithHandlerRips2> ok1)
                     return ok1;
@@ -483,8 +542,26 @@ namespace Dna.BinaryTranslator.VMProtect.Rewrite
             return solve();
         }
 
+        private void OptimizeHeavy(LLVMValueRef function)
+        {
+            var storeToLoad = new CombinedFixedpointOptPass(dna.Binary);
+            var pStoreToLoad = Marshal.GetFunctionPointerForDelegate(storeToLoad.PtrToStoreLoadPropagation);
+
+            var instCombine = new AdhocInstCombinePass();
+            var pInstCombine = Marshal.GetFunctionPointerForDelegate(instCombine.PtrToStoreLoadPropagation);
+
+            var multiUseCloning = new MultiUseCloningPass();
+            var pMultiUseCloning = Marshal.GetFunctionPointerForDelegate(multiUseCloning.PtrToStoreLoadPropagation);
+
+            //if (i != 0 && i % 2 != 0)
+            //    MbaDeobfuscationPass.Run(function);
+            bool useCloning = true;
+            OptimizationApi.OptimizeModuleVmp(function.GlobalParent, function, false, false, 0, false, 0, false, false, 0, pStoreToLoad, pInstCombine, useCloning ? pMultiUseCloning : 0);
+        }
+
         private Result<JmpTablesWithHandlerRips2, InvalidOperationException> TrySolve(VmpParameterizedStateStructure stateStruct, ParameterizedStateStructure stateStruct2, LLVMValueRef liftedFunction, HandlerLifter handlerLifter, Dictionary<ulong, HandlerData> handlerRipToRegisters)
         {
+            liftedFunction.GlobalParent.PrintToFile("translatedFunction.ll");
             // Attempt to solve the handler RIPs    
             var solver = new VmpSolver(arch, liftedFunction);
             var ripResult = solver.SolveRIPs(stateStruct);
@@ -852,7 +929,7 @@ namespace Dna.BinaryTranslator.VMProtect.Rewrite
             }
         }
 
-        public static ControlFlowGraph<VmHandler> GetCfg(VmCfg vCfg, VmHandler entry)
+        public static (ControlFlowGraph<VmHandler>, Dictionary<VmHandler, BasicBlock<VmHandler>>) GetCfg(VmCfg vCfg, VmHandler entry)
         {
             var cfg = new ControlFlowGraph<VmHandler>(entry.BytecodeRip);
 
@@ -874,7 +951,7 @@ namespace Dna.BinaryTranslator.VMProtect.Rewrite
             foreach (var label in labels.Keys)
                 VisitLabel(vCfg, labels, label);
 
-            return cfg;
+            return (cfg, labels);
         }
 
         public static void VisitLabel(VmCfg vCfg, Dictionary<VmHandler, BasicBlock<VmHandler>> labels, VmHandler handler)
@@ -1361,12 +1438,19 @@ namespace Dna.BinaryTranslator.VMProtect.Rewrite
             liftedFunction = FunctionIsolator.IsolateFunctionIntoNewModule(arch, liftedFunction);
 
 
+            foreach (var inst in liftedFunction.GetInstructions())
+                ConstantFoldingAPI.DropPoisonGeneratingFlags(inst);
+
             //liftedFunction.Handle = 0;
     
      
             var (stripped, stateStruct) = IterativeFunctionTranslator.StripRuntimeVmp(dna, ctx, arch, liftedFunction);
             liftedFunction.Handle = 0;
 
+
+
+            foreach (var inst in stripped.GetInstructions())
+                ConstantFoldingAPI.DropPoisonGeneratingFlags(inst);
             //stripped.GlobalParent.PrintToFile("translatedFunction.ll");
             // liftedFunction.Handle = 0;
 
@@ -1374,19 +1458,25 @@ namespace Dna.BinaryTranslator.VMProtect.Rewrite
             // This is where the VIP gets swapped from RSI to r9
             // Notably RSI is set to some BS + a binary offset
 
-   
+
             // Eliminate any stack expansion in the IR
             EliminateStackExpansionLoop(stripped, handlerRip);
 
             EliminateStackAlignment(stripped, stateStruct);
 
 
+            foreach (var inst in stripped.GetInstructions())
+                ConstantFoldingAPI.DropPoisonGeneratingFlags(inst);
+
             // Optimize one last time
             OptimizationApi.OptimizeModule(stripped.GlobalParent, stripped, false, false, 0, false, 0, false);
 
 
+
+            foreach (var inst in stripped.GetInstructions())
+                ConstantFoldingAPI.DropPoisonGeneratingFlags(inst);
             //stripped.GlobalParent.PrintToFile("translatedFunction.ll");
-           
+
             // Move the newly created function into the target module.
             var newHandler = FunctionIsolator.IsolateFunctionInto(cacheModule, stripped);
             handlerRipToLlvmFunction[handlerRip] = newHandler;

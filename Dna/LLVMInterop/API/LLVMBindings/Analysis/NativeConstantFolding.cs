@@ -20,6 +20,11 @@ namespace Dna.LLVMInterop.API.LLVMBindings.Analysis
         {
             return NativeConstantFoldingAPI.TrySimplify(inst);
         }
+
+        public static unsafe void DropPoisonGeneratingFlags(LLVMValueRef inst)
+        {
+            NativeConstantFoldingAPI.DropPoisonGeneratingFlags(inst);
+        }
     }
 
     public static class NativeConstantFoldingAPI
@@ -29,5 +34,9 @@ namespace Dna.LLVMInterop.API.LLVMBindings.Analysis
 
         [DllImport("Dna.LLVMInterop", CallingConvention = CallingConvention.Cdecl, EntryPoint = "TrySimplify")]
         public unsafe static extern LLVMOpaqueValue* TrySimplify(LLVMOpaqueValue* inst);
+
+
+        [DllImport("Dna.LLVMInterop", CallingConvention = CallingConvention.Cdecl, EntryPoint = "DropPoisonGeneratingFlags")]
+        public unsafe static extern void DropPoisonGeneratingFlags(LLVMOpaqueValue* inst);
     }
 }

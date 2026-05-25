@@ -273,6 +273,12 @@ namespace Dna::API {
 		return llvm::isModSet(I);
 	}
 
+	DNA_EXPORT void MemorySSA_Validate(llvm::MemorySSA* memSsa)
+	{
+		memSsa->verifyMemorySSA(llvm::MemorySSA::VerificationLevel::Full);
+	}
+
+
 	DNA_EXPORT llvm::MemorySSAUpdater* MemorySSAUpdater_Get(llvm::MemorySSA* memSsa)
 	{
 		return new llvm::MemorySSAUpdater(memSsa);
@@ -295,6 +301,7 @@ namespace Dna::API {
 
 	DNA_EXPORT void MemorySSAUpdater_Delete(llvm::MemorySSAUpdater* updater)
 	{
+		
 		delete updater;
 	}
 }

@@ -62,6 +62,8 @@ namespace Dna.LLVMInterop.API.LLVMBindings.Analysis
 
         public unsafe bool MayAlias(MemoryUseOrDef use, MemoryUseOrDef def) => NativeMemorySSAApi.MayAlias(this, use, def);
 
+        public unsafe void Validate() => NativeMemorySSAApi.Validate(this);
+
         public unsafe static implicit operator LLVMOpaqueMemorySSA*(MemorySSA memAccess)
         {
             return (LLVMOpaqueMemorySSA*)memAccess.Handle;
