@@ -21,6 +21,11 @@ namespace Dna.LLVMInterop.API.LLVMBindings.Analysis
             return NativeConstantFoldingAPI.TrySimplify(inst);
         }
 
+        public static unsafe bool IsInstructionTriviallyDead(LLVMValueRef inst)
+        {
+            return NativeConstantFoldingAPI.IsInstructionTriviallyDead(inst);
+        }
+
         public static unsafe void DropPoisonGeneratingFlags(LLVMValueRef inst)
         {
             NativeConstantFoldingAPI.DropPoisonGeneratingFlags(inst);
@@ -34,6 +39,10 @@ namespace Dna.LLVMInterop.API.LLVMBindings.Analysis
 
         [DllImport("Dna.LLVMInterop", CallingConvention = CallingConvention.Cdecl, EntryPoint = "TrySimplify")]
         public unsafe static extern LLVMOpaqueValue* TrySimplify(LLVMOpaqueValue* inst);
+
+        [DllImport("Dna.LLVMInterop", CallingConvention = CallingConvention.Cdecl, EntryPoint = "IsInstructionTriviallyDead")]
+        [return: MarshalAs(UnmanagedType.U1)]
+        public unsafe static extern bool IsInstructionTriviallyDead(LLVMOpaqueValue* inst);
 
 
         [DllImport("Dna.LLVMInterop", CallingConvention = CallingConvention.Cdecl, EntryPoint = "DropPoisonGeneratingFlags")]

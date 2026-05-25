@@ -138,9 +138,6 @@ namespace Dna.BinaryTranslator.Lifting
             // Build a mapping of <llvm cfg block name, x86 block>..
             var irBlockNameToX86 = blockMapping.ToDictionary(x => x.Value.AsValue().Name, x => x.Key);
 
-            translatedFunction.GlobalParent.Verify(LLVMVerifierFailureAction.LLVMAbortProcessAction);
-         
-
             return (translatedFunction, blockMapping, filterFunctions);
         }
 

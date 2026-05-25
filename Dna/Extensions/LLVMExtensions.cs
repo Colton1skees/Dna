@@ -160,13 +160,13 @@ namespace Dna.Extensions
             => inst.Kind == LLVMValueKind.LLVMInstructionValueKind && inst.InstructionOpcode == opcode;
 
         public static bool Is(this LLVMValueRef inst, params LLVMOpcode[] opcodes)
-        => opcodes.Any(x => inst.Is(x));
+        => Array.IndexOf(opcodes, inst.InstructionOpcode) != -1;
 
         public static bool Is(this LLVMValueRef inst, LLVMValueKind kind)
           => inst.Kind == kind;
 
         public static bool Is(this LLVMValueRef inst, params LLVMValueKind[] opcodes)
-        => opcodes.Any(x => inst.Is(x));
+        => Array.IndexOf(opcodes, inst.Kind) != -1;
 
         public static bool IsConstant(this LLVMValueRef inst)
             => inst.Is(LLVMValueKind.LLVMConstantIntValueKind);

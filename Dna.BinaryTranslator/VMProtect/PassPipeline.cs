@@ -41,7 +41,7 @@ namespace Dna.BinaryTranslator.VMProtect
                 Console.WriteLine($"Round {c++}!");
                 i++;
 
-                var storeToLoad = new CombinedFixedpointOptPass(bin);
+                var storeToLoad = new CombinedFixedpointOptPass(bin, new FixedpointPassConfig());
                 CombinedFixedpointOptPass.runCount = c;
                 var pStoreToLoad = Marshal.GetFunctionPointerForDelegate(storeToLoad.PtrToStoreLoadPropagation);
 
@@ -54,7 +54,16 @@ namespace Dna.BinaryTranslator.VMProtect
                 //if (i != 0 && i % 2 != 0)
                 //    MbaDeobfuscationPass.Run(function);
 
+                if (fastPipeline)
+                {
+                    //storeToLoad.config.MaxLoadElimDepth = 3;
+                    storeToLoad.config.InstSimplify = true;
+                    //storeToLoad.config.VisitLoadsOnly = false;
+                }
+
                 OptimizationApi.OptimizeModuleVmp(function.GlobalParent, function, false, false, 0, false, 0, false, false, 0, pStoreToLoad, pInstCombine, useCloning ? pMultiUseCloning : 0, fastPipeline);
+
+                return function;
 
                 if (fastPipeline)
                     return function;

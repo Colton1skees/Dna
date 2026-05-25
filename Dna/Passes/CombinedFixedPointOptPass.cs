@@ -38,6 +38,23 @@ namespace Dna.Passes
         }
     }
 
+    public class FixedpointPassConfig
+    {
+        // Perform adhoc instruction combining 
+        public bool AdhocInstcombine = true;
+
+        // Use LLVM's InstSimplify method to simplify individual instructions
+        public bool InstSimplify = false;
+
+        public bool ConstFold = true;
+
+        // Maximum recursion depth used during store to load elimination
+        public int MaxLoadElimDepth = int.MaxValue;
+
+        // If enabled, we only queue load instructions to the worklist initially.
+        public bool VisitLoadsOnly = false;
+    }
+
     public record BaseWithOffset(LLVMValueRef Base, ulong Offset);
     public record ClobberingStore(MemoryUseOrDef UseOrDef, BaseWithOffset BaseOffsetPair);
     public record LoadReplacement(LLVMValueRef ToReplace, LLVMValueRef Replacement);
@@ -62,13 +79,16 @@ namespace Dna.Passes
 
         private IBinary bin;
 
+        public FixedpointPassConfig config;
+
         public bool Changed = false;
 
         public dgCombinedFixedpointPass PtrToStoreLoadPropagation { get; }
 
-        public unsafe CombinedFixedpointOptPass(IBinary binary)
+        public unsafe CombinedFixedpointOptPass(IBinary binary, FixedpointPassConfig config)
         {
             bin = binary;
+            this.config = config;
             PtrToStoreLoadPropagation = new dgCombinedFixedpointPass(StoreToLoadPropagation);
         }
 
@@ -190,7 +210,8 @@ namespace Dna.Passes
             using (var updater = new MemorySSAUpdater(mssa))
             {
                 var localChanged = true;
-                while (localChanged && numIterations < 10)
+                //while (localChanged && numIterations < 10)
+                while (numIterations == 0) // we don't need to loop anymore because this *should* converge in a single iteration
                 {
                     numIterations++;
                     localChanged = false;
@@ -198,22 +219,36 @@ namespace Dna.Passes
                     var instcombine = new AdhocInstCombinePass();
                     instcombine.builder = LLVMBuilderRef.Create(function.GetFunctionCtx());
 
-                    if (numIterations == 3)
-                        Debugger.Break();
+                    var rpoInstructions = LLVMUtil.GetRpoInstructions(function);
+                    WorkList<LLVMValueRef> worklist = new();
+                    if (!config.VisitLoadsOnly)
+                        worklist.AddRangeToBack(rpoInstructions);
+                    else
+                        worklist.AddRangeToBack(rpoInstructions.Where(x => x.InstructionOpcode == LLVMOpcode.LLVMLoad));
+                   
 
-                    var worklist = new WorkList<LLVMValueRef>(LLVMUtil.GetRpoInstructions(function));
                     while (worklist.Count > 0)
                     {
                         var nextInstr = worklist.PopFront();
-                        if (!nextInstr.Is(LLVMValueKind.LLVMInstructionValueKind, LLVMValueKind.LLVMConstantIntValueKind))
-                            Debugger.Break();
 
                         if (!nextInstr.Is(LLVMValueKind.LLVMInstructionValueKind))
                             continue;
 
+                        // Delete trivially dead instructions
+                        if (false && ConstantFoldingAPI.IsInstructionTriviallyDead(nextInstr))
+                        {
+                            var memoryAccess = mssa.GetMemoryAccess(nextInstr);
+                            if (memoryAccess.Handle != 0)
+                                updater.RemoveMemoryAccess(nextInstr);
+
+                            nextInstr.InstructionEraseFromParent();
+                            continue;
+                        }
+
+                        var opc = nextInstr.InstructionOpcode;
+
                         bool TryReplaceAndRemove(LLVMValueRef replaceWith)
                         {
-                            Console.WriteLine($"    replacing {nextInstr} with {replaceWith}");
                             if (replaceWith.Handle == 0 || replaceWith.Handle == nextInstr.Handle)
                                 return false;
 
@@ -254,27 +289,39 @@ namespace Dna.Passes
 
                         }
 
-
-
                         // Do a const-prop loop before anything else since we don't want to do redundant work.
-                        unsafe
+                        if (config.ConstFold)
                         {
-                            var result = NativeConstantFoldingAPI.TryConstantFold((LLVMOpaqueValue*)nextInstr.Handle);
+                            var result = ConstantFoldingAPI.TryConstantFold(nextInstr);
                             if (result != null)
                             {
                                 Debug.Assert(!worklist.Contains(nextInstr));
-                                TryReplaceAndRemove(new LLVMValueRef((nint)result));
+                                TryReplaceAndRemove(result);
                                 continue;
                             }
+                        }
 
+                        if (config.InstSimplify && opc != LLVMOpcode.LLVMLoad && opc != LLVMOpcode.LLVMStore)
+                        {
+                            var simplified = ConstantFoldingAPI.TrySimplify(nextInstr);
+                            if (simplified != null)
+                            {
+                                TryReplaceAndRemove(simplified);
+                                continue;
+                            }
+                        }
+
+                        if (config.AdhocInstcombine)
+                        {
                             var peephole = instcombine.PeepholeInst(nextInstr, simplifyQuery);
                             if (TryReplaceAndRemove2(peephole))
                                 continue;
                         }
 
-                        if (nextInstr.InstructionOpcode == LLVMOpcode.LLVMLoad)
+
+                        if (opc == LLVMOpcode.LLVMLoad)
                         {
-                            var repl = ProcessLoad(nextInstr, updater);
+                            var repl = ProcessLoad(nextInstr, updater, 0);
                             if (repl != null)
                             {
                                 TryReplaceAndRemove2(repl);
@@ -323,19 +370,20 @@ namespace Dna.Passes
             }
         }
 
-        private PeepholeResult ProcessLoad(LLVMValueRef loadInst, MemorySSAUpdater updater)
+        private PeepholeResult ProcessLoad(LLVMValueRef loadInst, MemorySSAUpdater updater, int depth)
         {
-            /*
-            if(loadInst.ToString().Contains("%136 = load i32, ptr %39, align 4"))
-            {
-                Debugger.Break();
-            }
-            */
+            // Exit early if we hit the max recursion depth
+            if (depth >= config.MaxLoadElimDepth)
+                return null;
+
+
+
             var repl = ProcessBinaryLoad(loadInst);
             if (repl != null)
             {
                 return repl;
             }
+
 
             if (loadInst.TypeOf.Kind != LLVMTypeKind.LLVMIntegerTypeKind && loadInst.TypeOf.Kind != LLVMTypeKind.LLVMPointerTypeKind)
             {
@@ -349,8 +397,6 @@ namespace Dna.Passes
             var firstAccess = mssa.GetMemoryAccess(loadInst);
             if (!IsValidMemoryAccess(firstAccess))
                 return null;
-
-            //Console.WriteLine($"Processing load: {loadInst}");
 
             var loadSize = LoadSizeOf(loadInst.TypeOf);
             Debug.Assert(loadSize <= 8);
@@ -487,7 +533,7 @@ namespace Dna.Passes
 
                 if (handledBytesToValue.Count == loadSize)
                 {
-                    Console.WriteLine("   --> Final store found! Bailing out.");
+                    Console.WriteLine($"   --> Final store found! Bailing out at depth {depth}.");
                     break;
                 }
             }
@@ -548,7 +594,7 @@ namespace Dna.Passes
                 updater.InsertUse(mssaLoad1, false);
                 
 
-                var solution1 = ProcessLoad(load1, updater);
+                var solution1 = ProcessLoad(load1, updater, depth + 1);
                 if(solution1 == null)
                 {
                     Console.WriteLine("Bailing out: First memory location could not be resolved to another load.");
@@ -556,7 +602,7 @@ namespace Dna.Passes
                 }
 
                 // Try to solve the second load.
-                var solution2 = ProcessLoad(load2, updater);
+                var solution2 = ProcessLoad(load2, updater, depth + 1);
                 if (solution2 == null)
                 {
                     Console.WriteLine("Bailing out: Second memory location could not be resolved to another load.");

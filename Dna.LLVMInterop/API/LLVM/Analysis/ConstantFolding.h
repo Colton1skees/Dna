@@ -3,6 +3,7 @@
 #include <llvm/Analysis/InstructionSimplify.h>
 #include <llvm/IR/Instruction.h>
 #include <llvm/IR/Module.h>
+#include <llvm/Transforms/Utils/Local.h>
 
 #include <API/ExportDef.h>
 
@@ -21,6 +22,12 @@ namespace DNA::API {
 
 		return llvm::simplifyInstruction(instruction, query);
 	}
+
+	DNA_EXPORT bool IsInstructionTriviallyDead(llvm::Instruction* instruction) {
+
+		return llvm::isInstructionTriviallyDead(instruction);
+	}
+
 
 	DNA_EXPORT void DropPoisonGeneratingFlags(llvm::Instruction* instruction) {
 

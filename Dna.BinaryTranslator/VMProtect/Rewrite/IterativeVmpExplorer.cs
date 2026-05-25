@@ -314,6 +314,12 @@ namespace Dna.BinaryTranslator.VMProtect.Rewrite
                 //    Debugger.Break();
                 //}
 
+                if (ii == 531)
+                {
+                    //liftedFunction.GlobalParent.PrintToFile("translatedFunction.ll");
+                   // Debugger.Break();
+                }
+
                 if (optHeavy)
                 {
                     OptimizeHeavy(liftedFunction);
@@ -333,6 +339,8 @@ namespace Dna.BinaryTranslator.VMProtect.Rewrite
 
                 if (!newTables.Any())
                 {
+                    OptimizeHeavy(liftedFunction);
+
                     Console.WriteLine($"Finished devirt");
                     outModule.PrintToFile("translatedFunction.ll");
                     IDALoader.Load(ClangCompiler.Compile("translatedFunction.ll"));
@@ -498,23 +506,31 @@ namespace Dna.BinaryTranslator.VMProtect.Rewrite
 
             var solve = () => TrySolve(stateStruct, stateStruct2, function, handlerLifter, handlerRipToRegisters);
 
+
+
+            if (si % 10 == 0)
+            {
+                OptimizeHeavy(function);
+                si++;
+
+                var solution = solve();
+                if (solution is Ok<JmpTablesWithHandlerRips2> ok0)
+                {
+                    return ok0;
+                }
+            }
+
             int iter = 0;
             while (iter < 5)
             {
                 var optimizeFast = () =>
                 {
-                    var storeToLoad = new CombinedFixedpointOptPass(dna.Binary);
+                    var storeToLoad = new CombinedFixedpointOptPass(dna.Binary, new FixedpointPassConfig());
                     var pStoreToLoad = Marshal.GetFunctionPointerForDelegate(storeToLoad.PtrToStoreLoadPropagation);
                     OptimizationApi.OptimizeModuleVmp(function.GlobalParent, function, false, false, 0, false, 0, false, false, 0, pStoreToLoad, 0, 0, fastPipeline: true);
                 };
 
-                
-
-                if (si % 15 == 0)
-                {
-                    OptimizeHeavy(function);
-                    si++;
-                }
+               
 
                 // In most cases we solve for the VIPs using a simple and cheap pipeline.
                 for (int i = 0; i < 1; i++)
@@ -544,8 +560,10 @@ namespace Dna.BinaryTranslator.VMProtect.Rewrite
 
         private void OptimizeHeavy(LLVMValueRef function)
         {
-            var storeToLoad = new CombinedFixedpointOptPass(dna.Binary);
+            var storeToLoad = new CombinedFixedpointOptPass(dna.Binary, new FixedpointPassConfig());
             var pStoreToLoad = Marshal.GetFunctionPointerForDelegate(storeToLoad.PtrToStoreLoadPropagation);
+            storeToLoad.config.InstSimplify = true;
+
 
             var instCombine = new AdhocInstCombinePass();
             var pInstCombine = Marshal.GetFunctionPointerForDelegate(instCombine.PtrToStoreLoadPropagation);
@@ -561,7 +579,6 @@ namespace Dna.BinaryTranslator.VMProtect.Rewrite
 
         private Result<JmpTablesWithHandlerRips2, InvalidOperationException> TrySolve(VmpParameterizedStateStructure stateStruct, ParameterizedStateStructure stateStruct2, LLVMValueRef liftedFunction, HandlerLifter handlerLifter, Dictionary<ulong, HandlerData> handlerRipToRegisters)
         {
-            liftedFunction.GlobalParent.PrintToFile("translatedFunction.ll");
             // Attempt to solve the handler RIPs    
             var solver = new VmpSolver(arch, liftedFunction);
             var ripResult = solver.SolveRIPs(stateStruct);
@@ -1192,7 +1209,6 @@ namespace Dna.BinaryTranslator.VMProtect.Rewrite
                 if (handler != entryHandler)
                 {
                     var incomingVipRegister = handlerRipToRegisters[handler.NativeRip].Vip;
-                    //var incomingVipRegister = vCfg.Instructions[handler].Predecessors.Select(x => handlerVips[x]).DistinctBy(x => x.Name).Single();
                     builder.BuildStore(LLVMValueRef.CreateConstInt(LLVMTypeRef.Int64, handler.BytecodeRip), registerAllocaMapping[incomingVipRegister]);
 
                     // Concretize vkey if its known
@@ -1201,11 +1217,9 @@ namespace Dna.BinaryTranslator.VMProtect.Rewrite
                         // TODO: If this is a vmexit, do not concretize bytecode rip and stuff
                         var incomingVkeyRegister = handlerRipToRegisters[handler.NativeRip].Vkey;
 
-                        Console.WriteLine($"Loading incoming vkey register: {incomingVkeyRegister}");
                         if (incomingVkeyRegister == null)
                         {
-                            Console.WriteLine("PROBLEM");
-                            //Console.ReadLine();
+
                         }
 
                         else
@@ -2041,7 +2055,7 @@ namespace Dna.BinaryTranslator.VMProtect.Rewrite
 
                 var optimizeFast = () =>
                 {
-                    var storeToLoad = new CombinedFixedpointOptPass(bin);
+                    var storeToLoad = new CombinedFixedpointOptPass(bin, new FixedpointPassConfig());
                     var pStoreToLoad = Marshal.GetFunctionPointerForDelegate(storeToLoad.PtrToStoreLoadPropagation);
                     OptimizationApi.OptimizeModuleVmp(function.GlobalParent, function, false, false, 0, false, 0, false, false, 0, pStoreToLoad, 0, 0, fastPipeline: true);
                 };

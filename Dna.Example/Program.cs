@@ -77,7 +77,7 @@ if (genDsl)
 bool dbgCode = false;
 if (dbgCode)
 {
-    var irPath = "C:\\Users\\colton\\Downloads\\fast_fail.ll";
+    var irPath = "C:\\Users\\colton\\Downloads\\huge.ll";
     var t = File.ReadAllText(irPath);
     Console.WriteLine(irPath);
     var tempNewMod = RemillUtils.LoadModuleFromFile(LLVMContextRef.Global, irPath).Value;
@@ -97,7 +97,7 @@ if (dbgCode)
                 new AdhocInstCombinePass().InstCombine((LLVMOpaqueValue*)existingFunc.Handle, 0, 0, 0);
                 MultiUseCloningPass.Run(existingFunc);
                 MbaDeobfuscationPass.Run(existingFunc);
-                var bar = new CombinedFixedpointOptPass(null);
+                var bar = new CombinedFixedpointOptPass(null, new FixedpointPassConfig());
             }
 
         } 
@@ -110,7 +110,15 @@ if (dbgCode)
 
         //MbaDeobfuscationPass.Run(existingFunc);
         tempNewMod.PrintToFile(("translatedFunction.ll"));
-        PassPipeline.Run(vmpBin, existingFunc, false, false, true);
+        while (true)
+        {
+            var sw2 = Stopwatch.StartNew();
+            PassPipeline.Run(vmpBin, existingFunc, false, false, false);
+            PassPipeline.Run(vmpBin, existingFunc, false, false, true);
+            sw2.Stop();
+            tempNewMod.PrintToFile(("translatedFunction.ll"));
+            Console.WriteLine($"Fast optimization took {sw2.ElapsedMilliseconds}ms");
+        }
         tempNewMod.PrintToFile(("translatedFunction.ll"));
         unsafe
         {
@@ -128,7 +136,7 @@ if (dbgCode)
 
         var compiledPath3 = ClangCompiler.Compile("compile.ll");
 
-        Console.WriteLine("Loading into IDA.  ");
+        Console.WriteLine("Loading into IDA.   ");
         var exePath3 = IDALoader.Load(compiledPath3, true);
 
 
@@ -138,7 +146,7 @@ if (dbgCode)
         File.WriteAllText("binja.py", new LLVMToBinjaGraph(existingFunc).Process());
 
         sw.Stop();
-            Console.WriteLine($"Pass took  {sw.ElapsedMilliseconds}ms ");
+            Console.WriteLine($"Pass took  {sw.ElapsedMilliseconds}ms");
         Debugger.Break();
     }
     Debugger.Break();

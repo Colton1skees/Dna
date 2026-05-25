@@ -1398,7 +1398,114 @@ void Initialize() {
 
 }
 
+
 void OptimizeVmpModule(llvm::Module* module,
+	llvm::Function* f,
+	bool aggressiveUnroll,
+	bool runClassifyingAliasAnalysis,
+	Dna::Passes::tGetAliasResult getAliasResult,
+	bool runConstantConcretization,
+	Dna::Passes::tReadBinaryContents readBinaryContents,
+	bool runStructuring,
+	bool justGVN,
+	Dna::Passes::tStructureFunction structureFunction,
+	Dna::Passes::tEliminateStackVars eliminateStackVars,
+	Dna::Passes::tStructureFunction adhocInstCombine,
+	Dna::Passes::tEliminateStackVars multiUseCloning,
+	bool fastPipeline)
+{
+	Initialize();
+
+
+
+	// Create pass managers.
+	llvm::FunctionPassManager FPM;
+	//llvm::PassManagerBuilder PMB;
+	llvm::legacy::PassManager module_manager;
+	llvm::LoopAnalysisManager LAM;
+	llvm::FunctionAnalysisManager FAM;
+	llvm::CGSCCAnalysisManager CGAM;
+	llvm::ModulePassManager MPM;
+	llvm::ModuleAnalysisManager MAM;
+	llvm::LoopPassManager LPM;
+	llvm::PassBuilder PB;
+
+	FPM.addPass(llvm::SROAPass({}));
+
+
+	if (eliminateStackVars != nullptr)
+	{
+		FPM.addPass(Dna::Passes::OpaqueStackVarEliminationPass(eliminateStackVars));
+	}
+
+	FPM.addPass(llvm::SimplifyCFGPass());
+	FPM.addPass(llvm::ADCEPass());
+	FPM.addPass(llvm::SimplifyCFGPass());
+
+	// Skip the remaining passes if we are
+	if (fastPipeline)
+		goto execute;
+
+	FPM.addPass(llvm::InstCombinePass());
+	FPM.addPass(llvm::EarlyCSEPass(true));
+	FPM.addPass(llvm::ReassociatePass());
+	FPM.addPass(llvm::DSEPass());
+
+	FPM.addPass(llvm::SCCPPass());
+	// Using this pass to add nsw/nuw annotations to instructions
+	FPM.addPass(llvm::CorrelatedValuePropagationPass());
+	FPM.addPass(llvm::JumpThreadingPass(99999));
+
+	// Use multi-use cloning to disable InstCombine's single use checks
+	if (multiUseCloning != nullptr)
+	{
+		FPM.addPass(Dna::Passes::MultiUseCloningPass(multiUseCloning));
+	}
+
+	FPM.addPass(llvm::InstCombinePass());
+	FPM.addPass(llvm::NewGVNPass());
+
+	FPM.addPass(llvm::LoopSimplifyPass());
+	LPM.addPass(llvm::LoopSimplifyCFGPass());
+	LPM.addPass(llvm::LoopRotatePass());
+	LPM.addPass(llvm::LICMPass(500, 500, true));
+	LPM.addPass(llvm::IndVarSimplifyPass());
+	LPM.addPass(llvm::LoopDeletionPass());
+
+	FPM.addPass(llvm::BDCEPass());
+	FPM.addPass(llvm::ADCEPass());
+	FPM.addPass(llvm::SimplifyCFGPass());
+
+execute:
+
+	try
+	{
+		FAM.registerPass([&] { return PB.buildDefaultAAPipeline(); });
+		PB.registerModuleAnalyses(MAM);
+		PB.registerCGSCCAnalyses(CGAM);
+		PB.registerFunctionAnalyses(FAM);
+		PB.registerLoopAnalyses(LAM);
+		PB.crossRegisterProxies(LAM, FAM, CGAM, MAM);
+
+		//MPM.addPass(createModuleToFunctionPassAdaptor(std::move(FPM)));
+
+		FPM.addPass(createFunctionToLoopPassAdaptor<LoopPassManager>(
+			std::move(LPM), /*UseMemorySSA=*/true,
+			/*UseBlockFrequencyInfo=*/true));
+
+
+		FPM.run(*f, FAM);
+	}
+
+	catch (...)
+	{
+		printf("Exception in pass pipeline!\n");
+
+	}
+}
+
+
+void OptimizeVmpModuleOld(llvm::Module* module,
 	llvm::Function* f,
 	bool aggressiveUnroll,
 	bool runClassifyingAliasAnalysis,

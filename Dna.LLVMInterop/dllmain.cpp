@@ -16,7 +16,7 @@ struct RestrictedKnownBits {
 };
 
 DNA_EXPORT void GetKnownBits(llvm::Instruction* instruction, RestrictedKnownBits* out, llvm::SimplifyQuery* sq) {
-	auto KB = llvm::computeKnownBits(instruction, sq->DL, 0, sq->AC, sq->CxtI, sq->DT);
+	auto KB = llvm::computeKnownBits(instruction, sq->DL, 0);
 	out->Zero = KB.Zero.getZExtValue();
 	out->One = KB.One.getZExtValue();
 }
