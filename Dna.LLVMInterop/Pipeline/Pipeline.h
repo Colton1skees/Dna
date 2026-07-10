@@ -1441,6 +1441,7 @@ void OptimizeVmpModule(llvm::Module* module,
 	FPM.addPass(llvm::SimplifyCFGPass());
 	FPM.addPass(llvm::ADCEPass());
 	FPM.addPass(llvm::SimplifyCFGPass());
+	FPM.addPass(llvm::EarlyCSEPass(true));
 
 	// Skip the remaining passes if we are
 	if (fastPipeline)

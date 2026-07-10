@@ -74,10 +74,10 @@ if (genDsl)
 //LazyLLVMFixes.InstallValueToStringBugFix(RemillUtils.LLVMValueToString);
 
 
-bool dbgCode = false;
+bool dbgCode = true;
 if (dbgCode)
 {
-    var irPath = "C:\\Users\\colton\\Downloads\\huge.ll";
+    var irPath = "C:\\Users\\colton\\Downloads\\noidea.ll";
     var t = File.ReadAllText(irPath);
     Console.WriteLine(irPath);
     var tempNewMod = RemillUtils.LoadModuleFromFile(LLVMContextRef.Global, irPath).Value;
@@ -118,16 +118,17 @@ if (dbgCode)
             sw2.Stop();
             tempNewMod.PrintToFile(("translatedFunction.ll"));
             Console.WriteLine($"Fast optimization took {sw2.ElapsedMilliseconds}ms");
+            break;
         }
         tempNewMod.PrintToFile(("translatedFunction.ll"));
         unsafe
         {
-            new AdhocInstCombinePass().InstCombine((LLVMOpaqueValue*)existingFunc.Handle, 0, 0, 0);
-            new AdhocInstCombinePass().InstCombine((LLVMOpaqueValue*)existingFunc.Handle, 0, 0, 0);
+            //new AdhocInstCombinePass().InstCombine((LLVMOpaqueValue*)existingFunc.Handle, 0, 0, 0);
+            //new AdhocInstCombinePass().InstCombine((LLVMOpaqueValue*)existingFunc.Handle, 0, 0, 0);
         }
         //MbaDeobfuscationPass.Run(existingFunc);
         tempNewMod.PrintToFile(("translatedFunction.ll"));
-        PassPipeline.Run(vmpBin, existingFunc, false, false, true);
+        PassPipeline.Run(vmpBin, existingFunc, false, false, fastPipeline: false);
         //  PassPipeline.Run(vmpBin, existingFunc);
 
         tempNewMod.PrintToFile("instcombine.ll");
@@ -143,10 +144,10 @@ if (dbgCode)
 
         //IDALoader.Load(ClangCompiler.Compile("instcombine.ll"));
 
-        File.WriteAllText("binja.py", new LLVMToBinjaGraph(existingFunc).Process());
+        //File.WriteAllText("binja.py", new LLVMToBinjaGraph(existingFunc).Process());
 
         sw.Stop();
-            Console.WriteLine($"Pass took  {sw.ElapsedMilliseconds}ms");
+            Console.WriteLine($"Pass took {sw.ElapsedMilliseconds}ms");
         Debugger.Break();
     }
     Debugger.Break();
@@ -171,9 +172,11 @@ if (useVmp)
     vmpAddr = 0x14000335E; // 3 if/else statements with additions
 
 
-    // loop
+    // simple_loop_64
     vmpAddr = 0x140003710;
 
+    // complex_loop_32
+    vmpAddr = 0x1400037AF;
 
     var vmpBin = WindowsBinary.From(vmpPath);
     var vmpDna = new Dna.Dna(vmpBin);

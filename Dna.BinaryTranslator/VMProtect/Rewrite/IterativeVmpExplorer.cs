@@ -751,6 +751,7 @@ namespace Dna.BinaryTranslator.VMProtect.Rewrite
             return cands.SingleOrDefault();
         }
 
+
         private RemillRegister GetVipByUsage(ulong rip, LLVMValueRef function, VmpParameterizedStateStructure stateStruct)
         {
             /*
@@ -763,8 +764,9 @@ namespace Dna.BinaryTranslator.VMProtect.Rewrite
             */
             var loads = function.GetInstructions().Where(x => x.Is(LLVMOpcode.LLVMLoad) && IsGepRegister(x.GetOperand(0))).ToList();
 
-            HashSet<LLVMValueRef> cands = new();
-            foreach(var x in loads)
+            //HashSet<(LLVMValueRef, int) > options = new();
+            Dictionary<LLVMValueRef, int> options = new();
+            foreach (var x in loads)
             {
                 var users = CollectUsers(x, 15);
                 var count = users.Sum(x => IsPossibleVipDecryptionInst(x));
@@ -781,9 +783,18 @@ namespace Dna.BinaryTranslator.VMProtect.Rewrite
                 if (IsStoredToBase(function, regArg))
                     continue;
 
-                
 
-                cands.Add(regArg);
+                options.TryAdd(regArg, 0);
+                options[regArg] += count;
+            }
+
+            HashSet<LLVMValueRef> cands = options.Select(x => x.Key).ToHashSet();
+            if (options.Count == 2)
+            {
+                var arr = options.OrderBy(x => x.Value).ToArray();
+                Console.WriteLine($"Warning: Handler at RIP 0x{rip.ToString("X")} has two VIP registers candidates: [{arr[0]}], [{arr[1]}]. Picked the second one.");
+                cands.Remove(arr[0].Key);
+                Debugger.Break();
             }
 
             // There should only be one candidate.

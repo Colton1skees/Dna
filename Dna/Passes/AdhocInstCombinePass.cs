@@ -1,6 +1,8 @@
 ﻿using Dna.Binary;
+using Dna.DataStructures;
 using Dna.Extensions;
 using Dna.LLVMInterop.API.LLVMBindings.Analysis;
+using Dna.Passes.Mba;
 using LLVMSharp.Interop;
 using Microsoft.Z3;
 using System;
@@ -14,6 +16,7 @@ using System.Security.Cryptography;
 using System.Text;
 using System.Threading.Tasks;
 using WebAssembly.Instructions;
+using static Antlr4.Runtime.Atn.SemanticContext;
 using static Dna.LLVMInterop.NativePassApi;
 using static System.Net.Mime.MediaTypeNames;
 
@@ -126,9 +129,24 @@ namespace Dna.Passes
             if (changed != null)
                 return changed;
 
-            changed = TryDistributeSelect(inst);
+
+            changed = TryDistributeUnarySelect(inst);
             if (changed != null)
                 return changed;
+
+
+            changed = TryDistributeBinarySelect(inst);
+            if (changed != null)
+                return changed;
+
+            changed = TryDistributeTernarySelect(inst);
+            if (changed != null)
+                return changed;
+
+            changed = TrySimplifySharedConditionSelect(inst);
+            if (changed != null)
+                return changed;
+
 
             changed = TrySimplifyDemandedBits(inst);
             if (changed != null)
@@ -170,15 +188,30 @@ namespace Dna.Passes
             if (changed != null)
                 return changed;
 
+            changed = TryRewriteCmpAnd(inst);
+            if (changed != null)
+                return changed;
+
+            changed = TryRewriteInverseCmp(inst);
+            if (changed != null)
+                return changed;
+
+            changed = TryRewriteInverseXor(inst);
+            if (changed != null)
+                return changed;
+
 
             return null;
         }
 
-    
-        private static readonly LLVMOpcode[] Opcodes = { LLVMOpcode.LLVMAdd, LLVMOpcode.LLVMSub, LLVMOpcode.LLVMMul, LLVMOpcode.LLVMAnd, LLVMOpcode.LLVMOr, LLVMOpcode.LLVMXor, LLVMOpcode.LLVMShl, LLVMOpcode.LLVMLShr, LLVMOpcode.LLVMAShr, LLVMOpcode.LLVMCall };
+        private static readonly LLVMOpcode[] UnaryOpcodes = { LLVMOpcode.LLVMTrunc, LLVMOpcode.LLVMCall };
+
+        private static readonly string[] UnaryWhitelist = { "llvm.ctpop"};
+
+        private static readonly LLVMOpcode[] BinaryOpcodes = { LLVMOpcode.LLVMAdd, LLVMOpcode.LLVMSub, LLVMOpcode.LLVMMul, LLVMOpcode.LLVMAnd, LLVMOpcode.LLVMOr, LLVMOpcode.LLVMXor, LLVMOpcode.LLVMShl, LLVMOpcode.LLVMLShr, LLVMOpcode.LLVMAShr, LLVMOpcode.LLVMCall };
 
 
-    private static readonly string[] Whitelist = { "llvm.bswap", "llvm.fshl" };
+        private static readonly string[] BinaryWhitelist = { "llvm.bswap", "llvm.fshl" };
         /*
 private PeepholeResult TryDistributeSelect(LLVMValueRef inst)
 {
@@ -245,18 +278,51 @@ return peephole;
 }
 */
 
-
-
-        private PeepholeResult TryDistributeSelect(LLVMValueRef inst)
+        private PeepholeResult TryDistributeUnarySelect(LLVMValueRef inst)
         {
             var opcode = inst.InstructionOpcode;
-            if (Array.IndexOf(Opcodes, opcode) == -1)
+            if (Array.IndexOf(UnaryOpcodes, opcode) == -1)
                 return null;
 
             if (opcode == LLVMOpcode.LLVMCall)
             {
                 var name = inst.GetCallInstTarget().Name;
-                if (!Whitelist.Any(x => name.StartsWith(x)))
+                if (!UnaryWhitelist.Any(x => name.StartsWith(x)))
+                    return null;
+            }
+
+            // Get the operands
+            var selectOperand = inst.GetOperand(0);
+            if (!selectOperand.Is(LLVMOpcode.LLVMSelect))
+                return null;
+
+
+            builder.PositionBefore(inst);
+            var clone0 = Clone(inst);
+            builder.PositionBefore(inst);
+            var clone1 = Clone(inst);
+
+
+            builder.PositionBefore(inst);
+            clone0.SetOperand(0, selectOperand.GetOperand(1));
+            clone1.SetOperand(0, selectOperand.GetOperand(2));
+
+            var res = builder.BuildSelect(selectOperand.GetOperand(0), clone0, clone1);
+            var peephole = new PeepholeResult();
+            peephole.Add(clone0, clone1, res);
+            return peephole;
+        }
+
+        private PeepholeResult TryDistributeBinarySelect(LLVMValueRef inst)
+        {
+            var opcode = inst.InstructionOpcode;
+            if (Array.IndexOf(BinaryOpcodes, opcode) == -1)
+                return null;
+
+            if (opcode == LLVMOpcode.LLVMCall)
+            {
+                var name = inst.GetCallInstTarget().Name;
+                if (!BinaryWhitelist.Any(x => name.StartsWith(x)))
                     return null;
             }
 
@@ -293,6 +359,37 @@ return peephole;
             return peephole;
         }
 
+        private PeepholeResult TryDistributeTernarySelect(LLVMValueRef inst)
+        {
+            if (!inst.Is(LLVMOpcode.LLVMCall))
+                return null;
+
+            var name = inst.GetCallInstTarget().Name;
+            if (!name.StartsWith("llvm.fshl"))
+                return null;
+
+            var selectOperand = inst.GetOperand(1);
+            if (!selectOperand.Is(LLVMOpcode.LLVMSelect))
+                return null;
+
+            builder.PositionBefore(inst);
+            var clone0 = Clone(inst);
+            builder.PositionBefore(inst);
+            builder.PositionBefore(inst);
+            var clone1 = Clone(inst);
+            builder.PositionBefore(inst);
+            clone0.SetOperand((uint)1, selectOperand.GetOperand(1));
+            clone1.SetOperand((uint)1, selectOperand.GetOperand(2));
+
+            var res = builder.BuildSelect(selectOperand.GetOperand(0), clone0, clone1);
+
+            var peephole = new PeepholeResult();
+            peephole.Add(clone0, clone1, res);
+            return peephole;
+
+            return null;
+        }
+
         private static readonly LLVMOpcode[] kbFolds = { LLVMOpcode.LLVMAdd, LLVMOpcode.LLVMSub, LLVMOpcode.LLVMMul, LLVMOpcode.LLVMAnd, LLVMOpcode.LLVMOr, LLVMOpcode.LLVMXor, LLVMOpcode.LLVMShl, LLVMOpcode.LLVMLShr, LLVMOpcode.LLVMAShr };
 
 
@@ -303,6 +400,190 @@ return peephole;
             var paramTypes = new LLVMTypeRef[] { originalCall.TypeOf };
             var functionType = LLVMTypeRef.CreateFunction(originalCall.TypeOf, paramTypes);
             return builder.BuildCall2(functionType, callee, new LLVMValueRef[] { newArg0 });
+        }
+
+        // bar ? (cond ? a : b) : (cond ? c : d)
+        //  =>
+        // bar ?
+        private PeepholeResult TrySimplifySharedConditionSelect(LLVMValueRef inst)
+        {
+            return null;
+            if (inst.InstructionOpcode != LLVMOpcode.LLVMSelect)
+                return null;
+
+
+
+            // Get the chain of selects
+            Stack<LLVMValueRef> stack = new();
+            OrderedSet<LLVMValueRef> seen = new();
+            stack.Push(inst);
+            while (stack.Count != 0)
+            {
+                var pop = stack.Pop();
+                if (pop.IsConstant())
+                    continue;
+                if (!seen.Add(pop))
+                    continue;
+
+
+                if (!pop.Is(LLVMOpcode.LLVMSelect))
+                    return null;
+
+                stack.Push(pop.GetOperand(1));
+                stack.Push(pop.GetOperand(2));
+            }
+
+
+
+            HashSet<LLVMValueRef> substitutions = new();
+            Queue<LLVMValueRef> workQueue = new();
+            HashSet<LLVMValueRef> visited = new();
+
+            foreach (var select in seen)
+            {
+                var cond = select.GetOperand(0);
+                if (!IsSupported(cond.InstructionOpcode))
+                    substitutions.Add(cond);
+
+
+                if (visited.Add(cond))
+                    workQueue.Enqueue(select.GetOperand(0));
+            }
+
+
+
+            //if (inst.GetOperand(1).ToString().Contains("10737722993") && inst.GetOperand(1).Is(LLVMOpcode.LLVMSelect))
+            //{
+            //    inst.InstructionParent.Parent.GlobalParent.PrintToFile("translatedFunction.ll");
+            //    Debugger.Break();
+            //}
+            // Problem: Unsupported instruction..
+
+
+
+            Dictionary<LLVMValueRef, ulong> valueMap = new();
+            while (workQueue.Count > 0)
+            {
+                //Console.WriteLine($"Visiting {inst}");
+
+
+
+                // Emulate the
+                var variables = workQueue.Concat(substitutions).Distinct().ToArray();
+                var numVars = variables.Length;
+                if (numVars <= 5)
+                {
+                    // Assign a value to each variable
+                    int numEntries = 1 << 5;
+                    var resultVector = new ulong[numEntries];
+                    for (var resultVecIdx = 0; resultVecIdx < numEntries; resultVecIdx++)
+                    {
+                        valueMap.Clear();
+
+                        for (ushort varIdx = 0; varIdx < numVars; varIdx++)
+                            valueMap[variables[varIdx]] = (resultVecIdx & (1u << varIdx)) != 0 ? 1ul : 0;
+
+                        var r = Emulate(inst, valueMap); ;
+                        resultVector[resultVecIdx] = r;
+                        //Console.WriteLine($"Got {r}");
+                    }
+
+
+
+                    //Console.WriteLine("");
+
+                    var substList = substitutions.ToList();
+                    for (int i = 0; i < substList.Count; i++)
+                    {
+                        var op0 = substList[i];
+                        if (!op0.Is(LLVMOpcode.LLVMICmp))
+                            continue;
+                        for (int j = i + 1; j < substList.Count; i++)
+                        {
+                            var op1 = substList[j];
+                            if (!op1.Is(LLVMOpcode.LLVMICmp))
+                                continue;
+
+                            //Debugger.Break();
+                        }
+                    }
+
+                    var uniqueValues = resultVector.ToHashSet();
+                    if (uniqueValues.Count <= 2 && !IsSelectOfTwoConstants(inst))
+                    {
+                        Debugger.Break();
+                    }
+
+                }
+
+
+                var current = workQueue.Dequeue();
+
+                foreach (var operand in current.GetOperands())
+                {
+                    if (!operand.Is(LLVMValueKind.LLVMInstructionValueKind))
+                        continue;
+
+                    // Skip operands that are not i1
+                    var size = operand.TypeOf.IntWidth;
+                    if (size != 1)
+                        continue;
+
+                    switch (operand.InstructionOpcode)
+                    {
+                        case LLVMOpcode.LLVMAnd:
+                        case LLVMOpcode.LLVMOr:
+                        case LLVMOpcode.LLVMXor:
+                        case LLVMOpcode.LLVMSelect:
+                            if (visited.Add(operand))
+                                workQueue.Enqueue(operand);
+                            break;
+                        default:
+                            substitutions.Add(operand);
+                            break;
+
+                    }
+
+                }
+            }
+
+            return null;
+        }
+
+        private static bool IsSupported(LLVMOpcode opcode)
+        {
+            return opcode switch
+            {
+                LLVMOpcode.LLVMAnd or LLVMOpcode.LLVMOr or LLVMOpcode.LLVMXor or LLVMOpcode.LLVMSelect => true,
+                _ => false,
+            };
+        }
+
+        private ulong Emulate(LLVMValueRef value, Dictionary<LLVMValueRef, ulong> valueMap)
+        {
+            //Console.WriteLine($"Getting {value}");
+            if (value.IsConstant())
+                return value.ConstIntZExt;
+
+            if (valueMap.TryGetValue(value, out var existing))
+                return existing;
+
+            var op0 = () => Emulate(value.GetOperand(0), valueMap);
+            var op1 = () => Emulate(value.GetOperand(1), valueMap);
+            var op2 = () => Emulate(value.GetOperand(2), valueMap);
+
+            var opc = value.InstructionOpcode;
+            var result = opc switch
+            {
+                LLVMOpcode.LLVMAnd => op0() & op1(),
+                LLVMOpcode.LLVMOr => op0() | op1(),
+                LLVMOpcode.LLVMXor => op0() | op1(),
+                LLVMOpcode.LLVMSelect => op0() != 0 ? op1() : op2(),
+                _ => throw new InvalidOperationException($"Unimplemented instruction: {opc}")
+            };
+
+            valueMap[value] = result;
+            return result;
         }
 
         // Adhoc demanded bits simplifications. TODO: Generalize
@@ -323,7 +604,7 @@ return peephole;
             if (!baseSelect.Is(LLVMOpcode.LLVMSelect))
                 return null;
 
-            
+
             var select0 = baseSelect.GetOperand(1);
             var select1 = baseSelect.GetOperand(2);
             if (!select0.Is(LLVMOpcode.LLVMSelect) || !select1.Is(LLVMOpcode.LLVMSelect))
@@ -581,8 +862,10 @@ return peephole;
         }
 
 
-        //   %3581 = trunc i64 %3017 to i8
+        // %3581 = trunc i64 %3017 to i8
         // %3582 = zext i8 %3581 to i64
+        // =>
+        // (x & 255)
         private PeepholeResult TryRewriteZextTrunc(LLVMValueRef zext)
         {
             if (!zext.Is(LLVMOpcode.LLVMZExt))
@@ -605,6 +888,224 @@ return peephole;
             peephole.Add(replacement);
             return peephole;
         }
+
+        // TODO: Canonicalize this
+        /*
+        
+         %371 = and i64 %phiofops.in, 4294967295
+
+          %372 = trunc i64 %phiofops.in to i32
+
+          %418 = icmp eq i32 %372, 23423235
+
+          %419 = icmp eq i64 %371, 23423235
+        */
+        //  %371 = and i64 %phiofops.in, 4294967295
+        //  %419 = icmp eq i64 %371, 23423235
+        // =>
+        //  %372 = trunc i64 %phiofops.in to i32
+        //  %419.canon = icmp eq i32 % 372, 23423235
+        private PeepholeResult TryRewriteCmpAnd(LLVMValueRef icmp)
+        {
+            if (!icmp.Is(LLVMOpcode.LLVMICmp))
+                return null;
+            if (icmp.ICmpPredicate != LLVMIntPredicate.LLVMIntEQ && icmp.ICmpPredicate != LLVMIntPredicate.LLVMIntNE)
+                return null;
+
+            //if (icmp.ToString().Contains("%136 = icmp eq i64 %13"))
+            //    Debugger.Break();
+
+            var cmpImm = icmp.GetOperand(1);
+            if (!cmpImm.IsConstant())
+                return null;
+            var cmpMask = cmpImm.ConstIntZExt;
+            var cmpWidth = (ulong)cmpImm.TypeOf.IntWidth - (ulong)BitOperations.LeadingZeroCount(cmpImm.ConstIntZExt);
+            cmpWidth = NearestPow2(cmpWidth);
+            if (cmpWidth >= cmpImm.TypeOf.IntWidth)
+                return null;
+
+            //  %371 = and i64 %phiofops.in, 4294967295
+            //  %419 = icmp eq i64 %371, 23423235
+            var and = icmp.GetOperand(0);
+            if (!and.Is(LLVMOpcode.LLVMAnd))
+                return null;
+            var andImm = and.GetOperand(1);
+            if (!andImm.IsConstant())
+                return null;
+            var andMask = andImm.ConstIntZExt;
+            var andWidth = BitOperations.TrailingZeroCount(~andMask);
+            if (andWidth >= cmpImm.TypeOf.IntWidth)
+                return null;
+
+            if (BitOperations.PopCount((uint)andWidth) != 1)
+                return null;
+
+            builder.PositionBefore(and);
+            var t0 = builder.BuildTrunc(and.GetOperand(0), LLVMTypeRef.CreateInt((uint)andWidth));
+            var t1 = builder.BuildICmp(icmp.ICmpPredicate, t0, LLVMValueRef.CreateConstInt(t0.TypeOf, cmpMask));
+
+            var peephole = new PeepholeResult();
+            peephole.Add(t0);
+            peephole.Add(t1);
+            return peephole;
+
+            /*
+            var truncWidth = and.TypeOf.IntWidth;
+            var andWidth = BitOperations.TrailingZeroCount(~andMask);
+            if (andWidth >= cmpImm.TypeOf.IntWidth)
+                return null;
+            */
+
+
+
+            return null;
+        }
+
+        public static ulong NearestPow2(ulong value)
+        {
+            if (value <= 1)
+                return 1;
+
+            if (value >= 0x8000000000000000)
+                return 0x8000000000000000;
+
+            int leadingZeros = BitOperations.LeadingZeroCount(value);
+            ulong prevPower = 1UL << (63 - leadingZeros);
+            ulong nextPower = prevPower << 1;
+
+            return (value - prevPower < nextPower - value) ? prevPower : nextPower;
+        }
+
+        // %419 = icmp ne i32 %417, 2
+        // %420 = icmp eq i32 % 417, 2
+        private PeepholeResult TryRewriteInverseCmp(LLVMValueRef icmp)
+        {
+            if (!icmp.Is(LLVMOpcode.LLVMICmp))
+                return null;
+
+            if (icmp.ICmpPredicate != LLVMIntPredicate.LLVMIntEQ && icmp.ICmpPredicate != LLVMIntPredicate.LLVMIntNE)
+                return null;
+
+            var inversePredicate = icmp.ICmpPredicate == LLVMIntPredicate.LLVMIntEQ
+                ? LLVMIntPredicate.LLVMIntNE
+                : LLVMIntPredicate.LLVMIntEQ;
+
+            
+            int depth = 0;
+            var curr = icmp.NextInstruction;
+            while (curr.Handle != 0 && curr.InstructionParent == icmp.InstructionParent && depth < 10)
+            {
+                //if (curr.Is(LLVMOpcode.LLVMICmp) && curr.ICmpPredicate == inversePredicate && HasSameCommutativeOperands(icmp, curr))
+                if (AreInverseComparisons(icmp, curr))
+                {
+                    var insertBefore = curr.NextInstruction;
+                    if (insertBefore.Handle == 0)
+                        return null;
+
+                    builder.PositionBefore(insertBefore);
+                    var not = builder.BuildXor(curr, LLVMValueRef.CreateConstInt(LLVMTypeRef.Int1, 1));
+
+                    var peephole = new PeepholeResult();
+                    peephole.Add(not);
+                    return peephole;
+                }
+
+                curr = curr.NextInstruction;
+                depth++;
+            }
+
+            return null;
+        }
+
+        private static bool AreInverseComparisons(LLVMValueRef icmp, LLVMValueRef other)
+        {
+            if (!icmp.Is(LLVMOpcode.LLVMICmp) || !other.Is(LLVMOpcode.LLVMICmp))
+                return false;
+
+            if (icmp.ICmpPredicate != LLVMIntPredicate.LLVMIntEQ && icmp.ICmpPredicate != LLVMIntPredicate.LLVMIntNE)
+                return false;
+
+            var inversePredicate = icmp.ICmpPredicate == LLVMIntPredicate.LLVMIntEQ
+                ? LLVMIntPredicate.LLVMIntNE
+                : LLVMIntPredicate.LLVMIntEQ;
+
+            return other.ICmpPredicate == inversePredicate && HasSameCommutativeOperands(icmp, other);
+        }
+
+        private static bool HasSameCommutativeOperands(LLVMValueRef a, LLVMValueRef b)
+        {
+            var a0 = a.GetOperand(0);
+            var a1 = a.GetOperand(1);
+            var b0 = b.GetOperand(0);
+            var b1 = b.GetOperand(1);
+
+            return (a0.Handle == b0.Handle && a1.Handle == b1.Handle) ||
+                   (a0.Handle == b1.Handle && a1.Handle == b0.Handle);
+        }
+
+        // TODO: Validate correctness
+        private PeepholeResult TryRewriteInverseXor(LLVMValueRef inst)
+        {
+            if (!inst.Is(LLVMOpcode.LLVMXor))
+                return null;
+
+            // Walk the next up to 10 instructions looking for an inverse comparison.
+            // If found, rewrite the inverse comparison as a XOR of the first comparison.
+            int depth = 0;
+            var curr = inst.NextInstruction;
+            while (curr.Handle != 0 && curr.InstructionParent == inst.InstructionParent && depth < 10)
+            {
+                //if (curr.Is(LLVMOpcode.LLVMICmp) && curr.ICmpPredicate == inversePredicate && HasSameCommutativeOperands(icmp, curr))
+                //var isInverseXor = curr.Is(LLVMOpcode.LLVMXor) && inst.GetOperand(0) == curr.GetOperand(0) && curr.GetOperand(1).IsConstant() && curr.GetOperand(1).ConstIntZExt == ModuloReducer.GetMask(curr.TypeOf.IntWidth);
+                var isInverseXor = AreInverseXor(inst, curr);
+                if (isInverseXor)
+                {
+                    var insertBefore = curr.NextInstruction;
+                    if (insertBefore.Handle == 0)
+                        return null;
+
+                    builder.PositionBefore(insertBefore);
+                    var not = builder.BuildXor(curr, LLVMValueRef.CreateConstInt(curr.TypeOf, ulong.MaxValue));
+
+                    var peephole = new PeepholeResult();
+                    peephole.Add(not);
+                    return peephole;
+                }
+
+                curr = curr.NextInstruction;
+                depth++;
+            }
+
+            return null;
+        }
+
+        // %476 = xor i1 %467, %420
+        // %477 = xor i1 %467, %419
+        //
+        // where %420 = xor i1 %419, true
+        private static bool AreInverseXor(LLVMValueRef xor1, LLVMValueRef xor2)
+        {
+            if (!xor1.Is(LLVMOpcode.LLVMXor) || !xor2.Is(LLVMOpcode.LLVMXor))
+                return false;
+
+            if (xor1.GetOperand(0) != xor1.GetOperand(0))
+                return false;
+
+            var t420 = xor1.GetOperand(1);
+            if (!t420.Is(LLVMOpcode.LLVMXor))
+                return false;
+            if (t420.GetOperand(0) != xor2.GetOperand(1))
+                return false;
+
+            var trueOp = t420.GetOperand(1);
+            if (!trueOp.IsConstant())
+                return false;
+            if (trueOp.ConstIntZExt != ModuloReducer.GetMask(xor1.TypeOf.IntWidth))
+                return false;
+
+            return true;
+        }
+
 
         private PeepholeResult TryRewriteDisjointOr(LLVMValueRef or)
         {
