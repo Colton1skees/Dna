@@ -88,7 +88,8 @@ namespace Dna::API {
 		function->addFnAttr(llvm::Attribute::NoSync);
 		function->addFnAttr(llvm::Attribute::NoUnwind);
 		function->addFnAttr(llvm::Attribute::WillReturn);
-		function->setMemoryEffects(MemoryEffects::none());
+		//function->setMemoryEffects(MemoryEffects::none());
+		function->setMemoryEffects(llvm::MemoryEffects::inaccessibleMemOnly(llvm::ModRefInfo::Mod));
 		return;
 	}
 

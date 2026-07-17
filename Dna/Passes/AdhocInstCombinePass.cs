@@ -97,7 +97,7 @@ namespace Dna.Passes
             if (select.ToString().Contains("%454 = select i1 %455, i64 68, i64 0"))
                 Debugger.Break();
         }
-        
+
 
 
         private readonly bool debug = false;
@@ -230,37 +230,51 @@ namespace Dna.Passes
             if (changed != null)
                 return changed;
 
-
-            changed = TrySinkLoadOfSelect(inst);
+            /*
+            changed = TryDistributeTruncation(inst);
             if (changed != null)
                 return changed;
-
-
-            changed = TryRewriteSignExtI1(inst);
-            if (changed != null)
-                return changed;
-
-
-            changed = TryRewriteTruncAnd(inst);
-            if (changed != null)
-                return changed;
-
-            changed = TryRewriteZextTrunc(inst);
-            if (changed != null)
-                return changed;
-
-            changed = TryRewriteDisjointOr(inst);
-            if (changed != null)
-                return changed;
-
-            changed = TryRewriteInverseShifts(inst);
-            if (changed != null)
-                return changed;
+            */
 
             changed = TryRewriteCmpAnd(inst);
             if (changed != null)
                 return changed;
 
+            changed = TryEliminateTrunc(inst);
+            if (changed != null)
+                return changed;
+
+            changed = TrySinkLoadOfSelect(inst);
+            if (changed != null)
+                return changed;
+
+         
+            changed = TryRewriteSignExtI1(inst);
+            if (changed != null)
+                return changed;
+            /*
+         changed = TryRewriteTruncAnd(inst);
+         if (changed != null)
+             return changed;
+
+         changed = TryRewriteZextTrunc(inst);
+         if (changed != null)
+             return changed;
+         */
+            changed = TryRewriteDisjointOr(inst);
+            if (changed != null)
+                return changed;
+
+
+            changed = TryRewriteInverseShifts(inst);
+            if (changed != null)
+                return changed;
+
+
+            return changed;
+
+
+            /*
             changed = TryRewriteInverseCmp(inst);
             if (changed != null)
                 return changed;
@@ -268,6 +282,7 @@ namespace Dna.Passes
             changed = TryRewriteInverseXor(inst);
             if (changed != null)
                 return changed;
+            */
 
 
             return null;
@@ -275,7 +290,7 @@ namespace Dna.Passes
 
         private static readonly LLVMOpcode[] UnaryOpcodes = { LLVMOpcode.LLVMTrunc, LLVMOpcode.LLVMCall };
 
-        private static readonly string[] UnaryWhitelist = { "llvm.ctpop"};
+        private static readonly string[] UnaryWhitelist = { "llvm.ctpop" };
 
         private static readonly LLVMOpcode[] BinaryOpcodes = { LLVMOpcode.LLVMAdd, LLVMOpcode.LLVMSub, LLVMOpcode.LLVMMul, LLVMOpcode.LLVMAnd, LLVMOpcode.LLVMOr, LLVMOpcode.LLVMXor, LLVMOpcode.LLVMShl, LLVMOpcode.LLVMLShr, LLVMOpcode.LLVMAShr, LLVMOpcode.LLVMCall };
 
@@ -382,6 +397,7 @@ return peephole;
             peephole.Add(clone0, clone1, res);
             return peephole;
         }
+
 
         private PeepholeResult TryDistributeBinarySelect(LLVMValueRef inst)
         {
@@ -703,6 +719,82 @@ return peephole;
             return peephole;
         }
 
+        private static readonly LLVMOpcode[] distributableOpcodes
+            = { LLVMOpcode.LLVMAdd, LLVMOpcode.LLVMSub, LLVMOpcode.LLVMMul, LLVMOpcode.LLVMAnd, LLVMOpcode.LLVMOr, LLVMOpcode.LLVMXor };
+
+        private LLVMValueRef Create(LLVMOpcode opcode, LLVMValueRef[] operands)
+        {
+            var op0 = () => operands[0];
+            var op1 = () => operands[1];
+            var op2 = () => operands[2];
+            return opcode switch
+            {
+                LLVMOpcode.LLVMAdd => builder.BuildAdd(op0(), op1()),
+                LLVMOpcode.LLVMSub => builder.BuildSub(op0(), op1()),
+                LLVMOpcode.LLVMMul => builder.BuildMul(op0(), op1()),
+                LLVMOpcode.LLVMAnd => builder.BuildAnd(op0(), op1()),
+                LLVMOpcode.LLVMOr => builder.BuildOr(op0(), op1()),
+                LLVMOpcode.LLVMXor => builder.BuildXor(op0(), op1()),
+                LLVMOpcode.LLVMShl => builder.BuildShl(op0(), op1()),
+            };
+        }
+
+        // trunc(a+b) => trunc(a) + trunc(b)
+        private PeepholeResult TryDistributeTruncation(LLVMValueRef trunc)
+        {
+            if (!trunc.Is(LLVMOpcode.LLVMTrunc))
+                return null;
+
+            var inst = trunc.GetOperand(0);
+            if (!inst.Is(LLVMValueKind.LLVMInstructionValueKind))
+                return null;
+
+            if (!inst.Is(distributableOpcodes))
+                return null;
+
+            builder.PositionBefore(inst);
+            var children = inst.GetOperands().Select(x => builder.BuildTrunc(x, trunc.TypeOf)).ToArray();
+
+            builder.PositionBefore(inst);
+            /*
+            var clone = Clone(inst);
+            for(int i = 0; i < children.Length; i++)
+            {
+                clone.SetOperand((uint)i, children[i]);
+            }
+            */
+
+            var result = Create(inst.InstructionOpcode, children);
+
+            //var result = builder.BuildTrunc(clone, trunc.TypeOf);
+
+            var peephole = new PeepholeResult();
+            peephole.Add(children);
+            peephole.Add(result);
+
+            return peephole;
+
+        }
+
+        // trunc(trunc, a)
+        private PeepholeResult TryEliminateTrunc(LLVMValueRef trunc)
+        {
+            if (!trunc.Is(LLVMOpcode.LLVMTrunc))
+                return null;
+
+            var inst = trunc.GetOperand(0);
+            if (!inst.Is(LLVMOpcode.LLVMTrunc))
+                return null;
+
+            if (inst.TypeOf.Handle != trunc.TypeOf.Handle)
+                return null;
+
+            var peephole = new PeepholeResult();
+            peephole.Add(inst);
+            return peephole;
+
+        }
+
         private PeepholeResult TryKnownBitsFoldToSelect(LLVMValueRef inst, SimplifyQuery simplifyQuery)
         {
             if (!inst.Is(kbFolds))
@@ -789,7 +881,20 @@ return peephole;
                 return false;
 
             // If either operand is not a constant, return false.
-            if (inst.GetOperand(1).Kind != LLVMValueKind.LLVMConstantIntValueKind || inst.GetOperand(2).Kind != LLVMValueKind.LLVMConstantIntValueKind)
+            if (inst.GetOperand(1).Kind != LLVMValueKind.LLVMConstantIntValueKind && inst.GetOperand(2).Kind != LLVMValueKind.LLVMConstantIntValueKind)
+                return false;
+
+            return true;
+        }
+
+        private static bool IsRealSelect(LLVMValueRef inst)
+        {
+
+            if (inst.Kind != LLVMValueKind.LLVMInstructionValueKind)
+                return false;
+
+            // Return false if it's not a select inst.
+            if (inst.InstructionOpcode != LLVMOpcode.LLVMSelect)
                 return false;
 
             return true;
@@ -960,6 +1065,54 @@ return peephole;
             return peephole;
         }
 
+        //   %133 = and i64 %9, 4294967295
+        // %134 = icmp eq i64 % 133, 0
+        //
+        // =>
+        // trunc(%9, i32)
+        // %9 == 0
+        private PeepholeResult TryRewriteCmpAnd(LLVMValueRef icmp)
+        {
+            if (!icmp.Is(LLVMOpcode.LLVMICmp))
+                return null;
+            var kind = icmp.ICmpPredicate;
+            if (kind != LLVMIntPredicate.LLVMIntNE && kind != LLVMIntPredicate.LLVMIntEQ)
+                return null;
+
+            var constant = icmp.GetOperand(1);
+            if (!constant.IsConstant())
+                return null;
+            if (constant.ConstIntZExt != 0)
+                return null;
+
+            var andInst = icmp.GetOperand(0);
+            if (!andInst.Is(LLVMOpcode.LLVMAnd))
+                return null;
+
+            var andMask = andInst.GetOperand(1);
+            if (!andMask.IsConstant() || andMask.ConstIntZExt > 4294967295)
+                return null;
+            if (andMask.TypeOf.IntWidth != 64)
+                return null;
+
+            builder.PositionBefore(andInst);
+            var peephole = new PeepholeResult();
+            var trunc = builder.BuildTrunc(andInst.GetOperand(0), LLVMTypeRef.Int32);
+            peephole.Add(trunc);
+            if (andMask.ConstIntZExt != 4294967295)
+            {
+                trunc = builder.BuildAnd(trunc, LLVMValueRef.CreateConstInt(LLVMTypeRef.Int32, andMask.ConstIntZExt));
+                peephole.Add(trunc);
+            }
+
+
+            var newCmp = builder.BuildICmp(icmp.ICmpPredicate, trunc, LLVMValueRef.CreateConstInt(LLVMTypeRef.Int32, 0));
+            peephole.Add(trunc);
+            peephole.Add(newCmp);
+
+            return peephole;
+        }
+
         // TODO: Canonicalize this
         /*
         
@@ -976,7 +1129,7 @@ return peephole;
         // =>
         //  %372 = trunc i64 %phiofops.in to i32
         //  %419.canon = icmp eq i32 % 372, 23423235
-        private PeepholeResult TryRewriteCmpAnd(LLVMValueRef icmp)
+        private PeepholeResult TryRewriteCmpAndOld(LLVMValueRef icmp)
         {
             if (!icmp.Is(LLVMOpcode.LLVMICmp))
                 return null;
@@ -1053,7 +1206,7 @@ return peephole;
         {
             if (!icmp.Is(LLVMOpcode.LLVMICmp))
                 return null;
-https://open.spotify.com/playlist/2OfZT7teUPaGjHWRgGqMta
+        https://open.spotify.com/playlist/2OfZT7teUPaGjHWRgGqMta
             if (icmp.ICmpPredicate != LLVMIntPredicate.LLVMIntEQ && icmp.ICmpPredicate != LLVMIntPredicate.LLVMIntNE)
                 return null;
 
@@ -1061,7 +1214,7 @@ https://open.spotify.com/playlist/2OfZT7teUPaGjHWRgGqMta
                 ? LLVMIntPredicate.LLVMIntNE
                 : LLVMIntPredicate.LLVMIntEQ;
 
-            
+
             int depth = 0;
             var curr = icmp.NextInstruction;
             while (curr.Handle != 0 && curr.InstructionParent == icmp.InstructionParent && depth < 10)

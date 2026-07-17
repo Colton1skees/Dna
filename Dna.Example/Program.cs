@@ -77,7 +77,7 @@ if (genDsl)
 bool dbgCode = false;
 if (dbgCode)
 {
-    var irPath = "C:\\Users\\user\\Downloads\\translatedFunction.ll";
+    var irPath = "C:\\Users\\user\\Downloads\\debugme2.ll";
     var t = File.ReadAllText(irPath);
     Console.WriteLine(irPath);
 
@@ -129,8 +129,11 @@ if (dbgCode)
         while (true)
         {
             var sw2 = Stopwatch.StartNew();
-            PassPipeline.Run(vmpBin, existingFunc, false, false, false);
-            PassPipeline.Run(vmpBin, existingFunc, false, false, true);
+            for (int i = 0; i < 10; i++)
+            {
+                PassPipeline.Run(vmpBin, existingFunc, false, true, false);
+                PassPipeline.Run(vmpBin, existingFunc, false, false, true);
+            }
             sw2.Stop();
             tempNewMod.PrintToFile(("translatedFunction.ll"));
             Console.WriteLine($"Fast optimization took {sw2.ElapsedMilliseconds}ms");
@@ -344,7 +347,7 @@ var target = exceptions.Single(x => (ulong)x.Begin.Rva + bin.BaseAddress == 0x14
             Console.WriteLine($"{tab} Begin: 0x{(bin.BaseAddress + entry.Begin.Rva).ToString("X")} ");
             Console.WriteLine($"{tab} End: 0x{(bin.BaseAddress + entry.End.Rva).ToString("X")}");
             Console.WriteLine($"{tab} Handler 0x{(bin.BaseAddress + entry.Filter.Rva).ToString("X")}");
-            Console.WriteLine($"{tab} Target 0x{(bin.BaseAddress + entry.ExceptionHandler.Rva).ToString("X")} ");
+            Console.WriteLine($"{tab} Target 0x{(bin.BaseAddress + entry.ExceptionHandler.Rva).ToString("X")}  ");
             Console.WriteLine("");
         }
 

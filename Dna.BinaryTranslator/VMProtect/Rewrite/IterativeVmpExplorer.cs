@@ -8,6 +8,7 @@ using Dna.ControlFlow.Extensions;
 using Dna.DataStructures;
 using Dna.Extensions;
 using Dna.LLVMInterop;
+using Dna.LLVMInterop.API.LLVMBindings;
 using Dna.LLVMInterop.API.LLVMBindings.Analysis;
 using Dna.LLVMInterop.API.LLVMBindings.IR;
 using Dna.LLVMInterop.API.LLVMBindings.Transforms.Utils;
@@ -27,6 +28,7 @@ using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.Linq;
+using System.Reflection.Metadata;
 using System.Runtime.InteropServices;
 using System.Text;
 using System.Text.RegularExpressions;
@@ -221,6 +223,12 @@ namespace Dna.BinaryTranslator.VMProtect.Rewrite
             while (true)
             {
 
+               if (vCfg.Instructions.ContainsKey(new VmHandler(0x14000FE70, 0)))
+                {
+                  // liftedFunction.GlobalParent.PrintToFile("translatedFunction.ll");
+                  // Debugger.Break();
+                }
+
                 
                 // It's failing once we hit the loop?
                 if (ii == 960)
@@ -234,6 +242,8 @@ namespace Dna.BinaryTranslator.VMProtect.Rewrite
                     var exePath3 = IDALoader.Load(compiledPath3, true);
                     Debugger.Break();
                 }
+
+
 
 
                 //AdhocInstCombinePass.bar = numFast;
@@ -283,6 +293,13 @@ namespace Dna.BinaryTranslator.VMProtect.Rewrite
                 // Lift the partial CFG
                 //var stateStruct = handlerCache.GetLiftedHandler(handlers.First().NativeRip).ParameterizedStateStructure;
 
+                // So the problem is with rebuilding???
+                // ii >= 1040 triggers it
+                if (ii >= 1 && liftedFunction.Handle != 0)
+                {
+                    liftedFunction.DeleteFunction();
+                    liftedFunction.Handle = 0;
+                }
                 AdhocInstCombinePass.Validate(liftedFunction);
                 liftedFunction = new IterativeCfgBuilder(outModule, arch, stateStruct, vCfg, handlerLifter, vmexitHandlerRips, handlerVips, handlerToVkey, handlerRipToRegisters).Run(liftedFunction, handlers.First());
                 AdhocInstCombinePass.Validate(liftedFunction);
@@ -622,16 +639,16 @@ namespace Dna.BinaryTranslator.VMProtect.Rewrite
             // Compute the VIP/vkey reg for each handler
             foreach (var (bytecodePtr, outgoingHandlers) in dests.Value)
             {
-                liftedFunction.GlobalParent.PrintToFile("translatedFunction.ll");
+                //liftedFunction.GlobalParent.PrintToFile("translatedFunction.ll");
                 // Compute the VIP and vkey
                 var regs = GetHandlerRegisters(stateStruct, stateStruct2, handlers.First(), handlerLifter, bytecodePtr, outgoingHandlers, handlerRipToRegisters);
 
                 foreach (var rip in outgoingHandlers)
                 {
-                    if (rip == 0x14012158B)
-                        regs = new(regs.Vip, arch.GetRegisterByName("RBP"));
-                    if (rip == 0x14001367C)
-                        regs = new(regs.Vip, arch.GetRegisterByName("R8"));
+                   // if (rip == 0x14012158B)
+                   //     regs = new(regs.Vip, arch.GetRegisterByName("RBP"));
+                   // if (rip == 0x14001367C)
+                   //     regs = new(regs.Vip, arch.GetRegisterByName("R8"));
                     handlerRipToRegisters[rip] = regs;
                 }
             }
@@ -672,6 +689,9 @@ namespace Dna.BinaryTranslator.VMProtect.Rewrite
                     Debugger.Break();
                 }
                 */
+
+                //if (rip == 0x14005DFB7)
+                //    Debugger.Break();
 
                 RemillRegister vkey = null;
                 if (existingRegister.Name != vip.Name)
@@ -1151,6 +1171,9 @@ namespace Dna.BinaryTranslator.VMProtect.Rewrite
 
         public LLVMValueRef Run(LLVMValueRef translatedFunction, VmHandler entryHandler)
         {
+
+            var bar = arch.Registers;
+
             var jmpHandler = module.GetNamedFunction("vmp_branch");
             bool incremental = translatedFunction.Handle != 0;
             //if (incremental)
@@ -1345,7 +1368,7 @@ namespace Dna.BinaryTranslator.VMProtect.Rewrite
 
                         else
                         {
-                            builder.BuildStore(LLVMValueRef.CreateConstInt(LLVMTypeRef.Int64, existing), registerAllocaMapping[incomingVkeyRegister]);
+                           builder.BuildStore(LLVMValueRef.CreateConstInt(LLVMTypeRef.Int64, existing), registerAllocaMapping[incomingVkeyRegister]);
                         }
                        
 
@@ -1358,11 +1381,40 @@ namespace Dna.BinaryTranslator.VMProtect.Rewrite
                 }
 
                 var liftedHandler = handlerCache.Lift(module, handler.NativeRip, handler == entryHandler);
+
+                var getSaveVip = () =>
+                {
+                    var func = module.GetNamedFunction("SaveVIP");
+                    if (func.Handle == 0)
+                    {
+                        var prototype = LLVMTypeRef.CreateFunction(LLVMTypeRef.Void, new[] { LLVMTypeRef.Int64, LLVMTypeRef.Int64 });
+                        func = module.AddFunction("SaveVIP", prototype);
+                        LLVMUtilApi.AddNoSideEffectAttributes(func);
+                    }
+                    ;
+                    return func;
+                };
+
+
+
                 var call = VmPartialBlockLifter.CallVmHandler(builder, function, liftedHandler, registerAllocaMapping, stateStruct);
 
+                bool dbgIntrins = false;
+
+
+                builder.PositionBefore(call);
+                var saveVip = getSaveVip();
+
+                if (dbgIntrins)
+                    builder.BuildCall2(saveVip.GetFunctionPrototype(), saveVip, new[] { LLVMValueRef.CreateConstInt(LLVMTypeRef.Int64, handler.BytecodeRip), LLVMValueRef.CreateConstInt(LLVMTypeRef.Int64, handler.NativeRip) });
+
+
+
+                builder.PositionAtEnd(call.InstructionParent);
                 if (true && handler != entryHandler && handlerRipToRegisters.TryGetValue(handler.NativeRip, out var slotInfo) && slotInfo.hasVkeyStackSlot)
                 {
-                    liftedHandler.GlobalParent.PrintToFile("translatedFunction.ll");
+
+                    /*
                     var name = $"solve_{handler.BytecodeRip.ToString("X")}";
                     var load = liftedHandler.GetInstructions().Skip(1).First(x => x.InstructionOpcode == LLVMOpcode.LLVMLoad);
 
@@ -1385,10 +1437,29 @@ namespace Dna.BinaryTranslator.VMProtect.Rewrite
 
                     liftedHandler.GlobalParent.PrintToFile("translatedFunction.ll");
                     //Debugger.Break();
+                    */
+
+
+                    var func = module.GetNamedFunction("SaveVkey");
+                    if (func.Handle == 0)
+                    {
+                        var prototype = LLVMTypeRef.CreateFunction(LLVMTypeRef.Void, new[] { LLVMTypeRef.Int64 });
+                        func = module.AddFunction("SaveVkey", prototype);
+                        LLVMUtilApi.AddNoSideEffectAttributes(func);
+                    }
+
+
+                    var load = liftedHandler.GetInstructions().Skip(1).First(x => x.InstructionOpcode == LLVMOpcode.LLVMLoad);
+                    Debug.Assert(load.TypeOf.Kind == LLVMTypeKind.LLVMIntegerTypeKind);
+                    builder.PositionBefore(load.NextInstruction);
+
+                    if (dbgIntrins)
+                        builder.BuildCall2(func.GetFunctionPrototype(), func, new[] { load});
+
                 }
 
 
-
+                builder.PositionAtEnd(call.InstructionParent);
                 LiftInstEdges(handler, function, exitBlock, blockMapping, registerAllocaMapping);
                 //module.PrintToFile("translatedFunction.ll");
 
@@ -1818,12 +1889,6 @@ namespace Dna.BinaryTranslator.VMProtect.Rewrite
         // To make optimization a bit easier we modify the VMEnter to allocate a huge amount of stack space and delete all of the stack expansion loops.
         private void EliminateStackExpansionLoop(LLVMValueRef function, ulong handlerRip)
         {
-            if (handlerRip == 0x1400D0A98)
-            {
-                function.GlobalParent.PrintToFile("ProblematicHandler.ll");
-                Debugger.Break();
-            }
-
             var hasCycles = () =>
             {
                 var entryBlock = function.EntryBasicBlock;

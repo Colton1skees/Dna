@@ -232,6 +232,20 @@ namespace Dna.BinaryTranslator.Unsafe
             // Allocate a local state structure at the start of the function.
             var stateStructType = arch.StateStructType;
             var localStateStruct = builder.BuildAlloca(stateStructType, "local_state_struct");
+
+            foreach(var register in arch.Registers)
+            {
+                var type = register.LLVMType;
+                if (type.Kind != LLVMTypeKind.LLVMIntegerTypeKind)
+                    continue;
+
+                var zero = LLVMValueRef.CreateConstInt(type, 0);
+                builder.BuildStore(zero, register.GetAddressOf(localStateStruct, builder));
+
+                
+
+            }
+
             return localStateStruct;
         }
 
