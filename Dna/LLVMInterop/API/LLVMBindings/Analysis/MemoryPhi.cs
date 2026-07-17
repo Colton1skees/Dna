@@ -9,6 +9,7 @@ namespace Dna.LLVMInterop.API.LLVMBindings.Analysis
 {
     public class MemoryPhi : MemoryAccess
     {
+        public unsafe LLVMBasicBlockRef Block => NativeMemoryPhiApi.GetBlock(this);
         public IReadOnlyList<LLVMBasicBlockRef> Blocks => GetBlocks();
 
         public IReadOnlyList<LLVMUseRef> IncomingValues => GetIncomingValues();

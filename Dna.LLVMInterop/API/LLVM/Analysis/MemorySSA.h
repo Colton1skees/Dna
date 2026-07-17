@@ -112,6 +112,11 @@ namespace Dna::API {
 
 // MemoryPhi
 namespace Dna::API {
+	DNA_EXPORT llvm::BasicBlock* MemoryPhi_GetBlock(llvm::MemoryPhi* memPhi)
+	{
+		return memPhi->getBlock();
+	}
+
 	DNA_EXPORT ImmutableManagedVector* MemoryPhi_GetBlocks(llvm::MemoryPhi* memPhi)
 	{
 		auto output = new std::vector<llvm::BasicBlock*>();

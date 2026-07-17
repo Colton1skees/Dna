@@ -74,13 +74,29 @@ if (genDsl)
 //LazyLLVMFixes.InstallValueToStringBugFix(RemillUtils.LLVMValueToString);
 
 
-bool dbgCode = true;
+bool dbgCode = false;
 if (dbgCode)
 {
-    var irPath = "C:\\Users\\colton\\Downloads\\noidea.ll";
+    var irPath = "C:\\Users\\user\\Downloads\\translatedFunction.ll";
     var t = File.ReadAllText(irPath);
     Console.WriteLine(irPath);
+
+
+
     var tempNewMod = RemillUtils.LoadModuleFromFile(LLVMContextRef.Global, irPath).Value;
+
+
+    /*
+    var name3 = Guid.NewGuid().ToString() + ".ll";
+    tempNewMod.PrintToFile((name3));
+
+
+    var compiledPath33 = ClangCompiler.Compile(name3);
+
+    Console.WriteLine("Loading into IDA.   ");
+    var exePath33 = IDALoader.Load(compiledPath33, true);
+    */
+
     var existingFunc = tempNewMod.GetFunctions().Single(x => x.Name.Contains("Part"));
 
 
@@ -103,7 +119,7 @@ if (dbgCode)
         } 
 
         // Note: Need to update this path on different samples
-        var vmpPath = @"C:\Users\colton\Desktop\PRIV_BINARIES\vmp3_private_tlb.vmp.exe";
+        var vmpPath = @"C:\Users\user\Downloads\PRIV_BINARIES\vmp3_private_tlb.vmp.exe";
         var vmpBin = WindowsBinary.From(vmpPath);
         var vmpDna = new Dna.Dna(vmpBin);
 
@@ -132,10 +148,15 @@ if (dbgCode)
         //  PassPipeline.Run(vmpBin, existingFunc);
 
         tempNewMod.PrintToFile("instcombine.ll");
-        tempNewMod.PrintToFile(("compile.ll"));
+
         tempNewMod.PrintToFile(("translatedFunction.ll"));
 
-        var compiledPath3 = ClangCompiler.Compile("compile.ll");
+
+        var name = Guid.NewGuid().ToString() + ".ll";
+        tempNewMod.PrintToFile((name));
+
+
+        var compiledPath3 = ClangCompiler.Compile(name);
 
         Console.WriteLine("Loading into IDA.   ");
         var exePath3 = IDALoader.Load(compiledPath3, true);
@@ -167,7 +188,7 @@ if (useVmp)
     vmpAddr = 0x140001030;
 
 
-    vmpPath = @"C:\Users\colton\Desktop\PRIV_BINARIES\vmp3_private_tlb.vmp.exe";
+    vmpPath = @"C:\Users\user\Downloads\PRIV_BINARIES\vmp3_private_tlb.vmp.exe";
     vmpAddr = 0x1400032FA; // x+y
     vmpAddr = 0x14000335E; // 3 if/else statements with additions
 

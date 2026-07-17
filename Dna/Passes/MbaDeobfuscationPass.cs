@@ -390,7 +390,8 @@ namespace Dna.Passes.Mba
                             var c2 = ctx.GetCost(pair.Idx);
 
                             var part1 = pair.Idx;
-                            if (c1 < c2 && c1 < 50 && ProbableEquivalenceChecker.ProbablyEquivalentZ3(ctx, part1, unsound.Value))
+                            //if (c1 < c2 && c1 < 50 && ProbableEquivalenceChecker.ProbablyEquivalentZ3(ctx, part1, unsound.Value))
+                            if (false) // broken
                             {
                                 optimal[pair.Idx] = unsound.Value;
                                 if (IsNeg(pair.Idx))

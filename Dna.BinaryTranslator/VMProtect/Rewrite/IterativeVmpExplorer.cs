@@ -61,7 +61,7 @@ namespace Dna.BinaryTranslator.VMProtect.Rewrite
     }
 
 
-    public record HandlerData(RemillRegister Vip, RemillRegister Vkey);
+    public record HandlerData(RemillRegister Vip, RemillRegister Vkey, bool hasVkeyStackSlot = false);
 
     public class IterativeVmpExplorer
     {
@@ -118,6 +118,7 @@ namespace Dna.BinaryTranslator.VMProtect.Rewrite
             return true;
         }
 
+  
         public LLVMValueRef Run()
         {
             arch.GetOrLoadSemantics();
@@ -220,12 +221,30 @@ namespace Dna.BinaryTranslator.VMProtect.Rewrite
             while (true)
             {
 
+                
+                // It's failing once we hit the loop?
+                if (ii == 960)
+                {
+                    var name = Guid.NewGuid().ToString() + ".ll";
+                    liftedFunction.GlobalParent.PrintToFile((name));
 
+                    var compiledPath3 = ClangCompiler.Compile(name);
+
+                    Console.WriteLine("Loading into IDA.   ");
+                    var exePath3 = IDALoader.Load(compiledPath3, true);
+                    Debugger.Break();
+                }
+
+
+                //AdhocInstCombinePass.bar = numFast;
                 Console.WriteLine($"Lifting iteration {ii++} at {sw.ElapsedMilliseconds}ms");
                 Console.WriteLine($"{numFast} / {numFast + numHeavy} solvers finished");
 
                 serialize();
-                    
+
+                var text = new BinjaVmCfgViewerV2(vCfg).Run(handlerRipToRegisters, handlerToVkey);
+                File.WriteAllText("binja.py", text);
+
                 /*
                 // see VIPs.txt
                 if (false && ii == 551)
@@ -264,9 +283,12 @@ namespace Dna.BinaryTranslator.VMProtect.Rewrite
                 // Lift the partial CFG
                 //var stateStruct = handlerCache.GetLiftedHandler(handlers.First().NativeRip).ParameterizedStateStructure;
 
-
+                AdhocInstCombinePass.Validate(liftedFunction);
                 liftedFunction = new IterativeCfgBuilder(outModule, arch, stateStruct, vCfg, handlerLifter, vmexitHandlerRips, handlerVips, handlerToVkey, handlerRipToRegisters).Run(liftedFunction, handlers.First());
+                AdhocInstCombinePass.Validate(liftedFunction);
                 FixMemPtr(liftedFunction.GlobalParent);
+
+                AdhocInstCombinePass.Validate(liftedFunction);
 
                 //liftedFunction.GlobalParent.PrintToFile("translatedFunction.ll");
                 liftedFunction.GlobalParent.Verify(LLVMVerifierFailureAction.LLVMAbortProcessAction);
@@ -330,6 +352,10 @@ namespace Dna.BinaryTranslator.VMProtect.Rewrite
                 if (solution is Err<InvalidOperationException> err)
                 {
                     liftedFunction.GlobalParent.PrintToFile("translatedFunction.ll");
+                    var hname = "DBG_HandlerCache.ll";
+                    handlerLifter.cacheModule.PrintToFile(hname);
+                    ClangCompiler.Compile(hname);
+
                     throw err.Error;
                 }
 
@@ -337,6 +363,13 @@ namespace Dna.BinaryTranslator.VMProtect.Rewrite
 
                 Console.WriteLine($"Target handler RIPs: {String.Join(" ", bytecodePtrToRips.Select(x => x.Value.rip.ToString("X")))}");
 
+                /*
+                if (liftedFunction.GetInstructions().Any(x => x.InstructionOpcode == LLVMOpcode.LLVMXor && x.GetOperand(1).IsConstant() && x.GetOperand(1).ConstIntZExt == 1685814885))
+                {
+                    liftedFunction.GlobalParent.PrintToFile("translatedFunction.ll");
+                    Debugger.Break();
+                }
+                */
                 if (!newTables.Any())
                 {
                     OptimizeHeavy(liftedFunction);
@@ -501,8 +534,8 @@ namespace Dna.BinaryTranslator.VMProtect.Rewrite
         private Result<JmpTablesWithHandlerRips2, InvalidOperationException> OptimizeAndSolve(VmpParameterizedStateStructure stateStruct, ParameterizedStateStructure stateStruct2, LLVMValueRef function, HandlerLifter handlerLifter, Dictionary<ulong, HandlerData> handlerRipToRegisters)
         {
             si++;
-            foreach (var inst in function.GetInstructions())
-                ConstantFoldingAPI.DropPoisonGeneratingFlags(inst);
+            //foreach (var inst in function.GetInstructions())
+             //   ConstantFoldingAPI.DropPoisonGeneratingFlags(inst);
 
             var solve = () => TrySolve(stateStruct, stateStruct2, function, handlerLifter, handlerRipToRegisters);
 
@@ -537,6 +570,7 @@ namespace Dna.BinaryTranslator.VMProtect.Rewrite
                 {
                     numFast += 1;
                     optimizeFast();
+                    //OptimizeHeavy(function);
                 }
 
                 var solution = solve();
@@ -588,11 +622,18 @@ namespace Dna.BinaryTranslator.VMProtect.Rewrite
             // Compute the VIP/vkey reg for each handler
             foreach (var (bytecodePtr, outgoingHandlers) in dests.Value)
             {
+                liftedFunction.GlobalParent.PrintToFile("translatedFunction.ll");
                 // Compute the VIP and vkey
                 var regs = GetHandlerRegisters(stateStruct, stateStruct2, handlers.First(), handlerLifter, bytecodePtr, outgoingHandlers, handlerRipToRegisters);
 
                 foreach (var rip in outgoingHandlers)
+                {
+                    if (rip == 0x14012158B)
+                        regs = new(regs.Vip, arch.GetRegisterByName("RBP"));
+                    if (rip == 0x14001367C)
+                        regs = new(regs.Vip, arch.GetRegisterByName("R8"));
                     handlerRipToRegisters[rip] = regs;
+                }
             }
 
             var branchResults = solver.Solve(handlerRipToRegisters, stateStruct);
@@ -607,6 +648,7 @@ namespace Dna.BinaryTranslator.VMProtect.Rewrite
             var targets = outgoingHandlers.Select(x => (x, handlerLifter.Lift(debugModule, x, x == entryHandler.BytecodeRip))).ToList();
 
             HashSet<(RemillRegister, RemillRegister)> registers = new();
+            bool hasStackKey = false;
             foreach(var (rip, t) in targets)
             {
                 var existingRegister = handlerRipToRegister[prevRip].Vip;
@@ -615,6 +657,7 @@ namespace Dna.BinaryTranslator.VMProtect.Rewrite
                     registers.Add(new(existingRegister, existingRegister));
                     continue;
                 }
+
 
                 var vip = GetVipByUsage(rip, t, stateStruct);
 
@@ -638,6 +681,12 @@ namespace Dna.BinaryTranslator.VMProtect.Rewrite
 
                     Console.WriteLine("Nullll");
 
+
+                    
+                    hasStackKey = GetStackKeyByUsage(rip, t, stateStruct, vip);
+                   
+                    
+
                     //handlerLifter.cacheModule.PrintToFile("translatedFunction.ll");
 
                     //vkey = GetVkeyByUsage(rip, t, stateStruct, vip);
@@ -652,6 +701,13 @@ namespace Dna.BinaryTranslator.VMProtect.Rewrite
                     Debug.Assert(vkey != null);
                 }
 
+                if (vkey == null)
+                {
+                    //Debugger.Break();
+                }
+
+
+
 
 
                 //handlerLifter.cacheModule.PrintToFile("translatedFunction.ll");
@@ -663,7 +719,7 @@ namespace Dna.BinaryTranslator.VMProtect.Rewrite
 
             Debug.Assert(registers.Count == 1);
             var single = registers.Single();
-            return new HandlerData(single.Item1, single.Item2);
+            return new HandlerData(single.Item1, single.Item2, hasStackKey);
             //debugModule.PrintToFile("translatedFunction.ll");
 
             //Debugger.Break();
@@ -686,6 +742,59 @@ namespace Dna.BinaryTranslator.VMProtect.Rewrite
                 LLVMOpcode.LLVMZExt,
                 LLVMOpcode.LLVMTrunc,
         };
+
+        private bool GetStackKeyByUsage(ulong rip, LLVMValueRef function, VmpParameterizedStateStructure stateStructure, RemillRegister vipReg)
+        {
+            var vipArg = function.GetParam((uint)stateStructure.RegisterArgumentIndices[vipReg]);
+            var loads = function.GetInstructions().Where(x => x.Is(LLVMOpcode.LLVMLoad) && IsGepRegister(x.GetOperand(0))).ToList();
+
+            var shouldContinue = (LLVMValueRef x) =>
+            {
+                if (x.Is(opcodesToVisit))
+                    return true;
+
+                if (x.Is(LLVMOpcode.LLVMCall) && IsIntegerIntrinsic(x.GetCallInstTarget()))
+                    return true;
+
+                return false;
+            };
+
+            function.GlobalParent.PrintToFile("translatedFunction.ll");
+
+            LLVMValueRef? best = null;
+            int bestScore = 0;
+            foreach(var load in loads)
+            {
+                var users = CollectUsers(load, 50, shouldContinue).ToHashSet();
+                var score = users.Sum(x => IsPossibleVipDecryptionInst(x));
+                if (score < 5)
+                    continue;
+
+
+                var gep = load.GetOperand(0);
+                if (!gep.Is(LLVMOpcode.LLVMGetElementPtr))
+                    continue;
+                if (gep.OperandCount != 2 || gep.GetOperand(1).Kind != LLVMValueKind.LLVMArgumentValueKind)
+                    continue;
+
+
+                Console.WriteLine($"Cand has score: {score}");
+
+                if (score < bestScore)
+                    continue;
+
+
+
+                best = load;
+            }
+
+
+            if (best == null)
+                return false;
+
+            
+            return true;
+        }
 
         private RemillRegister GetVkeyByUsage(ulong rip, LLVMValueRef function, VmpParameterizedStateStructure stateStructure, RemillRegister vipReg)
         {
@@ -1219,18 +1328,19 @@ namespace Dna.BinaryTranslator.VMProtect.Rewrite
                 // Concretize the VIP register!
                 if (handler != entryHandler)
                 {
-                    var incomingVipRegister = handlerRipToRegisters[handler.NativeRip].Vip;
+                    var regInfo = handlerRipToRegisters[handler.NativeRip];
+                    var incomingVipRegister = regInfo.Vip;
                     builder.BuildStore(LLVMValueRef.CreateConstInt(LLVMTypeRef.Int64, handler.BytecodeRip), registerAllocaMapping[incomingVipRegister]);
 
                     // Concretize vkey if its known
                     if (handlerToVkey.TryGetValue(handler, out var existing))
                     {
                         // TODO: If this is a vmexit, do not concretize bytecode rip and stuff
-                        var incomingVkeyRegister = handlerRipToRegisters[handler.NativeRip].Vkey;
+                        var incomingVkeyRegister = regInfo.Vkey;
 
                         if (incomingVkeyRegister == null)
                         {
-
+                            Console.WriteLine($"Failed to concretize vkey for handler: {handler.NativeRip}");
                         }
 
                         else
@@ -1238,12 +1348,45 @@ namespace Dna.BinaryTranslator.VMProtect.Rewrite
                             builder.BuildStore(LLVMValueRef.CreateConstInt(LLVMTypeRef.Int64, existing), registerAllocaMapping[incomingVkeyRegister]);
                         }
                        
+
+                        if (regInfo.hasVkeyStackSlot)
+                        {
+
+                        }
+
                     }
                 }
 
                 var liftedHandler = handlerCache.Lift(module, handler.NativeRip, handler == entryHandler);
                 var call = VmPartialBlockLifter.CallVmHandler(builder, function, liftedHandler, registerAllocaMapping, stateStruct);
-             
+
+                if (true && handler != entryHandler && handlerRipToRegisters.TryGetValue(handler.NativeRip, out var slotInfo) && slotInfo.hasVkeyStackSlot)
+                {
+                    liftedHandler.GlobalParent.PrintToFile("translatedFunction.ll");
+                    var name = $"solve_{handler.BytecodeRip.ToString("X")}";
+                    var load = liftedHandler.GetInstructions().Skip(1).First(x => x.InstructionOpcode == LLVMOpcode.LLVMLoad);
+
+                    var glob = liftedHandler.GlobalParent.GetNamedGlobal(name);
+                    if (glob.Handle == 0)
+                    {
+                        glob = liftedHandler.GlobalParent.AddGlobal(load.TypeOf, name);
+                        glob.Initializer = LLVMValueRef.CreateConstInt(load.TypeOf, 0);
+                    }
+
+                 
+                    //var value = LLVMValueRef.CreateConstInt(load.TypeOf, handler.BytecodeRip);
+                    //load.ReplaceAllUsesWith(value);
+
+                    builder.PositionBefore(load.NextInstruction);
+
+                    builder.BuildStore(load, glob);
+
+                    liftedHandler.Name = liftedHandler.Name + Guid.NewGuid().ToString();
+
+                    liftedHandler.GlobalParent.PrintToFile("translatedFunction.ll");
+                    //Debugger.Break();
+                }
+
 
 
                 LiftInstEdges(handler, function, exitBlock, blockMapping, registerAllocaMapping);
@@ -1675,6 +1818,12 @@ namespace Dna.BinaryTranslator.VMProtect.Rewrite
         // To make optimization a bit easier we modify the VMEnter to allocate a huge amount of stack space and delete all of the stack expansion loops.
         private void EliminateStackExpansionLoop(LLVMValueRef function, ulong handlerRip)
         {
+            if (handlerRip == 0x1400D0A98)
+            {
+                function.GlobalParent.PrintToFile("ProblematicHandler.ll");
+                Debugger.Break();
+            }
+
             var hasCycles = () =>
             {
                 var entryBlock = function.EntryBasicBlock;
@@ -1742,8 +1891,9 @@ namespace Dna.BinaryTranslator.VMProtect.Rewrite
             if (exitInsts.Count == 0)
                 return;
 
-            exitInsts.Single().SetOperand(0, LLVMValueRef.CreateConstInt(LLVMTypeRef.Int1, 1));
 
+            //function.GlobalParent.PrintToFile("ProblematicHandler.ll");
+            exitInsts.Single().SetOperand(0, LLVMValueRef.CreateConstInt(LLVMTypeRef.Int1, 1));
 
         }
 
@@ -1891,7 +2041,7 @@ namespace Dna.BinaryTranslator.VMProtect.Rewrite
                     return new Err<InvalidOperationException>(err.Error);
                 }
 
-                
+               
 
                 if (edge.Value is ConstantJmpTableEdge constantEdge)
                 {

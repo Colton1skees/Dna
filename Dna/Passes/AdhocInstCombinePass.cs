@@ -10,6 +10,7 @@ using System.Collections.Generic;
 using System.Diagnostics;
 using System.Linq;
 using System.Numerics;
+using System.Reflection;
 using System.Reflection.Emit;
 using System.Runtime.InteropServices.Marshalling;
 using System.Security.Cryptography;
@@ -24,6 +25,18 @@ namespace Dna.Passes
 {
     public class PeepholeResult
     {
+        public PeepholeResult()
+        {
+            if (AdhocInstCombinePass.bar == 519)
+            {
+                StackTrace stackTrace = new StackTrace(1);
+                StackFrame callingFrame = stackTrace.GetFrame(0);
+                MethodBase callingMethod = callingFrame.GetMethod();
+                string methodName = callingMethod.Name;
+                Console.WriteLine($"Constructor was invoked by: {methodName}");
+            }
+        }
+
         // List of new values added by the peephole optimization
         // Invariant: The last instruction is the result value.
         public List<LLVMValueRef> Insts = new();
@@ -40,6 +53,53 @@ namespace Dna.Passes
     // Peephole optimization pass for cases that InstCombine either cannot perform or choses not to due to global profitability
     public class AdhocInstCombinePass
     {
+        public static int bar = 0;
+
+        public static void Validate(LLVMValueRef function)
+        {
+            if (bar != 519)
+                return;
+
+            function.GlobalParent.Verify(LLVMVerifierFailureAction.LLVMAbortProcessAction);
+
+            foreach (var select in function.GetInstructions())
+            {
+                if (!select.Is(LLVMOpcode.LLVMSelect))
+                    continue;
+
+                var op0 = select.GetOperand(1);
+                if (!op0.IsConstant() || op0.ConstIntZExt != 68)
+                    continue;
+                var op1 = select.GetOperand(2);
+                if (!op1.IsConstant() || op1.ConstIntZExt != 0)
+                    continue;
+
+                if (select.ToString().Contains("%454 = select i1 %455, i64 68, i64 0"))
+                    Debugger.Break();
+            }
+        }
+
+        public static void ValidateSelect(LLVMValueRef select)
+        {
+            if (bar != 519)
+                return;
+
+            if (!select.Is(LLVMOpcode.LLVMSelect))
+                return;
+
+            var op0 = select.GetOperand(1);
+            if (!op0.IsConstant() || op0.ConstIntZExt != 68)
+                return;
+            var op1 = select.GetOperand(2);
+            if (!op1.IsConstant() || op1.ConstIntZExt != 0)
+                return;
+
+            if (select.ToString().Contains("%454 = select i1 %455, i64 68, i64 0"))
+                Debugger.Break();
+        }
+        
+
+
         private readonly bool debug = false;
 
         public LLVMBuilderRef builder;
@@ -85,7 +145,16 @@ namespace Dna.Passes
             return changed;
         }
 
-        public PeepholeResult PeepholeInst(LLVMValueRef inst, SimplifyQuery simplifyQuery)
+        public PeepholeResult PeepholeInst(LLVMValueRef inst, SimplifyQuery query)
+        {
+
+            Validate(inst.InstructionParent.Parent);
+            var r = PeepholeInstInternal(inst, query);
+            Validate(inst.InstructionParent.Parent);
+            return r;
+        }
+
+        public PeepholeResult PeepholeInstInternal(LLVMValueRef inst, SimplifyQuery simplifyQuery)
         {
             if (inst.TypeOf.IntWidth > 64)
                 return null;
@@ -308,6 +377,7 @@ return peephole;
             clone1.SetOperand(0, selectOperand.GetOperand(2));
 
             var res = builder.BuildSelect(selectOperand.GetOperand(0), clone0, clone1);
+            ValidateSelect(res);
             var peephole = new PeepholeResult();
             peephole.Add(clone0, clone1, res);
             return peephole;
@@ -352,7 +422,7 @@ return peephole;
             clone1.SetOperand((uint)selectIndex, selectOperand.GetOperand(2));
 
             var res = builder.BuildSelect(selectOperand.GetOperand(0), clone0, clone1);
-
+            ValidateSelect(res);
 
             var peephole = new PeepholeResult();
             peephole.Add(clone0, clone1, res);
@@ -382,7 +452,7 @@ return peephole;
             clone1.SetOperand((uint)1, selectOperand.GetOperand(2));
 
             var res = builder.BuildSelect(selectOperand.GetOperand(0), clone0, clone1);
-
+            ValidateSelect(res);
             var peephole = new PeepholeResult();
             peephole.Add(clone0, clone1, res);
             return peephole;
@@ -627,7 +697,7 @@ return peephole;
             builder.PositionBefore(inst);
             var ty = inst.TypeOf;
             var result = builder.BuildSelect(select0.GetOperand(0), LLVMValueRef.CreateConstInt(ty, imms0[0]), LLVMValueRef.CreateConstInt(ty, imms0[1]));
-
+            ValidateSelect(result);
             var peephole = new PeepholeResult();
             peephole.Add(result);
             return peephole;
@@ -656,7 +726,7 @@ return peephole;
             var values = kb.AllPossibleValues().Select(x => LLVMValueRef.CreateConstInt(ty, x)).ToList();
             var cmp = builder.BuildICmp(LLVMIntPredicate.LLVMIntEQ, clone, values[0]);
             var select = builder.BuildSelect(cmp, values[0], values[1]);
-
+            ValidateSelect(select);
             var peephole = new PeepholeResult();
             peephole.Add(clone, cmp, select);
             return peephole;
@@ -693,7 +763,7 @@ return peephole;
             var v1 = lambda(selectOp1);
             var v2 = lambda(selectOp2);
             var newSelect = builder.BuildSelect(select.GetOperand(0), v1, v2);
-
+            ValidateSelect(newSelect);
             var peephole = new PeepholeResult();
             peephole.Add(v1, v2, newSelect);
             return peephole;
@@ -805,6 +875,7 @@ return peephole;
             var load1 = builder.BuildLoad2(inst.TypeOf, ptr1);
 
             var replacement = builder.BuildSelect(select.GetOperand(0), load0, load1);
+            ValidateSelect(replacement);
 
             var peephole = new PeepholeResult();
             peephole.Add(ptr0, load0, ptr1, load1, replacement);
@@ -824,7 +895,7 @@ return peephole;
 
             builder.PositionBefore(inst);
             var select = builder.BuildSelect(inst.GetOperand(0), LLVMValueRef.CreateConstInt(type, ulong.MaxValue), LLVMValueRef.CreateConstInt(type, 0));
-
+            ValidateSelect(select);
             var peephole = new PeepholeResult();
             peephole.Add(select);
             return peephole;
@@ -982,7 +1053,7 @@ return peephole;
         {
             if (!icmp.Is(LLVMOpcode.LLVMICmp))
                 return null;
-
+https://open.spotify.com/playlist/2OfZT7teUPaGjHWRgGqMta
             if (icmp.ICmpPredicate != LLVMIntPredicate.LLVMIntEQ && icmp.ICmpPredicate != LLVMIntPredicate.LLVMIntNE)
                 return null;
 
@@ -1007,6 +1078,7 @@ return peephole;
 
                     var peephole = new PeepholeResult();
                     peephole.Add(not);
+                    //icmp.InstructionParent.Parent.VerifyFunction(LLVMVerifierFailureAction.LLVMAbortProcessAction);
                     return peephole;
                 }
 
@@ -1049,22 +1121,20 @@ return peephole;
             if (!inst.Is(LLVMOpcode.LLVMXor))
                 return null;
 
-            // Walk the next up to 10 instructions looking for an inverse comparison.
-            // If found, rewrite the inverse comparison as a XOR of the first comparison.
+            // Walk the previous up to 10 instructions looking for an earlier xor that is
+            // the inverse of `inst` (AreInverseXor(curr, inst)). Searching backward (rather
+            // than forward, as this used to) means `curr` always dominates `inst` - and
+            // therefore dominates every existing use of `inst` too, since those uses are
+            // themselves dominated by `inst`. Building NOT(curr) right before `inst` is
+            // therefore always safe, unlike searching forward for a later partner, which
+            // can be positioned after some of `inst`'s own uses and break dominance.
             int depth = 0;
-            var curr = inst.NextInstruction;
+            var curr = inst.PreviousInstruction;
             while (curr.Handle != 0 && curr.InstructionParent == inst.InstructionParent && depth < 10)
             {
-                //if (curr.Is(LLVMOpcode.LLVMICmp) && curr.ICmpPredicate == inversePredicate && HasSameCommutativeOperands(icmp, curr))
-                //var isInverseXor = curr.Is(LLVMOpcode.LLVMXor) && inst.GetOperand(0) == curr.GetOperand(0) && curr.GetOperand(1).IsConstant() && curr.GetOperand(1).ConstIntZExt == ModuloReducer.GetMask(curr.TypeOf.IntWidth);
-                var isInverseXor = AreInverseXor(inst, curr);
-                if (isInverseXor)
+                if (AreInverseXor(curr, inst))
                 {
-                    var insertBefore = curr.NextInstruction;
-                    if (insertBefore.Handle == 0)
-                        return null;
-
-                    builder.PositionBefore(insertBefore);
+                    builder.PositionBefore(inst);
                     var not = builder.BuildXor(curr, LLVMValueRef.CreateConstInt(curr.TypeOf, ulong.MaxValue));
 
                     var peephole = new PeepholeResult();
@@ -1072,7 +1142,7 @@ return peephole;
                     return peephole;
                 }
 
-                curr = curr.NextInstruction;
+                curr = curr.PreviousInstruction;
                 depth++;
             }
 
@@ -1088,7 +1158,7 @@ return peephole;
             if (!xor1.Is(LLVMOpcode.LLVMXor) || !xor2.Is(LLVMOpcode.LLVMXor))
                 return false;
 
-            if (xor1.GetOperand(0) != xor1.GetOperand(0))
+            if (xor1.GetOperand(0) != xor2.GetOperand(0))
                 return false;
 
             var t420 = xor1.GetOperand(1);

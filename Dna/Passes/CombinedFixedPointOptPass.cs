@@ -18,8 +18,10 @@ using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
 using System.Text;
 using System.Threading.Tasks;
+using WebAssembly.Instructions;
 using static Dna.LLVMInterop.NativePassApi;
 using StoreOffsetMapping = System.Collections.Generic.Dictionary<long, (LLVMSharp.Interop.LLVMValueRef byteSource, ulong byteIndex)>;
+
 
 namespace Dna.Passes
 {
@@ -38,6 +40,15 @@ namespace Dna.Passes
         }
     }
 
+
+    //public record SsaValue(LLVMValueRef value);
+    //public record SsaPhi(MemoryPhi memoryPhi, List<LLVMValueRef> values);
+
+    public record SsaValue(LLVMBasicBlockRef block, LLVMValueRef value);
+
+    public union SsaEdge(SsaValue, List<SsaEdge>);
+
+
     public class FixedpointPassConfig
     {
         // Perform adhoc instruction combining 
@@ -48,7 +59,7 @@ namespace Dna.Passes
 
         public bool ConstFold = true;
 
-        // Maximum recursion depth used during store to load elimination
+        // Maximum  on depth used during store to load elimination
         public int MaxLoadElimDepth = int.MaxValue;
 
         // If enabled, we only queue load instructions to the worklist initially.
@@ -313,6 +324,7 @@ namespace Dna.Passes
 
                         if (config.AdhocInstcombine)
                         {
+                        
                             var peephole = instcombine.PeepholeInst(nextInstr, simplifyQuery);
                             if (TryReplaceAndRemove2(peephole))
                                 continue;
@@ -370,8 +382,151 @@ namespace Dna.Passes
             }
         }
 
+        public record ByteSource(LLVMValueRef src, byte index);
+
+        private ByteSource? Process(MemoryUseOrDef firstAccess, BaseWithOffset loadBaseAndOffset, MemoryAccess currAccess, uint loadSize, int loadIndex, HashSet<LLVMBasicBlockRef> visitedPhis)
+        {
+            if (currAccess is MemoryPhi memoryPhi)
+            {
+                if (visitedPhis.Contains(memoryPhi.Block))
+                    return null;
+
+                visitedPhis.Add(memoryPhi.Block);
+
+                // Backtrack to find a definition
+                List<ByteSource> incomingValues = new();
+                foreach (var incomingAccess in memoryPhi.IncomingMemoryAccesses)
+                {
+                    var value = Process(firstAccess, loadBaseAndOffset, incomingAccess, loadSize, loadIndex, visitedPhis);
+                    // Bail if we failed to find a definition
+                    if (value == null)
+                        return null;
+
+                    // Bail if we find multiple conflicts definitions.
+                    if (incomingValues.Count > 0 && value != incomingValues[0])
+                        return null;
+
+                    incomingValues.Add(value);
+                }
+
+                return incomingValues[0];
+
+                // Otherwise we found a definition along all paths..
+            }
+
+            // Break out of the loop if we hit a memory clobber we can't handle.
+            if (!IsValidMemoryAccess(currAccess))
+                return null;
+
+            var newAccess = (MemoryUseOrDef)currAccess;
+
+            var skip = () => Process(firstAccess, loadBaseAndOffset, newAccess.DefiningAccess, loadSize, loadIndex, visitedPhis);
+
+            // If the new clobber doesn't alias the original clobber, continue on.
+            // TODO: MayAlias may be wrong in the presence of loops? Need to refer to DeadStoreElimination impl
+            if (!mssa.MayAlias(firstAccess, newAccess))
+                return skip();
+
+
+            // This should never happen.
+            var memoryInst = newAccess.MemoryInst;
+            if (memoryInst == null)
+            {
+                Debugger.Break();
+                throw new InvalidOperationException($"No defining memory instruction!");
+            }
+
+            // If the clobber is not a store, then it must be an atomic / fence, or some type of intrinsic.
+            // We don't yet support this.
+            if (memoryInst.InstructionOpcode != LLVMOpcode.LLVMStore)
+            {
+                // Special-case out soteria_error, we don't care about it.
+                if (memoryInst.InstructionOpcode == LLVMOpcode.LLVMCall && memoryInst.GetOperand(0).Kind == LLVMValueKind.LLVMFunctionValueKind && memoryInst.GetOperand(0).Name == "soteria_error")
+                    return skip();
+
+                throw new InvalidOperationException($"Cannot track clobber with instruction: {memoryInst}.");
+            }
+
+            // Bail if we get a base mismatch, we can't make any aliasing guarantees here.
+            var newBaseAndOffset = GetCanonicalBasePlusOffset(memoryInst.GetOperand(1));
+            if (loadBaseAndOffset.Base != newBaseAndOffset.Base)
+            {
+    
+                return null;
+            }
+
+
+            var storeVal = memoryInst.GetOperand(0);
+            var storeSize = LoadSizeOf(storeVal.TypeOf);
+
+            var loadOffset = loadBaseAndOffset.Offset;
+            // Make everything relative to the load and convert to signed integers.
+            var storeStart = Math.Max((long)(newBaseAndOffset.Offset - loadOffset), 0);
+            var storeEnd = Math.Min((long)((newBaseAndOffset.Offset + (storeSize - 1)) - loadOffset), loadSize - 1);
+
+            // If storeEnd is < 0 or storeStart >= loadSize we can do an early bail.
+            if (storeEnd < 0 || storeStart > loadSize)
+            {
+                //Console.WriteLine($" --> Ignoring dead store: ([{storeStart}, {storeEnd}] does not overlap with load");
+                return skip();
+            }
+
+            long initialOffset = 0;
+            // Otherwise they overlap
+            if (loadOffset < newBaseAndOffset.Offset)
+            {
+                var foo1 = (long)loadOffset;
+                var foo2 = (long)newBaseAndOffset.Offset;
+                // You must take the load starting point and then add the store offset.
+                // Note that the store offset is relative to the load. So the store offset for the example above would be one - giving you
+                initialOffset = 0 - storeStart;
+            }
+
+            /*
+            store:
+                0 = foo
+                1 = foo
+                2 = foo
+                3 = foo
+
+            load(1,2,3,4)
+            load offset comes after the store
+
+            loadOffset = 1
+            newBaseAndOffset = 0
+            */
+            else if (loadOffset > newBaseAndOffset.Offset)
+            {
+                var foo3 = (long)loadOffset;
+                var foo4 = (long)newBaseAndOffset.Offset;
+                // Subtract the load starting offset from the store start starting offset.
+                // Giving you -1 here as the initial offset. Then e.g. if we are handling the load offset 
+                initialOffset = (long)(loadOffset - newBaseAndOffset.Offset);
+            }
+
+            // Constant fold
+            if (storeVal.IsConstant())
+            {
+                var bytes = BitConverter.GetBytes(storeVal.ConstIntZExt);
+                var value = LLVMValueRef.CreateConstInt(LLVMTypeRef.Int8, bytes[initialOffset]);
+                storeVal = value;
+                initialOffset = 0;
+            }
+
+            else
+            {
+                initialOffset += loadIndex;
+            }
+
+            //initialOffset += unhandledIndex;
+            //handledBytesToValue.Add(unhandledIndex, (storeVal, (byte)(initialOffset)));
+            return new ByteSource(storeVal, (byte)initialOffset);
+        }
+
+
         private PeepholeResult ProcessLoad(LLVMValueRef loadInst, MemorySSAUpdater updater, int depth)
         {
+           
             // Exit early if we hit the max recursion depth
             if (depth >= config.MaxLoadElimDepth)
                 return null;
@@ -413,6 +568,38 @@ namespace Dna.Passes
             StoreOffsetMapping handledBytesToValue = new();
 
             var current = firstAccess;
+
+            /*
+            if (loadInst.ToString().Contains("load i64, ptr %88,"))
+            {
+                function.GlobalParent.PrintToFile("translatedFunction.ll");
+                Debugger.Break();
+                var bar = Process(firstAccess, loadBaseAndOffset, current.DefiningAccess, loadSize, 0, new());
+
+                Debugger.Break();
+            }
+            */
+
+            //List<ByteSource> values = new();
+            StoreOffsetMapping values = new();
+
+            /*
+        
+            for (int i = 0; i < loadSize; i++)
+            {
+                var result = Process(firstAccess, loadBaseAndOffset, current.DefiningAccess, loadSize, i, new());
+                if (result == null)
+                    break;
+                values[i] = (result.src, result.index);
+            }
+
+            if (values.Count == loadSize)
+            {
+                return CreateFullReplacementOfLoad(loadInst, values);
+            }
+            */
+            
+
             while (true)
             {
                 // Locate the first memory write *before* our current definition that may clobber the current definition.
@@ -452,6 +639,11 @@ namespace Dna.Passes
                 var newBaseAndOffset = GetCanonicalBasePlusOffset(memoryInst.GetOperand(1));
                 if (loadBaseAndOffset.Base != newBaseAndOffset.Base)
                 {
+                    var ignore = newBaseAndOffset.Base.Kind == LLVMValueKind.LLVMGlobalVariableValueKind;
+                    if (ignore)
+                        continue;
+
+
                     break;
                 }
 
@@ -554,6 +746,7 @@ namespace Dna.Passes
             
             else
             {
+
                 // Try to model this as an addition between a base pointer and a select between two constants.
                 // Return null if we can't.
                 var baseWithConstantSelect = KnownIndexStoreToLoadPropagation.GetAsBaseWithConstantSelect(loadInst);
@@ -620,7 +813,8 @@ namespace Dna.Passes
                 peephole.Add(combined);
                 return peephole;
             }
-            
+
+    
 
             return null;
         }

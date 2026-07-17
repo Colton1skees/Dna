@@ -9,7 +9,7 @@ if("${LLVM_SHA256}" STREQUAL "")
 endif()
 
 set(LLVM_ARGS
-    "-DLLVM_ENABLE_PROJECTS:STRING=lld;clang;clang-tools-extra"
+    "-DLLVM_ENABLE_PROJECTS:STRING=lld;clang"
     "-DLLVM_ENABLE_ASSERTIONS:STRING=${LLVM_ENABLE_ASSERTIONS}"
     "-DLLVM_ENABLE_DUMP:STRING=${LLVM_ENABLE_ASSERTIONS}"
     "-DLLVM_ENABLE_RTTI:STRING=ON"
@@ -19,6 +19,16 @@ set(LLVM_ARGS
     # This is meant for LLVM development, we use the DYLIB option instead
     "-DBUILD_SHARED_LIBS:STRING=OFF"
     "-DLLVM_LINK_LLVM_DYLIB:STRING=${BUILD_SHARED_LIBS}"
+    # Reduce generated target/path depth on Windows to avoid RC1109 (path too long)
+    # from rc.exe when producing windows_version_resource.rc.res deep in the build tree.
+    "-DLLVM_INCLUDE_TESTS:STRING=OFF"
+    "-DLLVM_INCLUDE_EXAMPLES:STRING=OFF"
+    "-DLLVM_INCLUDE_BENCHMARKS:STRING=OFF"
+    "-DLLVM_INCLUDE_DOCS:STRING=OFF"
+    # sancov.cpp fails to compile with newer MSVC STL versions (basic_string gained an
+    # explicit constructor that breaks an implicit initializer_list conversion in
+    # SpecialCaseList::createOrDie). Not needed by this project, so disable it.
+    "-DLLVM_TOOL_SANCOV_BUILD:STRING=OFF"
 )
 
 # LLVM has a bug on Windows where using clang.exe as the compiler fails to detect

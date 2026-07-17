@@ -11,6 +11,9 @@ namespace Dna.LLVMInterop.API.LLVMBindings.Analysis
 {
     public static class NativeMemoryPhiApi
     {
+        [DllImport("Dna.LLVMInterop", CallingConvention = CallingConvention.Cdecl, EntryPoint = "MemoryPhi_GetBlock")]
+        public unsafe static extern LLVMOpaqueBasicBlock* GetBlock(LLVMOpaqueMemoryPhi* memPhi);
+
         [DllImport("Dna.LLVMInterop", CallingConvention = CallingConvention.Cdecl, EntryPoint = "MemoryPhi_GetBlocks")]
         public unsafe static extern OpaqueManagedVector<LLVMOpaqueBasicBlock>* GetBlocks(LLVMOpaqueMemoryPhi* memPhi);
 

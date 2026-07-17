@@ -9,7 +9,7 @@ namespace Dna.Utilities
 {
     public static class IDALoader
     {
-        private static readonly string idaPath = FindIdaPath();
+        private static readonly string idaPath = @"C:\Program Files\IDA Home (PC) 9.4\ida.exe";
 
         private static string FindIdaPath()
         {
@@ -22,13 +22,13 @@ namespace Dna.Utilities
             {
                 foreach (var idaDir in Directory.EnumerateDirectories(programFiles, "IDA*"))
                 {
-                    var idaPath = Path.Combine(idaDir, "ida64.exe");
+                    var idaPath = Path.Combine(idaDir, "ida.exe");
                     if (File.Exists(idaPath))
                         return idaPath;
                 }
             }
 
-            return "ida64.exe";
+            return "ida.exe";
         }
 
         public static string Load(string exePath, bool overwrite = true)
