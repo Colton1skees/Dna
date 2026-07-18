@@ -65,6 +65,7 @@
 #include "llvm/Transforms/InstCombine/InstCombine.h"
 #include "llvm/Transforms/Utils/Local.h"
 #include <llvm/Analysis/MemorySSA.h>
+#include "llvm/Analysis/LazyValueInfo.h"
 #include <Passes/ClassifyingAliasAnalysisPass.h>
 namespace Dna::Passes {
 	// Helper function to be used by native code for attempting to solve constant jump table values.

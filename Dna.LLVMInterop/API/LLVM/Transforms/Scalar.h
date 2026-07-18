@@ -35,16 +35,6 @@ DNA_EXPORT FunctionPass* CreateSCCPPass()
 
 //===----------------------------------------------------------------------===//
 //
-// RedundantDbgInstElimination - This pass removes redundant dbg intrinsics
-// without modifying the CFG of the function.  It is a FunctionPass.
-//
-DNA_EXPORT Pass* CreateRedundantDbgInstEliminationPass()
-{
-    return createRedundantDbgInstEliminationPass();
-}
-
-//===----------------------------------------------------------------------===//
-//
 // DeadCodeElimination - This pass is more powerful than DeadInstElimination,// because it is worklist driven that can potentially revisit instructions when
 // their other instructions become dead, to eliminate chains of dead
 // computations.
@@ -82,29 +72,6 @@ DNA_EXPORT FunctionPass* CreateCallSiteSplittingPass()
 DNA_EXPORT FunctionPass* CreateAggressiveDCEPass()
 {
     return CreateAggressiveDCEPass();
-}
-
-//===----------------------------------------------------------------------===//
-//
-// GuardWidening - An optimization over the @llvm.experimental.guard intrinsic
-// that (optimistically) combines multiple guards into one to have fewer checks
-// at runtime.
-//
-DNA_EXPORT FunctionPass* CreateGuardWideningPass()
-{
-    return createGuardWideningPass();
-}
-
-//===----------------------------------------------------------------------===//
-//
-// LoopGuardWidening - Analogous to the GuardWidening pass, but restricted to a
-// single loop at a time for use within a LoopPassManager.  Desired effect is
-// to widen guards into preheader or a single guard within loop if that's not
-// possible.
-//
-DNA_EXPORT Pass* CreateLoopGuardWideningPass()
-{
-    return createLoopGuardWideningPass();
 }
 
 //===----------------------------------------------------------------------===//
@@ -163,25 +130,6 @@ DNA_EXPORT Pass* CreateLICMPass2(unsigned LicmMssaOptCap, unsigned LicmMssaNoAcc
 
 //===----------------------------------------------------------------------===//
 //
-// LoopSink - This pass sinks invariants from preheader to loop body where
-// frequency is lower than loop preheader.
-//
-DNA_EXPORT Pass* CreateLoopSinkPass()
-{
-    return createLoopSinkPass();
-}
-
-//===----------------------------------------------------------------------===//
-//
-// LoopPredication - This pass does loop predication on guards.
-//
-DNA_EXPORT Pass* CreateLoopPredicationPass()
-{
-    return createLoopPredicationPass();
-}
-
-//===----------------------------------------------------------------------===//
-//
 // LoopInterchange - This pass interchanges loops to provide a more
 // cache-friendly memory access patterns.
 //
@@ -207,15 +155,6 @@ DNA_EXPORT FunctionPass* CreateLoopFlattenPass()
 DNA_EXPORT Pass* CreateLoopStrengthReducePass()
 {
     return createLoopStrengthReducePass();
-}
-
-//===----------------------------------------------------------------------===//
-//
-// LoopInstSimplify - This pass simplifies instructions in a loop's body.
-//
-DNA_EXPORT Pass* CreateLoopInstSimplifyPass()
-{
-    return createLoopInstSimplifyPass();
 }
 
 //===----------------------------------------------------------------------===//
@@ -254,31 +193,11 @@ DNA_EXPORT Pass* CreateLoopRerollPass()
 
 //===----------------------------------------------------------------------===//
 //
-// LoopRotate - This pass is a simple loop rotating pass.
-//
-DNA_EXPORT Pass* CreateLoopRotatePass(int MaxHeaderSize, bool PrepareForLTO)
-{
-    return createLoopRotatePass(MaxHeaderSize, PrepareForLTO);
-}
-
-//===----------------------------------------------------------------------===//
-//
 // LoopIdiom - This pass recognizes and replaces idioms in loops.
 //
 DNA_EXPORT Pass* CreateLoopIdiomPass()
 {
     return CreateLoopIdiomPass();
-}
-
-//===----------------------------------------------------------------------===//
-//
-// DemoteRegisterToMemoryPass - This pass is used to demote registers to memory
-// references. In basically undoes the PromoteMemoryToRegister pass to make cfg
-// hacking easier.
-//
-DNA_EXPORT FunctionPass* CreateDemoteRegisterToMemoryPass()
-{
-    return createDemoteRegisterToMemoryPass();
 }
 
 extern char& DemoteRegisterToMemoryID;
@@ -389,16 +308,6 @@ DNA_EXPORT FunctionPass* CreateGVNSinkPass()
 
 //===----------------------------------------------------------------------===//
 //
-// MergedLoadStoreMotion - This pass merges loads and stores in diamonds. Loads
-// are hoisted into the header, while stores sink into the footer.
-//
-DNA_EXPORT FunctionPass* CreateMergedLoadStoreMotionPass(bool SplitFooterBB)
-{
-    return createMergedLoadStoreMotionPass(SplitFooterBB);
-}
-
-//===----------------------------------------------------------------------===//
-//
 // GVN - This pass performs global value numbering and redundant load
 // elimination cotemporaneously.
 //
@@ -476,15 +385,6 @@ DNA_EXPORT Pass* CreateLowerAtomicPass()
 
 //===----------------------------------------------------------------------===//
 //
-// LowerGuardIntrinsic - Lower guard intrinsics to normal control flow.
-//
-DNA_EXPORT Pass* CreateLowerGuardIntrinsicPass()
-{
-    return createLowerGuardIntrinsicPass();
-}
-
-//===----------------------------------------------------------------------===//
-//
 // LowerMatrixIntrinsics - Lower matrix intrinsics to vector operations.
 //
 DNA_EXPORT Pass* CreateLowerMatrixIntrinsicsPass()
@@ -500,15 +400,6 @@ DNA_EXPORT Pass* CreateLowerMatrixIntrinsicsPass()
 DNA_EXPORT Pass* CreateLowerMatrixIntrinsicsMinimalPass()
 {
     return CreateLowerMatrixIntrinsicsMinimalPass();
-}
-
-//===----------------------------------------------------------------------===//
-//
-// LowerWidenableCondition - Lower widenable condition to i1 true.
-//
-DNA_EXPORT Pass* CreateLowerWidenableConditionPass()
-{
-    return createLowerWidenableConditionPass();
 }
 
 //===----------------------------------------------------------------------===//
@@ -542,33 +433,6 @@ DNA_EXPORT FunctionPass* CreateInferAddressSpacesPass(unsigned AddressSpace)
 }
 
 extern char& InferAddressSpacesID;
-//===----------------------------------------------------------------------===//
-//
-// LowerExpectIntrinsics - Removes llvm.expect intrinsics and creates
-// "block_weights" metadata.
-DNA_EXPORT FunctionPass* CreateLowerExpectIntrinsicPass()
-{
-    return createLowerExpectIntrinsicPass();
-}
-
-//===----------------------------------------------------------------------===//
-//
-// TLSVariableHoist - This pass reduce duplicated TLS address call.
-//
-DNA_EXPORT FunctionPass* CreateTLSVariableHoistPass()
-{
-    return createTLSVariableHoistPass();
-}
-
-//===----------------------------------------------------------------------===//
-//
-// LowerConstantIntrinsicss - Expand any remaining llvm.objectsize and
-// llvm.is.constant intrinsic calls, even for the unknown cases.
-//
-DNA_EXPORT FunctionPass* CreateLowerConstantIntrinsicsPass()
-{
-    return createLowerConstantIntrinsicsPass();
-}
 
 //===----------------------------------------------------------------------===//
 //
@@ -701,15 +565,6 @@ DNA_EXPORT FunctionPass* CreateLoopDataPrefetchPass()
 DNA_EXPORT FunctionPass* CreateLibCallsShrinkWrapPass()
 {
     return CreateLibCallsShrinkWrapPass();
-}
-
-//===----------------------------------------------------------------------===//
-//
-// LoopSimplifyCFG - This pass performs basic CFG simplification on loops,// primarily to help other loop passes.
-//
-DNA_EXPORT Pass* CreateLoopSimplifyCFGPass()
-{
-    return createLoopSimplifyCFGPass();
 }
 
 //===----------------------------------------------------------------------===//

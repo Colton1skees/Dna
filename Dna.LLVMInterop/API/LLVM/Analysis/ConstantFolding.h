@@ -31,6 +31,7 @@ namespace DNA::API {
 
 	DNA_EXPORT void DropPoisonGeneratingFlags(llvm::Instruction* instruction) {
 
+		/*
 		instruction->dropPoisonGeneratingFlagsAndMetadata();
 
 		if (auto* Call = dyn_cast<CallBase>(instruction)) {
@@ -47,5 +48,6 @@ namespace DNA::API {
 				Call->removeParamAttr(ArgIdx, Attribute::Dereferenceable);
 			}
 		}
+		*/
 	}
 }

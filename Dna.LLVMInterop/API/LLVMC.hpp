@@ -1032,11 +1032,6 @@ DNA_EXPORT LLVMTypeRef  FfiLLVMLabelTypeInContext(LLVMContextRef C)
 }
 
 
-DNA_EXPORT LLVMTypeRef  FfiLLVMX86MMXTypeInContext(LLVMContextRef C)
-{
-    return LLVMX86MMXTypeInContext(C);
-}
-
 
 DNA_EXPORT LLVMTypeRef  FfiLLVMX86AMXTypeInContext(LLVMContextRef C)
 {
@@ -1066,13 +1061,6 @@ DNA_EXPORT LLVMTypeRef  FfiLLVMLabelType()
 {
     return LLVMLabelType();
 }
-
-
-DNA_EXPORT LLVMTypeRef  FfiLLVMX86MMXType()
-{
-    return LLVMX86MMXType();
-}
-
 
 DNA_EXPORT LLVMTypeRef  FfiLLVMX86AMXType()
 {
@@ -1463,72 +1451,10 @@ DNA_EXPORT LLVMValueRef  FfiLLVMConstNUWSub(LLVMValueRef LHSConstant, LLVMValueR
     return LLVMConstNUWSub(LHSConstant, RHSConstant);
 }
 
-
-DNA_EXPORT LLVMValueRef  FfiLLVMConstMul(LLVMValueRef LHSConstant, LLVMValueRef RHSConstant)
-{
-    return LLVMConstMul(LHSConstant, RHSConstant);
-}
-
-
-DNA_EXPORT LLVMValueRef  FfiLLVMConstNSWMul(LLVMValueRef LHSConstant, LLVMValueRef RHSConstant)
-{
-    return LLVMConstNSWMul(LHSConstant, RHSConstant);
-}
-
-
-DNA_EXPORT LLVMValueRef  FfiLLVMConstNUWMul(LLVMValueRef LHSConstant, LLVMValueRef RHSConstant)
-{
-    return LLVMConstNUWMul(LHSConstant, RHSConstant);
-}
-
-
-DNA_EXPORT LLVMValueRef  FfiLLVMConstAnd(LLVMValueRef LHSConstant, LLVMValueRef RHSConstant)
-{
-    return LLVMConstAnd(LHSConstant, RHSConstant);
-}
-
-
-DNA_EXPORT LLVMValueRef  FfiLLVMConstOr(LLVMValueRef LHSConstant, LLVMValueRef RHSConstant)
-{
-    return LLVMConstOr(LHSConstant, RHSConstant);
-}
-
-
 DNA_EXPORT LLVMValueRef  FfiLLVMConstXor(LLVMValueRef LHSConstant, LLVMValueRef RHSConstant)
 {
     return LLVMConstXor(LHSConstant, RHSConstant);
 }
-
-
-DNA_EXPORT LLVMValueRef  FfiLLVMConstICmp(LLVMIntPredicate Predicate, LLVMValueRef LHSConstant, LLVMValueRef RHSConstant)
-{
-    return LLVMConstICmp(Predicate, LHSConstant, RHSConstant);
-}
-
-
-DNA_EXPORT LLVMValueRef  FfiLLVMConstFCmp(LLVMRealPredicate Predicate, LLVMValueRef LHSConstant, LLVMValueRef RHSConstant)
-{
-    return LLVMConstFCmp(Predicate, LHSConstant, RHSConstant);
-}
-
-
-DNA_EXPORT LLVMValueRef  FfiLLVMConstShl(LLVMValueRef LHSConstant, LLVMValueRef RHSConstant)
-{
-    return LLVMConstShl(LHSConstant, RHSConstant);
-}
-
-
-DNA_EXPORT LLVMValueRef  FfiLLVMConstLShr(LLVMValueRef LHSConstant, LLVMValueRef RHSConstant)
-{
-    return LLVMConstLShr(LHSConstant, RHSConstant);
-}
-
-
-DNA_EXPORT LLVMValueRef  FfiLLVMConstAShr(LLVMValueRef LHSConstant, LLVMValueRef RHSConstant)
-{
-    return LLVMConstAShr(LHSConstant, RHSConstant);
-}
-
 
 DNA_EXPORT LLVMValueRef  FfiLLVMConstGEP2(LLVMTypeRef Ty, LLVMValueRef ConstantVal, LLVMValueRef* ConstantIndices, unsigned NumIndices)
 {
@@ -1546,55 +1472,6 @@ DNA_EXPORT LLVMValueRef  FfiLLVMConstTrunc(LLVMValueRef ConstantVal, LLVMTypeRef
 {
     return LLVMConstTrunc(ConstantVal, ToType);
 }
-
-
-DNA_EXPORT LLVMValueRef  FfiLLVMConstSExt(LLVMValueRef ConstantVal, LLVMTypeRef ToType)
-{
-    return LLVMConstSExt(ConstantVal, ToType);
-}
-
-
-DNA_EXPORT LLVMValueRef  FfiLLVMConstZExt(LLVMValueRef ConstantVal, LLVMTypeRef ToType)
-{
-    return LLVMConstZExt(ConstantVal, ToType);
-}
-
-
-DNA_EXPORT LLVMValueRef  FfiLLVMConstFPTrunc(LLVMValueRef ConstantVal, LLVMTypeRef ToType)
-{
-    return LLVMConstFPTrunc(ConstantVal, ToType);
-}
-
-
-DNA_EXPORT LLVMValueRef  FfiLLVMConstFPExt(LLVMValueRef ConstantVal, LLVMTypeRef ToType)
-{
-    return LLVMConstFPExt(ConstantVal, ToType);
-}
-
-
-DNA_EXPORT LLVMValueRef  FfiLLVMConstUIToFP(LLVMValueRef ConstantVal, LLVMTypeRef ToType)
-{
-    return LLVMConstUIToFP(ConstantVal, ToType);
-}
-
-
-DNA_EXPORT LLVMValueRef  FfiLLVMConstSIToFP(LLVMValueRef ConstantVal, LLVMTypeRef ToType)
-{
-    return LLVMConstSIToFP(ConstantVal, ToType);
-}
-
-
-DNA_EXPORT LLVMValueRef  FfiLLVMConstFPToUI(LLVMValueRef ConstantVal, LLVMTypeRef ToType)
-{
-    return LLVMConstFPToUI(ConstantVal, ToType);
-}
-
-
-DNA_EXPORT LLVMValueRef  FfiLLVMConstFPToSI(LLVMValueRef ConstantVal, LLVMTypeRef ToType)
-{
-    return LLVMConstFPToSI(ConstantVal, ToType);
-}
-
 
 DNA_EXPORT LLVMValueRef  FfiLLVMConstPtrToInt(LLVMValueRef ConstantVal, LLVMTypeRef ToType)
 {
@@ -1619,19 +1496,6 @@ DNA_EXPORT LLVMValueRef  FfiLLVMConstAddrSpaceCast(LLVMValueRef ConstantVal, LLV
     return LLVMConstAddrSpaceCast(ConstantVal, ToType);
 }
 
-
-DNA_EXPORT LLVMValueRef  FfiLLVMConstZExtOrBitCast(LLVMValueRef ConstantVal, LLVMTypeRef ToType)
-{
-    return LLVMConstZExtOrBitCast(ConstantVal, ToType);
-}
-
-
-DNA_EXPORT LLVMValueRef  FfiLLVMConstSExtOrBitCast(LLVMValueRef ConstantVal, LLVMTypeRef ToType)
-{
-    return LLVMConstSExtOrBitCast(ConstantVal, ToType);
-}
-
-
 DNA_EXPORT LLVMValueRef  FfiLLVMConstTruncOrBitCast(LLVMValueRef ConstantVal, LLVMTypeRef ToType)
 {
     return LLVMConstTruncOrBitCast(ConstantVal, ToType);
@@ -1641,18 +1505,6 @@ DNA_EXPORT LLVMValueRef  FfiLLVMConstTruncOrBitCast(LLVMValueRef ConstantVal, LL
 DNA_EXPORT LLVMValueRef  FfiLLVMConstPointerCast(LLVMValueRef ConstantVal, LLVMTypeRef ToType)
 {
     return LLVMConstPointerCast(ConstantVal, ToType);
-}
-
-
-DNA_EXPORT LLVMValueRef  FfiLLVMConstIntCast(LLVMValueRef ConstantVal, LLVMTypeRef ToType, LLVMBool isSigned)
-{
-    return LLVMConstIntCast(ConstantVal, ToType, isSigned);
-}
-
-
-DNA_EXPORT LLVMValueRef  FfiLLVMConstFPCast(LLVMValueRef ConstantVal, LLVMTypeRef ToType)
-{
-    return LLVMConstFPCast(ConstantVal, ToType);
 }
 
 
@@ -4133,31 +3985,6 @@ DNA_EXPORT LLVMMetadataRef  FfiLLVMDIBuilderCreateTempGlobalVariableFwdDecl(LLVM
     return LLVMDIBuilderCreateTempGlobalVariableFwdDecl(Builder, Scope, Name, NameLen, Linkage, LnkLen, File, LineNo, Ty, LocalToUnit, Decl, AlignInBits);
 }
 
-
-DNA_EXPORT LLVMValueRef  FfiLLVMDIBuilderInsertDeclareBefore(LLVMDIBuilderRef Builder, LLVMValueRef Storage, LLVMMetadataRef VarInfo, LLVMMetadataRef Expr, LLVMMetadataRef DebugLoc, LLVMValueRef Instr)
-{
-    return LLVMDIBuilderInsertDeclareBefore(Builder, Storage, VarInfo, Expr, DebugLoc, Instr);
-}
-
-
-DNA_EXPORT LLVMValueRef  FfiLLVMDIBuilderInsertDeclareAtEnd(LLVMDIBuilderRef Builder, LLVMValueRef Storage, LLVMMetadataRef VarInfo, LLVMMetadataRef Expr, LLVMMetadataRef DebugLoc, LLVMBasicBlockRef Block)
-{
-    return LLVMDIBuilderInsertDeclareAtEnd(Builder, Storage, VarInfo, Expr, DebugLoc, Block);
-}
-
-
-DNA_EXPORT LLVMValueRef  FfiLLVMDIBuilderInsertDbgValueBefore(LLVMDIBuilderRef Builder, LLVMValueRef Val, LLVMMetadataRef VarInfo, LLVMMetadataRef Expr, LLVMMetadataRef DebugLoc, LLVMValueRef Instr)
-{
-    return LLVMDIBuilderInsertDbgValueBefore(Builder, Val, VarInfo, Expr, DebugLoc, Instr);
-}
-
-
-DNA_EXPORT LLVMValueRef  FfiLLVMDIBuilderInsertDbgValueAtEnd(LLVMDIBuilderRef Builder, LLVMValueRef Val, LLVMMetadataRef VarInfo, LLVMMetadataRef Expr, LLVMMetadataRef DebugLoc, LLVMBasicBlockRef Block)
-{
-    return LLVMDIBuilderInsertDbgValueAtEnd(Builder, Val, VarInfo, Expr, DebugLoc, Block);
-}
-
-
 DNA_EXPORT LLVMMetadataRef  FfiLLVMDIBuilderCreateAutoVariable(LLVMDIBuilderRef Builder, LLVMMetadataRef Scope, const char* Name, size_t NameLen, LLVMMetadataRef File, unsigned LineNo, LLVMMetadataRef Ty, LLVMBool AlwaysPreserve, LLVMDIFlags Flags, uint32_t AlignInBits)
 {
     return LLVMDIBuilderCreateAutoVariable(Builder, Scope, Name, NameLen, File, LineNo, Ty, AlwaysPreserve, Flags, AlignInBits);
@@ -4168,7 +3995,6 @@ DNA_EXPORT LLVMMetadataRef  FfiLLVMDIBuilderCreateParameterVariable(LLVMDIBuilde
 {
     return LLVMDIBuilderCreateParameterVariable(Builder, Scope, Name, NameLen, ArgNo, File, LineNo, Ty, AlwaysPreserve, Flags);
 }
-
 
 DNA_EXPORT LLVMMetadataRef  FfiLLVMGetSubprogram(LLVMValueRef Func)
 {

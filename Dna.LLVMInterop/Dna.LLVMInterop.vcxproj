@@ -100,7 +100,7 @@
       <AdditionalLibraryDirectories>$(ProjectDir)dependencies\install\lib;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
       <GenerateDebugInformation>DebugFull</GenerateDebugInformation>
       <EnableUAC>false</EnableUAC>
-      <AdditionalDependencies>/INCLUDE:Z3_mk_int;libz3.lib;LLVMX86AsmParser.lib;LLVMX86Disassembler.lib;LLVMX86TargetMCA.lib;LLVMAArch64AsmParser.lib;LLVMAArch64CodeGen.lib;LLVMAArch64Desc.lib;LLVMAArch64Disassembler.lib;LLVMAArch64Info.lib;LLVMAArch64Utils.lib;LLVMOrcJIT.lib;LLVMWindowsDriver.lib;LLVMJITLink.lib;LLVMOption.lib;LLVMMCJIT.lib;LLVMX86CodeGen.lib;LLVMX86Desc.lib;LLVMX86Info.lib;LLVMMCDisassembler.lib;LLVMGlobalISel.lib;LLVMSelectionDAG.lib;LLVMCFGuard.lib;LLVMAsmPrinter.lib;LLVMExecutionEngine.lib;LLVMInterpreter.lib;LLVMRuntimeDyld.lib;LLVMOrcTargetProcess.lib;LLVMOrcShared.lib;LLVMPasses.lib;LLVMIRPrinter.lib;LLVMCoroutines.lib;LLVMCodeGen.lib;LLVMTarget.lib;LLVMObjCARCOpts.lib;LLVMCodeGenTypes.lib;LLVMipo.lib;LLVMInstrumentation.lib;LLVMVectorize.lib;LLVMLinker.lib;LLVMFrontendOpenMP.lib;LLVMBitWriter.lib;LLVMScalarOpts.lib;LLVMInstCombine.lib;LLVMAggressiveInstCombine.lib;LLVMTransformUtils.lib;LLVMAnalysis.lib;LLVMProfileData.lib;LLVMSymbolize.lib;LLVMDebugInfoBTF.lib;LLVMDebugInfoPDB.lib;LLVMDebugInfoMSF.lib;LLVMDebugInfoDWARF.lib;LLVMObject.lib;LLVMTextAPI.lib;LLVMMCParser.lib;LLVMIRReader.lib;LLVMAsmParser.lib;LLVMMC.lib;LLVMDebugInfoCodeView.lib;LLVMBitReader.lib;LLVMCore.lib;LLVMRemarks.lib;LLVMBitstreamReader.lib;LLVMBinaryFormat.lib;LLVMTargetParser.lib;LLVMSupport.lib;LLVMDemangle.lib;remill_arch.lib;remill_bc.lib;remill_os.lib;remill_version.lib;remill_arch_aarch64.lib;remill_arch_sleigh.lib;remill_arch_sparc32.lib;remill_arch_sparc64.lib;remill_arch_x86.lib;decomp.lib;sla.lib;slaSupport.lib;gflags_static.lib;gflags_nothreads_static.lib;glog.lib;xed.lib;xed-ild.lib;shlwapi.lib;psapi.lib;dbghelp.lib;shell32.lib;ole32.lib;uuid.lib;advapi32.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalDependencies>/INCLUDE:Z3_mk_int;libz3.lib;LLVMX86AsmParser.lib;LLVMX86Disassembler.lib;LLVMX86TargetMCA.lib;LLVMAArch64AsmParser.lib;LLVMAArch64CodeGen.lib;LLVMAArch64Desc.lib;LLVMAArch64Disassembler.lib;LLVMAArch64Info.lib;LLVMAArch64Utils.lib;LLVMOrcJIT.lib;LLVMWindowsDriver.lib;LLVMJITLink.lib;LLVMOption.lib;LLVMMCJIT.lib;LLVMX86CodeGen.lib;LLVMX86Desc.lib;LLVMX86Info.lib;LLVMMCDisassembler.lib;LLVMGlobalISel.lib;LLVMSelectionDAG.lib;LLVMCFGuard.lib;LLVMAsmPrinter.lib;LLVMExecutionEngine.lib;LLVMInterpreter.lib;LLVMRuntimeDyld.lib;LLVMOrcTargetProcess.lib;LLVMOrcShared.lib;LLVMPasses.lib;LLVMFrontendHLSL.lib;LLVMFrontendAtomic.lib;LLVMFrontendOffloading.lib;LLVMObjectYAML.lib;LLVMHipStdPar.lib;ntdll.lib;LLVMIRPrinter.lib;LLVMCoroutines.lib;LLVMCodeGen.lib;LLVMCGData.lib;LLVMTarget.lib;LLVMObjCARCOpts.lib;LLVMCodeGenTypes.lib;LLVMipo.lib;LLVMInstrumentation.lib;LLVMVectorize.lib;LLVMSandboxIR.lib;LLVMLinker.lib;LLVMFrontendOpenMP.lib;LLVMBitWriter.lib;LLVMScalarOpts.lib;LLVMInstCombine.lib;LLVMAggressiveInstCombine.lib;LLVMTransformUtils.lib;LLVMAnalysis.lib;LLVMProfileData.lib;LLVMSymbolize.lib;LLVMDebugInfoBTF.lib;LLVMDebugInfoPDB.lib;LLVMDebugInfoMSF.lib;LLVMDebugInfoDWARF.lib;LLVMDebugInfoDWARFLowLevel.lib;LLVMObject.lib;LLVMTextAPI.lib;LLVMMCParser.lib;LLVMIRReader.lib;LLVMAsmParser.lib;LLVMMC.lib;LLVMDebugInfoCodeView.lib;LLVMBitReader.lib;LLVMCore.lib;LLVMRemarks.lib;LLVMBitstreamReader.lib;LLVMBinaryFormat.lib;LLVMTargetParser.lib;LLVMSupport.lib;LLVMDemangle.lib;remill_arch.lib;remill_bc.lib;remill_os.lib;remill_version.lib;remill_arch_aarch64.lib;remill_arch_sleigh.lib;remill_arch_sparc32.lib;remill_arch_sparc64.lib;remill_arch_x86.lib;decomp.lib;sla.lib;slaSupport.lib;gflags_static.lib;gflags_nothreads_static.lib;glog.lib;xed.lib;xed-ild.lib;shlwapi.lib;psapi.lib;dbghelp.lib;shell32.lib;ole32.lib;uuid.lib;advapi32.lib;%(AdditionalDependencies)</AdditionalDependencies>
       <StackReserveSize>536870912</StackReserveSize>
       <AdditionalOptions>/ignore:4099 %(AdditionalOptions)</AdditionalOptions>
     </Link>
@@ -142,9 +142,6 @@
     <ClInclude Include="API\Remill\BC\IntrinsicTable.h" />
     <ClInclude Include="API\Remill\BC\Optimizer.h" />
     <ClInclude Include="API\Remill\BC\Util.h" />
-    <ClInclude Include="API\souper\SouperExprBuilder.h" />
-    <ClInclude Include="API\souper\SouperCandidates.h" />
-    <ClInclude Include="API\souper\SouperInst.h" />
     <ClInclude Include="Arch\X86\X86Registers.h" />
     <ClInclude Include="Passes\BoundsSolver.h" />
     <ClInclude Include="Passes\ClassifyingAliasAnalysisPass.h" />
@@ -158,43 +155,6 @@
     <ClInclude Include="Passes\mdl_assert.h" />
     <ClInclude Include="Passes\PassUtilities.h" />
     <ClInclude Include="Pipeline\Pipeline.h" />
-    <ClInclude Include="klee\include\klee\Config\config.h" />
-    <ClInclude Include="klee\include\klee\Config\Version.h" />
-    <ClInclude Include="klee\include\klee\Constraints.h" />
-    <ClInclude Include="klee\include\klee\Expr.h" />
-    <ClInclude Include="klee\include\klee\Internal\Support\IntEvaluation.h" />
-    <ClInclude Include="klee\include\klee\Solver.h" />
-    <ClInclude Include="klee\include\klee\util\Bits.h" />
-    <ClInclude Include="klee\include\klee\util\ExprPPrinter.h" />
-    <ClInclude Include="klee\include\klee\util\ExprSMTLIBPrinter.h" />
-    <ClInclude Include="klee\include\klee\util\PrintContext.h" />
-    <ClInclude Include="klee\include\klee\util\Ref.h" />
-    <ClInclude Include="souper\include\klee\Config\config.h" />
-    <ClInclude Include="souper\include\souper\Codegen\Codegen.h" />
-    <ClInclude Include="souper\include\souper\Extractor\Candidates.h" />
-    <ClInclude Include="souper\include\souper\Extractor\ExprBuilder.h" />
-    <ClInclude Include="souper\include\souper\Extractor\Solver.h" />
-    <ClInclude Include="souper\include\souper\Infer\AbstractInterpreter.h" />
-    <ClInclude Include="souper\include\souper\Infer\AliveDriver.h" />
-    <ClInclude Include="souper\include\souper\Infer\ConstantSynthesis.h" />
-    <ClInclude Include="souper\include\souper\Infer\EnumerativeSynthesis.h" />
-    <ClInclude Include="souper\include\souper\Infer\InstSynthesis.h" />
-    <ClInclude Include="souper\include\souper\Infer\Interpreter.h" />
-    <ClInclude Include="souper\include\souper\Infer\Preconditions.h" />
-    <ClInclude Include="souper\include\souper\Infer\Pruning.h" />
-    <ClInclude Include="souper\include\souper\Infer\Verification.h" />
-    <ClInclude Include="souper\include\souper\Infer\Z3Driver.h" />
-    <ClInclude Include="souper\include\souper\Infer\Z3Expr.h" />
-    <ClInclude Include="souper\include\souper\Inst\Inst.h" />
-    <ClInclude Include="souper\include\souper\Inst\InstGraph.h" />
-    <ClInclude Include="souper\include\souper\KVStore\KVStore.h" />
-    <ClInclude Include="souper\include\souper\Parser\Parser.h" />
-    <ClInclude Include="souper\include\souper\SMTLIB2\Solver.h" />
-    <ClInclude Include="souper\include\souper\Tool\CandidateMapUtils.h" />
-    <ClInclude Include="souper\include\souper\Tool\GetSolver.h" />
-    <ClInclude Include="souper\include\souper\Util\DfaUtils.h" />
-    <ClInclude Include="souper\include\souper\Util\LLVMUtils.h" />
-    <ClInclude Include="souper\include\souper\Util\UniqueNameSet.h" />
     <ClInclude Include="Utilities\magic_enum.hpp" />
     <ClInclude Include="Utilities\magic_enum_containers.hpp" />
     <ClInclude Include="Utilities\magic_enum_format.hpp" />
@@ -202,48 +162,12 @@
     <ClInclude Include="Utilities\magic_enum_switch.hpp" />
   </ItemGroup>
   <ItemGroup>
-    <ClCompile Include="klee\lib\Expr\Expr.cpp" />
-    <ClCompile Include="klee\lib\Expr\ExprPPrinter.cpp" />
-    <ClCompile Include="klee\lib\Expr\ExprSMTLIBPrinter.cpp" />
-    <ClCompile Include="klee\lib\Expr\Updates.cpp" />
     <ClCompile Include="dllmain.cpp" />
     <ClCompile Include="Passes\ClassifyingAliasAnalysisPass.cpp" />
     <ClCompile Include="Passes\compilercore_assert.cpp" />
     <ClCompile Include="Passes\ConstantConcretizationPass.cpp" />
     <ClCompile Include="Passes\ControlledNodeSplittingPass.cpp" />
     <ClCompile Include="Passes\generator_jit_ast_compute.cpp" />
-    <ClCompile Include="souper\lib\Codegen\Codegen.cpp" />
-    <ClCompile Include="souper\lib\Codegen\MachineCost.cpp" />
-    <ClCompile Include="souper\lib\Extractor\Candidates.cpp" />
-    <ClCompile Include="souper\lib\Extractor\ExprBuilder.cpp" />
-    <ClCompile Include="souper\lib\Extractor\KLEEBuilder.cpp" />
-    <ClCompile Include="souper\lib\Extractor\Solver.cpp" />
-    <ClCompile Include="souper\lib\Infer\AbstractInterpreter.cpp" />
-    <ClCompile Include="souper\lib\Infer\AliveDriver.cpp" />
-    <ClCompile Include="souper\lib\Infer\ConstantSynthesis.cpp" />
-    <ClCompile Include="souper\lib\Infer\EnumerativeSynthesis.cpp" />
-    <ClCompile Include="souper\lib\Infer\InstSynthesis.cpp" />
-    <ClCompile Include="souper\lib\Infer\Interpreter.cpp" />
-    <ClCompile Include="souper\lib\Infer\Preconditions.cpp" />
-    <ClCompile Include="souper\lib\Infer\Pruning.cpp" />
-    <ClCompile Include="souper\lib\Infer\Verification.cpp" />
-    <ClCompile Include="souper\lib\Infer\Z3Driver.cpp" />
-    <ClCompile Include="souper\lib\Infer\Z3Expr.cpp" />
-    <ClCompile Include="souper\lib\Inst\Inst.cpp" />
-    <ClCompile Include="souper\lib\KVStore\KVStore.cpp" />
-    <ClCompile Include="souper\lib\Parser\Parser.cpp" />
-    <ClCompile Include="souper\lib\Pass\Pass.cpp" />
-    <ClCompile Include="souper\lib\SMTLIB2\smtlib_Solver.cpp" />
-    <ClCompile Include="souper\lib\Tool\CandidateMapUtils.cpp" />
-  </ItemGroup>
-  <ItemGroup>
-    <None Include="klee\include\klee\Config\config.h.in" />
-    <None Include="klee\LICENSE.TXT" />
-    <None Include="klee\README.txt" />
-    <None Include="souper\include\souper\KVStore\KVSocket.h.in" />
-    <None Include="souper\include\souper\Tool\GetSolver.h.in" />
-    <None Include="souper\LICENSE" />
-    <None Include="souper\README.txt" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">

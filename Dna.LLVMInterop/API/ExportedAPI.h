@@ -25,7 +25,6 @@
 #include "llvm/Transforms/IPO/FunctionAttrs.h"
 #include "llvm/Transforms/IPO/InferFunctionAttrs.h"
 #include "llvm/Transforms/InstCombine/InstCombine.h"
-#include "llvm/Transforms/Instrumentation.h"
 #include "llvm/Transforms/Scalar.h"
 #include "llvm/Transforms/Scalar/GVN.h"
 #include "llvm/Transforms/Scalar/Reg2Mem.h"
@@ -38,7 +37,6 @@
 #include "llvm/Transforms/Utils.h"
 #include "llvm/Transforms/Utils/Cloning.h"
 #include "llvm/Transforms/Utils/BasicBlockUtils.h"
-#include "llvm/Transforms/Vectorize.h"
 #include <llvm/InitializePasses.h>
 
 #include "llvm/Transforms/IPO/AlwaysInliner.h"
@@ -76,10 +74,6 @@
 #include <API/Remill/BC/InstructionLifter.h>
 #include <API/Remill/BC/Util.h>
 #include <API/Remill/Arch/Context.h>
-
-#include "souper/SouperInst.h"
-#include "souper/SouperCandidates.h"
-#include "souper/SouperExprBuilder.h"
 
 #include "LLVMC.hpp"
 
