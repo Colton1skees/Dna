@@ -1291,7 +1291,7 @@ return peephole;
             var constant = icmp.GetOperand(1);
             if (!constant.IsConstant())
                 return null;
-            if (constant.ConstIntZExt != 0)
+            if (constant.ConstIntZExt > 4294967295)
                 return null;
 
             var andInst = icmp.GetOperand(0);
@@ -1315,7 +1315,7 @@ return peephole;
             }
 
 
-            var newCmp = builder.BuildICmp(icmp.ICmpPredicate, trunc, LLVMValueRef.CreateConstInt(LLVMTypeRef.Int32, 0));
+            var newCmp = builder.BuildICmp(icmp.ICmpPredicate, trunc, LLVMValueRef.CreateConstInt(LLVMTypeRef.Int32, constant.ConstIntZExt));
             peephole.Add(trunc);
             peephole.Add(newCmp);
 

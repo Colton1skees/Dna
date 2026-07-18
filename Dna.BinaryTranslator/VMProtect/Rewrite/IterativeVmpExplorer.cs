@@ -1478,7 +1478,7 @@ namespace Dna.BinaryTranslator.VMProtect.Rewrite
 
                         else
                         {
-                            //builder.BuildStore(LLVMValueRef.CreateConstInt(LLVMTypeRef.Int64, existingBase), registerAllocaMapping[incomingImgbaseReg]);
+                            builder.BuildStore(LLVMValueRef.CreateConstInt(LLVMTypeRef.Int64, existingBase), registerAllocaMapping[incomingImgbaseReg]);
                         }
 
 
