@@ -295,7 +295,8 @@ namespace Dna.BinaryTranslator.VMProtect.Rewrite
 
                 // So the problem is with rebuilding???
                 // ii >= 1040 triggers it
-                if (ii >= 1 && liftedFunction.Handle != 0)
+                //if (ii >= 1 && liftedFunction.Handle != 0)
+                if (false)
                 {
                     liftedFunction.DeleteFunction();
                     liftedFunction.Handle = 0;

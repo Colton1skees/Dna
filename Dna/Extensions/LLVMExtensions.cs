@@ -171,6 +171,10 @@ namespace Dna.Extensions
         public static bool IsConstant(this LLVMValueRef inst)
             => inst.Is(LLVMValueKind.LLVMConstantIntValueKind);
 
+        public static bool IsConstant(this LLVMValueRef inst, ulong v)
+    => IsConstant(inst) && inst.ConstIntZExt == v;
+
+
 
         public static bool TryGetConstant(this LLVMValueRef inst, out ulong constant)
         {

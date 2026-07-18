@@ -252,6 +252,11 @@ namespace Dna.Passes
             changed = TryRewriteSignExtI1(inst);
             if (changed != null)
                 return changed;
+
+            changed = TrySimplifySelectIdentity(inst);
+            if (changed != null)
+                return changed;
+
             /*
          changed = TryRewriteTruncAnd(inst);
          if (changed != null)
@@ -800,6 +805,9 @@ return peephole;
             if (!inst.Is(kbFolds))
                 return null;
 
+            if (inst.TypeOf.IntWidth <= 1)
+                return null;
+
             var kb = NativeKnownBits.Get(inst, simplifyQuery);
             if (kb.GetUnknownBitCount() != 1)
                 return null;
@@ -1111,6 +1119,37 @@ return peephole;
             peephole.Add(newCmp);
 
             return peephole;
+        }
+
+        private PeepholeResult TrySimplifySelectIdentity(LLVMValueRef inst)
+        {
+            if (!inst.Is(LLVMOpcode.LLVMSelect))
+                return null;
+            if (inst.TypeOf.IntWidth != 1)
+                return null;
+
+            if (!inst.GetOperand(1).IsConstant() && !inst.GetOperand(2).IsConstant())
+                return null;
+
+            var cond = inst.GetOperand(0);
+            var then = inst.GetOperand(1);
+            var other = inst.GetOperand(2);
+            builder.PositionBefore(inst);
+            var peephole = new PeepholeResult();
+            if (other.IsConstant(0))
+            {
+                peephole.Add(builder.BuildAnd(cond, then));
+                return peephole;
+            }
+
+            if (then.IsConstant(1))
+            {
+                peephole.Add(builder.BuildOr(cond, other));
+                return peephole;
+            }
+
+            return null;
+         
         }
 
         // TODO: Canonicalize this
