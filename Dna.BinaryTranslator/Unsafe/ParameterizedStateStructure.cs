@@ -227,7 +227,7 @@ namespace Dna.BinaryTranslator.Unsafe
         {
             // Position the builder at the very start of the function.
             var entryBlock = function.EntryBasicBlock;
-            builder.Position(entryBlock, entryBlock.FirstInstruction);
+            builder.PositionAtEnd(entryBlock);
 
             // Allocate a local state structure at the start of the function.
             var stateStructType = arch.StateStructType;

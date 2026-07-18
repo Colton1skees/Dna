@@ -375,10 +375,10 @@ namespace Dna.BinaryTranslator.Lifting
                     // fails to propagate the constant RIP inside of block1. 
                     // To fix this, we add an instruction to the start of both blocks,
                     // which updatres the RIP to the correct value. This removes the need for constant propagation.
-                    builder.Position(immDestBlock, immDestBlock.FirstInstruction);
+                    builder.PositionAt(immDestBlock, immDestBlock.FirstInstruction);
                     builder.BuildStore(immConstInt, RemillUtils.LoadNextProgramCounterRef(immDestBlock));
 
-                    builder.Position(falseBlock, falseBlock.FirstInstruction);
+                    builder.PositionAt(falseBlock, falseBlock.FirstInstruction);
                     immConstInt = LLVMValueRef.CreateConstInt(nextPc.TypeOf, branchInst.NextIP);
                     builder.BuildStore(immConstInt, RemillUtils.LoadNextProgramCounterRef(falseBlock));
                     return;
@@ -408,10 +408,10 @@ namespace Dna.BinaryTranslator.Lifting
                     // fails to propagate the constant RIP inside of block1. 
                     // To fix this, we add an instruction to the start of both blocks,
                     // which updatres the RIP to the correct value. This removes the need for constant propagation.
-                    builder.Position(immDestBlock, immDestBlock.FirstInstruction);
+                    builder.PositionAt(immDestBlock, immDestBlock.FirstInstruction);
                     //builder.BuildStore(builder.BuildAdd(llvmInstIp, immDestOffsetConstInt), RemillUtils.LoadNextProgramCounterRef(immDestBlock));
 
-                    builder.Position(falseBlock, falseBlock.FirstInstruction);
+                    builder.PositionAt(falseBlock, falseBlock.FirstInstruction);
                     //builder.BuildStore(builder.BuildAdd(llvmInstIp, nextPcOffsetConstInt), RemillUtils.LoadNextProgramCounterRef(falseBlock));
 
                     //Debugger.Break();

@@ -572,7 +572,7 @@ namespace Dna.BinaryTranslator.VMProtect.Rewrite
             }
 
             int iter = 0;
-            while (iter < 5)
+            while (iter < 10)
             {
                 var optimizeFast = () =>
                 {
@@ -604,6 +604,8 @@ namespace Dna.BinaryTranslator.VMProtect.Rewrite
 
                 iter++;
             }
+
+            Console.WriteLine($"All iterations failed");
 
             //function.GlobalParent.PrintToFile("translatedFunction.ll");
 
@@ -819,9 +821,20 @@ namespace Dna.BinaryTranslator.VMProtect.Rewrite
 
         private RemillRegister GetVkeyByUsage(ulong rip, LLVMValueRef function, VmpParameterizedStateStructure stateStructure, RemillRegister vipReg)
         {
-            //function.GlobalParent.PrintToFile("translatedFunction.ll");
+            //if (rip == 0x1400c02e0)
+    
             var vipArg = function.GetParam((uint)stateStructure.RegisterArgumentIndices[vipReg]);
-            var loads = function.GetInstructions().Where(x => x.Is(LLVMOpcode.LLVMLoad) && IsGepRegister(x.GetOperand(0)) && DecomposeSum(x.GetOperand(0).GetOperand(1)).Contains(vipArg)).ToList();
+            //var loads = function.GetInstructions().Where(x => x.Is(LLVMOpcode.LLVMLoad) && IsGepRegister(x.GetOperand(0)) && DecomposeSum(x.GetOperand(0).GetOperand(1)).Contains(vipArg)).ToList();
+
+            var clone = function.GetInstructions().Where(x => x.Is(LLVMOpcode.LLVMLoad) && IsGepRegister(x.GetOperand(0))).ToList();
+            List<LLVMValueRef> loads = new();
+            foreach(var load in clone.ToList())
+            {
+                var elements = new List<LLVMValueRef>();
+                UnfoldGep(load.GetOperand(0), elements);
+                if (elements.Contains(vipArg))
+                    loads.Add(load);
+            }
 
             var shouldContinue = (LLVMValueRef x) =>
             {
@@ -892,6 +905,9 @@ namespace Dna.BinaryTranslator.VMProtect.Rewrite
             if (rip == 0x1400e3c7d)
                 Debugger.Break();
             */
+
+
+
             var loads = function.GetInstructions().Where(x => x.Is(LLVMOpcode.LLVMLoad) && IsGepRegister(x.GetOperand(0))).ToList();
 
             //HashSet<(LLVMValueRef, int) > options = new();
@@ -903,12 +919,19 @@ namespace Dna.BinaryTranslator.VMProtect.Rewrite
                 if (count < 5)
                     continue;
 
+                /*
                 // add i64 %RSI, 1
                 // =>
                 // %RSI
                 var regArg = x.GetOperand(0).GetOperand(1);
                 if (regArg.Is(LLVMOpcode.LLVMAdd, LLVMOpcode.LLVMSub))
                     regArg = regArg.GetOperands().Single(x => x.Is(LLVMValueKind.LLVMArgumentValueKind));
+                */
+
+                var values = new List<LLVMValueRef>();
+                UnfoldGep(x.GetOperand(0), values);
+
+                LLVMValueRef regArg = values[1];
 
                 if (IsStoredToBase(function, regArg))
                     continue;
@@ -992,17 +1015,45 @@ namespace Dna.BinaryTranslator.VMProtect.Rewrite
         {
             if (!gep.Is(LLVMOpcode.LLVMGetElementPtr))
                 return false;
-            if (gep.OperandCount != 2)
+
+            var unfolded = new List<LLVMValueRef>();
+            UnfoldGep(gep, unfolded);
+
+            if (unfolded.Count != 3 && unfolded.Count != 2)
                 return false;
 
-            var operand = gep.GetOperand(1);
-            if (IsAddRegister(operand))
-                return true;
-            if (gep.GetOperand(1).Kind == LLVMValueKind.LLVMArgumentValueKind)
-                return true;
+            var reg = unfolded[1];
+            if (reg.Kind != LLVMValueKind.LLVMArgumentValueKind)
+                return false;
+            if (unfolded.Count > 2 && !unfolded[2].IsConstant())
+                return false;
 
-            return false;
+            //if (IsAddRegister(reg))
+            //    return true;
+            //if (gep.GetOperand(1).Kind == LLVMValueKind.LLVMArgumentValueKind)
+            //    return true;
+
+            return true;
         }
+
+        private static void UnfoldGep(LLVMValueRef gep, List<LLVMValueRef> values)
+        {
+            if (gep.Is(LLVMOpcode.LLVMAdd))
+            {
+                goto process;
+            }
+
+            if (!gep.Is(LLVMOpcode.LLVMGetElementPtr))
+            {
+                values.Add(gep);
+                return;
+            }
+
+        process:
+            for (int i = 0; i < gep.OperandCount; i++)
+                UnfoldGep(gep.GetOperand((uint)i), values);
+        }
+
 
         private bool IsAddRegister(LLVMValueRef add)
         {
@@ -1031,9 +1082,10 @@ namespace Dna.BinaryTranslator.VMProtect.Rewrite
                 if (!gep.Is(LLVMOpcode.LLVMGetElementPtr))
                     continue;
 
-                var seen = new HashSet<LLVMValueRef>();
-                foreach (var operand in gep.GetOperands())
-                    DecomposeSum(operand, seen);
+                var seen = new List<LLVMValueRef>();
+                //foreach (var operand in gep.GetOperands())
+                //    DecomposeSum(operand, seen);
+                UnfoldGep(gep, seen);
 
                 if (seen.Contains(basePtr))
                     return true;
@@ -1217,12 +1269,12 @@ namespace Dna.BinaryTranslator.VMProtect.Rewrite
 
             // Stack allocate a local state structure and copy all registers into it
             // Problem: Copying the values from the registers won't work anymore.. where do we put everything??
-            builder.Position(translatedFunction.EntryBasicBlock, translatedFunction.EntryBasicBlock.FirstInstruction);
+            builder.PositionAt(translatedFunction.EntryBasicBlock, translatedFunction.EntryBasicBlock.FirstInstruction);
             var registerAllocaMapping = VmPartialBlockLifter.CreateLocalStateStruct(builder, stateStruct, translatedFunction);
 
             // Lift all handlers into their own basic block
             var exitBlock = translatedFunction.AppendBasicBlock("exit");
-            builder.Position(exitBlock, exitBlock.FirstInstruction);
+            builder.PositionAt(exitBlock, exitBlock.FirstInstruction);
             builder.BuildRetVoid();
 
             var toDelete = new HashSet<LLVMValueRef>();

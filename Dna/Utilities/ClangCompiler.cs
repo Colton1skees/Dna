@@ -83,7 +83,7 @@ define i32 @main(i32 %argc, i8** %argv)
             // Compile the .ll file to assembly with vectorization disabled.
             var fileName = Path.GetFileName(llPath);
             var asmPath = Path.Combine(dir, Path.ChangeExtension(fileName, ".asm"));
-            RunClang(clangPath, @$"""{llPath}"" -S -o ""{asmPath}"" -fno-vectorize -fno-slp-vectorize -mno-avx -mno-avx512f -O3 -fasync-exceptions -fseh-exceptions -fexceptions -fcxx-exceptions -mno-sse -target x86_64-pc-windows-msvc");
+            RunClang(clangPath, @$"""{llPath}"" -S -o ""{asmPath}"" -fno-vectorize -fno-slp-vectorize -mno-avx -mno-avx512f -O3 -fasync-exceptions -fexceptions -fcxx-exceptions -mno-sse -target x86_64-pc-windows-msvc");
 
 
             // Compile the .ll to an exe.
@@ -114,14 +114,14 @@ define i32 @main(i32 %argc, i8** %argv)
             // Compile the .ll file to assembly with vectorization disabled.
             var fileName = Path.GetFileName(llPath);
             var asmPath = Path.Combine(dir, Path.ChangeExtension(fileName, ".asm"));
-            RunClang(clangPath, @$"""{llPath}"" -S -o ""{asmPath}"" -fno-vectorize -fno-slp-vectorize -O3 -fasync-exceptions -fseh-exceptions -fexceptions -fcxx-exceptions -mno-sse -target x86_64-pc-windows-msvc");
+            RunClang(clangPath, @$"""{llPath}"" -S -o ""{asmPath}"" -fno-vectorize -fno-slp-vectorize -O3 -mno-sse -target x86_64-pc-windows-msvc");
 
 
             // Compile the .ll to an exe.
             //var objPath = ArtifactPaths.GetAvailablePath(Path.Combine(dir, Path.ChangeExtension(fileName, ".exe")), overwrite);
             var objPath = Path.Combine(dir, Path.ChangeExtension(fileName, ".exe"));
 
-            RunClang(clangPath, @$"""{asmPath}"" -target x86_64-pc-windows-msvc -O3 -fasync-exceptions -fseh-exceptions -fexceptions -fcxx-exceptions -fno-vectorize -fno-slp-vectorize -c -mno-sse -o ""{objPath}""");
+            RunClang(clangPath, @$"""{asmPath}"" -target x86_64-pc-windows-msvc -O3 -fno-vectorize -fno-slp-vectorize -c -mno-sse -o ""{objPath}""");
 
             //var exePath = Path.Combine(dir, Path.ChangeExtension(fileName, ".exe"));
             //RunClang(objcpyPath, @$" --input-target=coff-x86-64 --output-target=pe-x86-64 ""{objPath}"" ""{exePath}"" ");

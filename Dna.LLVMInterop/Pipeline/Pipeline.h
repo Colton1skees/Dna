@@ -29,6 +29,7 @@
 #include "llvm/Transforms/Scalar/NewGVN.h"
 #include "llvm/Transforms/Scalar/EarlyCSE.h"
 #include "llvm/Transforms/Scalar/SCCP.h"
+#include "llvm/Transforms/IPO/SCCP.h"
 #include "llvm/Transforms/Utils/Mem2Reg.h"
 #include "llvm/Transforms/Utils/LowerSwitch.h"
 #include "llvm/Transforms/Utils/LoopSimplify.h"
@@ -54,6 +55,10 @@
 #include "llvm/Transforms/Scalar/DeadStoreElimination.h"
 #include <llvm/InitializePasses.h>
 #include "llvm/Transforms/IPO/AlwaysInliner.h"
+#include "llvm/Transforms/IPO/GlobalOpt.h"
+#include "llvm/Transforms/IPO/FunctionAttrs.h"
+#include "llvm/Transforms/Scalar/CorrelatedValuePropagation.h"
+#include "llvm/Transforms/Scalar/TailRecursionElimination.h"
 
 #include "llvm/Passes/PassBuilder.h"
 #include "Passes/ClassifyingAliasAnalysisPass.h"
@@ -797,6 +802,7 @@ void OptimizeVmpModule(llvm::Module* module,
 	llvm::legacy::PassManager module_manager;
 	llvm::LoopAnalysisManager LAM;
 	llvm::FunctionAnalysisManager FAM;
+	llvm::CGSCCPassManager CGPM;
 	llvm::CGSCCAnalysisManager CGAM;
 	llvm::ModulePassManager MPM;
 	llvm::ModuleAnalysisManager MAM;
@@ -820,14 +826,26 @@ void OptimizeVmpModule(llvm::Module* module,
 	if (fastPipeline)
 		goto execute;
 
+	MPM.addPass(llvm::IPSCCPPass());
+	MPM.addPass(llvm::GlobalOptPass());
+	CGPM.addPass(llvm::PostOrderFunctionAttrsPass());
+	MPM.addPass(llvm::createModuleToPostOrderCGSCCPassAdaptor(std::move(CGPM)));
+
+	FPM.addPass(llvm::DSEPass());
 	FPM.addPass(llvm::InstCombinePass());
 	FPM.addPass(llvm::EarlyCSEPass(true));
+
+	FPM.addPass(llvm::TailCallElimPass());
+	FPM.addPass(llvm::SimplifyCFGPass());
 	FPM.addPass(llvm::ReassociatePass());
 	FPM.addPass(llvm::DSEPass());
+
+	FPM.addPass(llvm::NewGVNPass());
 
 	FPM.addPass(llvm::SCCPPass());
 	// Using this pass to add nsw/nuw annotations to instructions
 	FPM.addPass(llvm::CorrelatedValuePropagationPass());
+
 	FPM.addPass(llvm::JumpThreadingPass(99999));
 
 	// Use multi-use cloning to disable InstCombine's single use checks
@@ -837,7 +855,9 @@ void OptimizeVmpModule(llvm::Module* module,
 	}
 
 	FPM.addPass(llvm::InstCombinePass());
-	FPM.addPass(llvm::NewGVNPass());
+	FPM.addPass(llvm::GVNPass());
+	FPM.addPass(llvm::SCCPPass());
+	FPM.addPass(llvm::BDCEPass());
 
 	FPM.addPass(llvm::LoopSimplifyPass());
 	LPM.addPass(llvm::LoopSimplifyCFGPass());
@@ -849,6 +869,7 @@ void OptimizeVmpModule(llvm::Module* module,
 	FPM.addPass(llvm::BDCEPass());
 	FPM.addPass(llvm::ADCEPass());
 	FPM.addPass(llvm::SimplifyCFGPass());
+
 
 execute:
 
@@ -864,6 +885,7 @@ execute:
 		//MPM.addPass(createModuleToFunctionPassAdaptor(std::move(FPM)));
 
 		FPM.run(*f, FAM);
+		MPM.run(*f->getParent(), MAM);
 	}
 
 	catch (...)

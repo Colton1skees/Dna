@@ -214,5 +214,16 @@ namespace Dna.Extensions
         public static unsafe LLVMTypeRef GetPtrType(this LLVMBasicBlockRef block, uint addressSpace = 0) => LLVM.PointerTypeInContext(block.GetCtx(), 0);
         public static unsafe LLVMTypeRef GetPtrType(this LLVMModuleRef module, uint addressSpace = 0) => module.Context.GetPtrType();
         public static unsafe LLVMTypeRef GetPtrType(this LLVMContextRef ctx, uint addressSpace = 0) => LLVM.PointerTypeInContext(ctx, 0);
+
+        public static void PositionAt(this LLVMBuilderRef builder, LLVMBasicBlockRef block, LLVMValueRef inst = default)
+        {
+            if (inst.Handle == 0)
+            {
+                builder.PositionAtEnd(block);
+                return;
+            }
+
+            builder.Position(block, inst);
+        }
     }
 }

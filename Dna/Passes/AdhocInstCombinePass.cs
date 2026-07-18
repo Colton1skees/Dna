@@ -2,6 +2,7 @@
 using Dna.DataStructures;
 using Dna.Extensions;
 using Dna.LLVMInterop.API.LLVMBindings.Analysis;
+using Dna.LLVMInterop.API.RegionAnalysis.Wrapper;
 using Dna.Passes.Mba;
 using LLVMSharp.Interop;
 using Microsoft.Z3;
@@ -248,7 +249,7 @@ namespace Dna.Passes
             if (changed != null)
                 return changed;
 
-         
+
             changed = TryRewriteSignExtI1(inst);
             if (changed != null)
                 return changed;
@@ -275,6 +276,10 @@ namespace Dna.Passes
             if (changed != null)
                 return changed;
 
+
+            changed = TryCanonicalizeInverseCmp(inst);
+            if (changed != null)
+                return changed;
 
             return changed;
 
@@ -1149,7 +1154,7 @@ return peephole;
             }
 
             return null;
-         
+
         }
 
         // TODO: Canonicalize this
@@ -1422,6 +1427,67 @@ return peephole;
             return peephole;
         }
 
+        private PeepholeResult TryCanonicalizeInverseCmp(LLVMValueRef icmp)
+        {
+            if (!icmp.Is(LLVMOpcode.LLVMICmp))
+                return null;
+            var predicate = icmp.ICmpPredicate;
+            if (predicate != LLVMIntPredicate.LLVMIntULT && predicate != LLVMIntPredicate.LLVMIntULE)
+                return null;
+
+            var firstInst = icmp.InstructionParent.FirstInstruction;
+            var curr = icmp.PreviousInstruction;
+            int depth = 0;
+            while (curr.Handle != 0 && curr != firstInst && depth++ < 25)
+            {
+                // We can backwards
+                var (a, b) = (curr, icmp);
+                // a = icmp ugt X, K
+                // b = icmp ult X, K + 1
+                if (!IsICmp(a, LLVMIntPredicate.LLVMIntUGT, out var x0, out var k0) ||
+                    !IsICmp(b, LLVMIntPredicate.LLVMIntULT, out var x1, out var k1) ||
+                    x0 != x1 ||
+                    !k0.IsConstant() ||
+                    !k1.IsConstant() ||
+                    k0.ConstIntZExt == ulong.MaxValue ||
+                    k1.ConstIntZExt != k0.ConstIntZExt + 1)
+                {
+                    curr = curr.PreviousInstruction;
+                    continue;
+                }
+
+                builder.PositionBefore(b);
+                var not = builder.BuildXor(a, LLVMValueRef.CreateConstInt(a.TypeOf, 1));
+                var peephole = new PeepholeResult();
+                peephole.Add(not);
+                return peephole;
+     
+            }
+
+            return null;
+        }
+
+
+        private static bool IsICmp(
+        LLVMValueRef value,
+        LLVMIntPredicate expectedPredicate,
+        out LLVMValueRef lhs,
+        out LLVMValueRef rhs)
+        {
+            lhs = null;
+            rhs = null;
+
+            if (value.Kind != LLVMValueKind.LLVMInstructionValueKind ||
+                value.InstructionOpcode != LLVMOpcode.LLVMICmp ||
+                value.ICmpPredicate != expectedPredicate)
+            {
+                return false;
+            }
+
+            lhs = value.GetOperand(0);
+            rhs = value.GetOperand(1);
+            return true;
+        }
 
         static HashSet<LLVMOpcode> opcodes = new();
         private PeepholeResult TrySimplifyInstruction(LLVMValueRef inst)

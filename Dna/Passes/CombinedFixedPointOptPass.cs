@@ -109,6 +109,102 @@ namespace Dna.Passes
             return Run(function, new LoopInfo(loopInfo), new MemorySSA(mssa), new SimplifyQuery(simplifyQuery));
         }
 
+        private BaseWithOffset GetCanonicalBasePlusOffsetOld(LLVMValueRef current)
+        {
+            var currentBase = current;
+            ulong currentOffset = 0;
+
+            bool cont = true;
+            while (cont)
+            {
+                switch (currentBase.InstructionOpcode)
+                {
+                    // Val = ADD (X, Const) -> (X, C + Const)
+                    // Val = ADD (Const, X) -> (X, C + Const)
+                    case LLVMOpcode.LLVMAdd:
+                        {
+                            var op0 = currentBase.GetOperand(0);
+                            var op1 = currentBase.GetOperand(1);
+
+                            Debug.Assert(!(op0.Kind == LLVMValueKind.LLVMConstantIntValueKind && op1.Kind == LLVMValueKind.LLVMConstantIntValueKind));
+                            Debug.Assert(op1.TypeOf.IntWidth <= 64);
+
+                            if (op1.Kind == LLVMValueKind.LLVMConstantIntValueKind)
+                            {
+                                currentOffset += op1.ConstIntZExt;
+                                currentBase = op0;
+                            }
+                            else if (op0.Kind == LLVMValueKind.LLVMConstantIntValueKind)
+                            {
+                                currentOffset += op0.ConstIntZExt;
+                                currentBase = op1;
+                            }
+                            else
+                            {
+                                cont = false;
+                            }
+
+                            break;
+                        }
+                    // Val = SUB (X, Const) -> (X, C - Const)
+                    case LLVMOpcode.LLVMSub:
+                        {
+                            var op0 = currentBase.GetOperand(0);
+                            var op1 = currentBase.GetOperand(1);
+
+                            Debug.Assert(!(op0.Kind == LLVMValueKind.LLVMConstantIntValueKind && op1.Kind == LLVMValueKind.LLVMConstantIntValueKind));
+                            Debug.Assert(op1.TypeOf.IntWidth <= 64);
+                            if (op1.Kind == LLVMValueKind.LLVMConstantIntValueKind)
+                            {
+                                currentOffset -= op1.ConstIntZExt;
+                                currentBase = op0;
+                            }
+                            else
+                            {
+                                cont = false;
+                            }
+
+                            break;
+                        }
+                    // Val = GEP(MEM, X) -> (X, C)
+                    case LLVMOpcode.LLVMGetElementPtr:
+                        {
+                            if (currentBase.OperandCount != 2)
+                            {
+                                cont = false;
+                                break;
+                            }
+
+                            var op0 = currentBase.GetOperand(0);
+                            var op1 = currentBase.GetOperand(1);
+
+                            if (op0 == memPtr)
+                            {
+                                // continue on with new ptr
+                                currentBase = op1;
+                            }
+                            else
+                            {
+                                cont = false;
+                                break;
+                            }
+
+                            break;
+                        }
+                    default:
+                        cont = false;
+                        break;
+                }
+
+                if (currentBase.Kind != LLVMValueKind.LLVMInstructionValueKind)
+                {
+                    break;
+                }
+            }
+
+            return new BaseWithOffset(currentBase, currentOffset);
+        }
+
         private BaseWithOffset GetCanonicalBasePlusOffset(LLVMValueRef currentBase)
         {
             ulong currentOffset = 0;
@@ -178,20 +274,28 @@ namespace Dna.Passes
                                 break;
                             }
 
-                            var op0 = currentBase.GetOperand(0);
-                            var op1 = currentBase.GetOperand(1);
+                            var pointerOperand = currentBase.GetOperand(0);
+                            var indexOperand = currentBase.GetOperand(1);
 
-                            if (op0 == memPtr)
+                            // getelementptr ..., ptr %memory, i64 %index
+                            // Canonical representation: (%index, 0).
+                            if (pointerOperand == memPtr)
                             {
-                                // continue on with new ptr
-                                currentBase = op1;
-                            }
-                            else
-                            {
-                                cont = false;
+                                currentBase = indexOperand;
                                 break;
                             }
 
+                            // getelementptr ..., ptr (getelementptr ...), i64 C
+                            // Fold a constant outer displacement into the accumulated offset.
+                            if (pointerOperand.Is(LLVMOpcode.LLVMGetElementPtr) &&
+                                indexOperand.Kind == LLVMValueKind.LLVMConstantIntValueKind)
+                            {
+                                currentOffset += indexOperand.ConstIntZExt;
+                                currentBase = pointerOperand;
+                                break;
+                            }
+
+                            cont = false;
                             break;
                         }
                     default:
@@ -526,7 +630,14 @@ namespace Dna.Passes
 
         private PeepholeResult ProcessLoad(LLVMValueRef loadInst, MemorySSAUpdater updater, int depth)
         {
-           
+            /*
+            if (loadInst.GetOperand(0).Is(LLVMOpcode.LLVMGetElementPtr) && loadInst.GetOperand(0).OperandCount == 2 && loadInst.GetOperand(0).GetOperand(1).IsConstant(0xFFFFFFFFFFFFFF70))
+            {
+                loadInst.GetFunction().GlobalParent.PrintToFile("translatedFunction.ll");
+                Debugger.Break();
+            }
+            */
+
             // Exit early if we hit the max recursion depth
             if (depth >= config.MaxLoadElimDepth)
                 return null;
@@ -583,8 +694,8 @@ namespace Dna.Passes
             //List<ByteSource> values = new();
             StoreOffsetMapping values = new();
 
+            
             /*
-        
             for (int i = 0; i < loadSize; i++)
             {
                 var result = Process(firstAccess, loadBaseAndOffset, current.DefiningAccess, loadSize, i, new());
@@ -597,8 +708,8 @@ namespace Dna.Passes
             {
                 return CreateFullReplacementOfLoad(loadInst, values);
             }
-            */
             
+            */
 
             while (true)
             {
