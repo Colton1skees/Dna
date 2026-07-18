@@ -28,13 +28,13 @@ namespace Dna.Passes
     {
         public PeepholeResult()
         {
-            if (AdhocInstCombinePass.bar == 519)
+            if (true)
             {
                 StackTrace stackTrace = new StackTrace(1);
                 StackFrame callingFrame = stackTrace.GetFrame(0);
                 MethodBase callingMethod = callingFrame.GetMethod();
                 string methodName = callingMethod.Name;
-                Console.WriteLine($"Constructor was invoked by: {methodName}");
+                //Console.WriteLine($"Constructor was invoked by: {methodName}");
             }
         }
 
@@ -170,9 +170,11 @@ namespace Dna.Passes
 
             PeepholeResult changed = null;
 
-            //changed = TrySimplifyInstruction(inst);
-            //if (changed != null)
-            //    return changed;
+            
+            changed = TrySimplifyInstruction(inst);
+            if (changed != null)
+                return changed;
+            
 
             /*
             if (opc == LLVMOpcode.LLVMShl || opc == LLVMOpcode.LLVMAShr || opc == LLVMOpcode.LLVMShl)
@@ -209,6 +211,14 @@ namespace Dna.Passes
             if (changed != null)
                 return changed;
 
+            changed = TryMergeSameConditionBinarySelect(inst);
+            if (changed != null)
+                return changed;
+
+            changed = TryCollapseRedundantSelectRound(inst);
+            if (changed != null)
+                return changed;
+
             changed = TryDistributeTernarySelect(inst);
             if (changed != null)
                 return changed;
@@ -228,6 +238,10 @@ namespace Dna.Passes
                 return changed;
 
             changed = TryRewriteVmpShifts(inst);
+            if (changed != null)
+                return changed;
+
+            changed = TrySimplifyCmp(inst);
             if (changed != null)
                 return changed;
 
@@ -281,6 +295,11 @@ namespace Dna.Passes
             if (changed != null)
                 return changed;
 
+
+            changed = TrySimplifyCmp(inst);
+            if (changed != null)
+                return changed;
+
             return changed;
 
 
@@ -298,7 +317,7 @@ namespace Dna.Passes
             return null;
         }
 
-        private static readonly LLVMOpcode[] UnaryOpcodes = { LLVMOpcode.LLVMTrunc, LLVMOpcode.LLVMCall };
+        private static readonly LLVMOpcode[] UnaryOpcodes = { LLVMOpcode.LLVMTrunc, LLVMOpcode.LLVMZExt, LLVMOpcode.LLVMSExt, LLVMOpcode.LLVMCall };
 
         private static readonly string[] UnaryWhitelist = { "llvm.ctpop" };
 
@@ -409,6 +428,63 @@ return peephole;
         }
 
 
+        
+        private PeepholeResult TryDistributeBinarySelect(LLVMValueRef inst)
+        {
+            var opcode = inst.InstructionOpcode;
+            if (Array.IndexOf(BinaryOpcodes, opcode) == -1)
+                return null;
+
+            if (opcode == LLVMOpcode.LLVMCall)
+            {
+                var name = inst.GetCallInstTarget().Name;
+                if (!BinaryWhitelist.Any(x => name.StartsWith(x)))
+                    return null;
+            }
+
+
+            // Get the operands
+            var op1 = inst.GetOperand(0);
+            var op2 = inst.GetOperand(1);
+
+            // A select is eligible for distribution if either (a) the select itself has a
+            // constant arm (IsSelect), or (b) the sibling operand it's being combined with is
+            // itself a plain constant. Either way, at least one operand of the binop is a
+            // constant - we never distribute a select whose arms are non-constant against a
+            // non-constant sibling operand. IsSelect() itself is left untouched.
+            bool op1Eligible = op1.Is(LLVMOpcode.LLVMSelect) && (IsSelect(op1) || op2.IsConstant());
+            bool op2Eligible = op2.Is(LLVMOpcode.LLVMSelect) && (IsSelect(op2) || op1.IsConstant());
+
+            if (!op1Eligible && !op2Eligible)
+                return null;
+
+            var selectIndex = op1Eligible ? 0 : 1;
+            var selectOperand = selectIndex == 0 ? op1 : op2;
+            var otherIndex = op1Eligible ? 1 : 0;
+            var otherOperand = otherIndex == 0 ? op1 : op2;
+
+            builder.PositionBefore(inst);
+            var clone0 = Clone(inst);
+            builder.PositionBefore(inst);
+            builder.PositionBefore(inst);
+            var clone1 = Clone(inst);
+
+            builder.PositionBefore(inst);
+
+            clone0.SetOperand((uint)selectIndex, selectOperand.GetOperand(1));
+            clone1.SetOperand((uint)selectIndex, selectOperand.GetOperand(2));
+
+            var res = builder.BuildSelect(selectOperand.GetOperand(0), clone0, clone1);
+            ValidateSelect(res);
+
+            var peephole = new PeepholeResult();
+            peephole.Add(clone0, clone1, res);
+            return peephole;
+        }
+        
+
+
+        /*
         private PeepholeResult TryDistributeBinarySelect(LLVMValueRef inst)
         {
             var opcode = inst.InstructionOpcode;
@@ -452,6 +528,121 @@ return peephole;
 
             var peephole = new PeepholeResult();
             peephole.Add(clone0, clone1, res);
+            return peephole;
+        }
+        */
+
+        // Merges a binary op of two selects that share the exact same condition, e.g.:
+        //   xor(select(c, a, b), select(c, d, e)) => select(c, xor(a, d), xor(b, e))
+        // Unlike TryDistributeBinarySelect, this does NOT go through IsSelect()/require either
+        // select to have a constant arm: the transform is unconditionally sound whenever both
+        // operands are selects gated by the identical condition value, regardless of what their
+        // arms are (loads, truncs, etc.), since we're not distributing across a non-select
+        // operand - we're just re-associating two selects that already share a branch.
+        private PeepholeResult TryMergeSameConditionBinarySelect(LLVMValueRef inst)
+        {
+            var opcode = inst.InstructionOpcode;
+            if (Array.IndexOf(BinaryOpcodes, opcode) == -1)
+                return null;
+
+            if (opcode == LLVMOpcode.LLVMCall)
+            {
+                var name = inst.GetCallInstTarget().Name;
+                if (!BinaryWhitelist.Any(x => name.StartsWith(x)))
+                    return null;
+            }
+
+            var op1 = inst.GetOperand(0);
+            var op2 = inst.GetOperand(1);
+
+            if (!op1.Is(LLVMOpcode.LLVMSelect) || !op2.Is(LLVMOpcode.LLVMSelect))
+                return null;
+
+            // Both selects must be gated by the exact same condition value.
+            if (op1.GetOperand(0) != op2.GetOperand(0))
+                return null;
+
+            builder.PositionBefore(inst);
+            var clone0 = Clone(inst);
+            builder.PositionBefore(inst);
+            var clone1 = Clone(inst);
+
+            builder.PositionBefore(inst);
+            clone0.SetOperand(0, op1.GetOperand(1));
+            clone0.SetOperand(1, op2.GetOperand(1));
+            clone1.SetOperand(0, op1.GetOperand(2));
+            clone1.SetOperand(1, op2.GetOperand(2));
+
+            var res = builder.BuildSelect(op1.GetOperand(0), clone0, clone1);
+            ValidateSelect(res);
+
+            var peephole = new PeepholeResult();
+            peephole.Add(clone0, clone1, res);
+            return peephole;
+        }
+
+        // Matches the recurrence shape:
+        //   %A = select c1, K1, %X
+        //   %B = select c1, %X, K2
+        //   %C = select c2, %A, %B
+        // i.e. f(X) = select(c2, select(c1,K1,X), select(c1,X,K2)).
+        private static bool TryMatchSelectRound(LLVMValueRef value, out LLVMValueRef c1, out LLVMValueRef c2, out LLVMValueRef k1, out LLVMValueRef k2, out LLVMValueRef x)
+        {
+            c1 = c2 = k1 = k2 = x = null;
+            if (!value.Is(LLVMOpcode.LLVMSelect))
+                return false;
+
+            c2 = value.GetOperand(0);
+            var a = value.GetOperand(1);
+            var b = value.GetOperand(2);
+            if (!a.Is(LLVMOpcode.LLVMSelect) || !b.Is(LLVMOpcode.LLVMSelect))
+                return false;
+
+            c1 = a.GetOperand(0);
+            if (b.GetOperand(0) != c1)
+                return false;
+
+            var aTrue = a.GetOperand(1);
+            var aFalse = a.GetOperand(2);
+            var bTrue = b.GetOperand(1);
+            var bFalse = b.GetOperand(2);
+
+            // a = select(c1, K1, X); b = select(c1, X, K2) - X must be the exact same value on both sides.
+            if (!aTrue.IsConstant() || !bFalse.IsConstant())
+                return false;
+            if (aFalse != bTrue)
+                return false;
+
+            k1 = aTrue;
+            k2 = bFalse;
+            x = aFalse;
+            return true;
+        }
+
+        // f(x) = select(c2, select(c1,K1,x), select(c1,x,K2)) is idempotent for ANY x:
+        // whichever of the 4 (c1,c2) combinations is taken, the result is either a fixed
+        // constant (independent of x) or x itself unchanged. So f(f(y)) == f(y) always,
+        // regardless of what y is. This collapses each redundant repeated "round" of an
+        // unrolled fixed-point recurrence (same c1/c2/K1/K2 reapplied to its own previous
+        // output) down to the first application - purely an identity, no constant-arm
+        // requirement beyond the pattern's own literal K1/K2, and IsSelect() is untouched.
+        private PeepholeResult TryCollapseRedundantSelectRound(LLVMValueRef inst)
+        {
+            if (!TryMatchSelectRound(inst, out var c1, out var c2, out var k1, out var k2, out var x))
+                return null;
+
+            if (!TryMatchSelectRound(x, out var innerC1, out var innerC2, out var innerK1, out var innerK2, out _))
+                return null;
+
+            if (innerC1 != c1 || innerC2 != c2)
+                return null;
+            if (innerK1.TypeOf.Handle != k1.TypeOf.Handle || innerK2.TypeOf.Handle != k2.TypeOf.Handle)
+                return null;
+            if (innerK1.ConstIntZExt != k1.ConstIntZExt || innerK2.ConstIntZExt != k2.ConstIntZExt)
+                return null;
+
+            var peephole = new PeepholeResult();
+            peephole.Add(x);
             return peephole;
         }
 
@@ -501,14 +692,18 @@ return peephole;
         // bar ? (cond ? a : b) : (cond ? c : d)
         //  =>
         // bar ?
-        private PeepholeResult TrySimplifySharedConditionSelect(LLVMValueRef inst)
+        public PeepholeResult TrySimplifySharedConditionSelect(LLVMValueRef inst)
         {
             return null;
             if (inst.InstructionOpcode != LLVMOpcode.LLVMSelect)
                 return null;
 
-
-
+            if (inst.GetOperand(1).IsConstant() && inst.GetOperand(2).IsConstant())
+                return null;
+            if (inst.ToString().Contains("%336 = select i1 %298, i32 %334, i32 %335"))
+                Debugger.Break();
+            else
+                return null;
             // Get the chain of selects
             Stack<LLVMValueRef> stack = new();
             OrderedSet<LLVMValueRef> seen = new();
@@ -556,7 +751,7 @@ return peephole;
             // Problem: Unsupported instruction..
 
 
-
+            inst.GetFunction().GlobalParent.PrintToFile("translatedFunction.ll");
             Dictionary<LLVMValueRef, ulong> valueMap = new();
             while (workQueue.Count > 0)
             {
@@ -594,7 +789,7 @@ return peephole;
                         var op0 = substList[i];
                         if (!op0.Is(LLVMOpcode.LLVMICmp))
                             continue;
-                        for (int j = i + 1; j < substList.Count; i++)
+                        for (int j = i + 1; j < substList.Count; j++)
                         {
                             var op1 = substList[j];
                             if (!op1.Is(LLVMOpcode.LLVMICmp))
@@ -607,7 +802,7 @@ return peephole;
                     var uniqueValues = resultVector.ToHashSet();
                     if (uniqueValues.Count <= 2 && !IsSelectOfTwoConstants(inst))
                     {
-                        Debugger.Break();
+                        //Debugger.Break();
                     }
 
                 }
@@ -673,7 +868,7 @@ return peephole;
             {
                 LLVMOpcode.LLVMAnd => op0() & op1(),
                 LLVMOpcode.LLVMOr => op0() | op1(),
-                LLVMOpcode.LLVMXor => op0() | op1(),
+                LLVMOpcode.LLVMXor => op0() ^ op1(),
                 LLVMOpcode.LLVMSelect => op0() != 0 ? op1() : op2(),
                 _ => throw new InvalidOperationException($"Unimplemented instruction: {opc}")
             };
@@ -916,6 +1111,7 @@ return peephole;
         private static bool IsSelect(LLVMValueRef inst)
         {
             return IsSelectOfTwoConstants(inst);
+            //return IsRealSelect(inst);
 
             if (inst.Kind != LLVMValueKind.LLVMInstructionValueKind)
                 return false;
@@ -1427,45 +1623,185 @@ return peephole;
             return peephole;
         }
 
+        // icmp eq (and X, 1), 0 -> xor(trunc X to i1), true
+        private PeepholeResult TrySimplifyCmp(LLVMValueRef icmp)
+        {
+            if (!icmp.Is(LLVMOpcode.LLVMICmp))
+                return null;
+            if (icmp.ICmpPredicate != LLVMIntPredicate.LLVMIntEQ)
+                return null;
+
+            var lhs = icmp.GetOperand(0);
+            var rhs = icmp.GetOperand(1);
+
+            // Equality is commutative, so canonicalize the zero to the RHS.
+            if (lhs.IsConstant(0))
+                (lhs, rhs) = (rhs, lhs);
+            if (!rhs.IsConstant(0))
+                return null;
+
+            if (!lhs.Is(LLVMOpcode.LLVMAnd))
+                return null;
+
+            var x = lhs.GetOperand(0);
+            var mask = lhs.GetOperand(1);
+
+            // `and` is commutative, so accept either operand order.
+            if (x.IsConstant(1))
+                (x, mask) = (mask, x);
+            if (!mask.IsConstant(1))
+                return null;
+
+            builder.PositionBefore(icmp);
+            var peephole = new PeepholeResult();
+
+            LLVMValueRef lowBit;
+            if (x.TypeOf.IntWidth == 1)
+            {
+                lowBit = x;
+            }
+            else
+            {
+                lowBit = builder.BuildTrunc(x, LLVMTypeRef.Int1);
+                peephole.Add(lowBit);
+            }
+
+            var not = builder.BuildXor(lowBit, LLVMValueRef.CreateConstInt(LLVMTypeRef.Int1, 1));
+            peephole.Add(not);
+            return peephole;
+
+        }
+
         private PeepholeResult TryCanonicalizeInverseCmp(LLVMValueRef icmp)
         {
             if (!icmp.Is(LLVMOpcode.LLVMICmp))
                 return null;
+
             var predicate = icmp.ICmpPredicate;
-            if (predicate != LLVMIntPredicate.LLVMIntULT && predicate != LLVMIntPredicate.LLVMIntULE)
+            bool isUnsignedRange = predicate == LLVMIntPredicate.LLVMIntUGT || predicate == LLVMIntPredicate.LLVMIntULT;
+            bool isEquality = predicate == LLVMIntPredicate.LLVMIntEQ || predicate == LLVMIntPredicate.LLVMIntNE;
+            if (!isUnsignedRange && !isEquality)
                 return null;
 
-            var firstInst = icmp.InstructionParent.FirstInstruction;
             var curr = icmp.PreviousInstruction;
             int depth = 0;
-            while (curr.Handle != 0 && curr != firstInst && depth++ < 25)
+            while (curr.Handle != 0 &&
+                   curr.InstructionParent == icmp.InstructionParent &&
+                   depth < 100)
             {
-                // We can backwards
-                var (a, b) = (curr, icmp);
-                // a = icmp ugt X, K
-                // b = icmp ult X, K + 1
-                if (!IsICmp(a, LLVMIntPredicate.LLVMIntUGT, out var x0, out var k0) ||
-                    !IsICmp(b, LLVMIntPredicate.LLVMIntULT, out var x1, out var k1) ||
-                    x0 != x1 ||
-                    !k0.IsConstant() ||
-                    !k1.IsConstant() ||
-                    k0.ConstIntZExt == ulong.MaxValue ||
-                    k1.ConstIntZExt != k0.ConstIntZExt + 1)
+                // Don't count calls in the walk limit. Sometimes we insert a lot of intrinsic calls
+                if (!curr.Is(LLVMOpcode.LLVMCall))
+                    depth++;
+
+                bool isMatch = isUnsignedRange
+                    ? AreComplementaryUnsignedComparisons(curr, icmp)
+                    : AreComplementaryEqualityComparisons(curr, icmp);
+
+                if (!isMatch)
                 {
                     curr = curr.PreviousInstruction;
                     continue;
                 }
 
-                builder.PositionBefore(b);
-                var not = builder.BuildXor(a, LLVMValueRef.CreateConstInt(a.TypeOf, 1));
+                // curr is earlier in the same block and therefore dominates icmp.
+                builder.PositionBefore(icmp);
+                var not = builder.BuildXor(curr, LLVMValueRef.CreateConstInt(curr.TypeOf, 1));
                 var peephole = new PeepholeResult();
                 peephole.Add(not);
                 return peephole;
-     
             }
 
             return null;
         }
+
+        // %261 = icmp eq i32 %259, 2
+        // %299 = icmp ne i32 %259, 2
+        // (or the reverse order: icmp ne then icmp eq)
+        private static bool AreComplementaryEqualityComparisons(LLVMValueRef first, LLVMValueRef second)
+        {
+            LLVMValueRef eq;
+            LLVMValueRef ne;
+            if (first.ICmpPredicate == LLVMIntPredicate.LLVMIntEQ &&
+                second.ICmpPredicate == LLVMIntPredicate.LLVMIntNE)
+            {
+                eq = first;
+                ne = second;
+            }
+            else if (first.ICmpPredicate == LLVMIntPredicate.LLVMIntNE &&
+                     second.ICmpPredicate == LLVMIntPredicate.LLVMIntEQ)
+            {
+                ne = first;
+                eq = second;
+            }
+            else
+            {
+                return false;
+            }
+
+            return HasSameCommutativeOperands(eq, ne);
+        }
+
+        private static bool AreComplementaryUnsignedComparisons(LLVMValueRef first, LLVMValueRef second)
+        {
+            LLVMValueRef ugt;
+            LLVMValueRef ult;
+            if (first.ICmpPredicate == LLVMIntPredicate.LLVMIntUGT &&
+                second.ICmpPredicate == LLVMIntPredicate.LLVMIntULT)
+            {
+                ugt = first;
+                ult = second;
+            }
+            else if (first.ICmpPredicate == LLVMIntPredicate.LLVMIntULT &&
+                     second.ICmpPredicate == LLVMIntPredicate.LLVMIntUGT)
+            {
+                ult = first;
+                ugt = second;
+            }
+            else
+            {
+                return false;
+            }
+
+            if (!IsICmp(ugt, LLVMIntPredicate.LLVMIntUGT, out var ugtValue, out var lowerBound) ||
+                !IsICmp(ult, LLVMIntPredicate.LLVMIntULT, out var ultValue, out var upperBound) ||
+                ugtValue != ultValue ||
+                !lowerBound.IsConstant() ||
+                !upperBound.IsConstant() ||
+                lowerBound.TypeOf.Handle != upperBound.TypeOf.Handle)
+            {
+                return false;
+            }
+
+            var bitWidth = lowerBound.TypeOf.IntWidth;
+            if (bitWidth == 0 || bitWidth > 64)
+                return false;
+
+            var lower = lowerBound.ConstIntZExt;
+            var upper = upperBound.ConstIntZExt;
+            var maxValue = ModuloReducer.GetMask(bitWidth);
+            if (lower == maxValue || upper != lower + 1)
+                return false;
+
+            // `samesign` changes the poison domain, so both comparisons must
+            // carry the flag and their constants must have the same sign, or
+            // neither comparison may carry it.
+            var ugtSameSign = HasSameSignFlag(ugt);
+            var ultSameSign = HasSameSignFlag(ult);
+            if (ugtSameSign != ultSameSign)
+                return false;
+
+            if (ugtSameSign)
+            {
+                var signBit = 1UL << ((int)bitWidth - 1);
+                if ((lower & signBit) != (upper & signBit))
+                    return false;
+            }
+
+            return true;
+        }
+
+        private static bool HasSameSignFlag(LLVMValueRef icmp)
+            => icmp.ToString().Contains("icmp samesign ", StringComparison.Ordinal);
 
 
         private static bool IsICmp(
@@ -1496,7 +1832,7 @@ return peephole;
                 return null;
 
 
-            var simplified = ConstantFoldingAPI.TryConstantFold(inst);
+            var simplified = ConstantFoldingAPI.TrySimplify(inst);
             if (simplified.Handle == 0)
                 return null;
 

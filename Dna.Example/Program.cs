@@ -77,7 +77,7 @@ if (genDsl)
 bool dbgCode = false;
 if (dbgCode)
 {
-    var irPath = "C:\\Users\\user\\Downloads\\debugme7.ll";
+    var irPath = "C:\\Users\\user\\Downloads\\debugme14.ll";
     var t = File.ReadAllText(irPath);
     Console.WriteLine(irPath);
 
@@ -131,8 +131,8 @@ if (dbgCode)
             var sw2 = Stopwatch.StartNew();
             for (int i = 0; i < 10; i++)
             {
-                PassPipeline.Run(vmpBin, existingFunc, false, true, false);
-                //PassPipeline.Run(vmpBin, existingFunc, false, false, true);
+                PassPipeline.Run(vmpBin, existingFunc, false, true, true);
+                PassPipeline.Run(vmpBin, existingFunc, false, false, false);
             }
             sw2.Stop();
             tempNewMod.PrintToFile(("translatedFunction.ll"));
@@ -153,6 +153,10 @@ if (dbgCode)
         tempNewMod.PrintToFile("instcombine.ll");
 
         tempNewMod.PrintToFile(("translatedFunction.ll"));
+
+        //var tt = existingFunc.GetInstructions().Single(x => x.InstructionOpcode == LLVMOpcode.LLVMSelect && x.ToString().Contains("336 = select i1 %298, i32 %334, i32 %335"));
+        //var temp = new AdhocInstCombinePass();
+        //temp.TrySimplifySharedConditionSelect(tt);
 
 
         var name = Guid.NewGuid().ToString() + ".ll";

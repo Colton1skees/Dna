@@ -555,7 +555,10 @@ namespace Dna.Passes
             var newBaseAndOffset = GetCanonicalBasePlusOffset(memoryInst.GetOperand(1));
             if (loadBaseAndOffset.Base != newBaseAndOffset.Base)
             {
-    
+                var ignore = newBaseAndOffset.Base.Kind == LLVMValueKind.LLVMGlobalVariableValueKind;
+                if (ignore)
+                    return skip();
+
                 return null;
             }
 
@@ -568,8 +571,11 @@ namespace Dna.Passes
             var storeStart = Math.Max((long)(newBaseAndOffset.Offset - loadOffset), 0);
             var storeEnd = Math.Min((long)((newBaseAndOffset.Offset + (storeSize - 1)) - loadOffset), loadSize - 1);
 
-            // If storeEnd is < 0 or storeStart >= loadSize we can do an early bail.
-            if (storeEnd < 0 || storeStart > loadSize)
+            // Skip this definition unless it provides the particular byte being resolved.
+            if (storeEnd < 0 ||
+                storeStart >= loadSize ||
+                loadIndex < storeStart ||
+                loadIndex > storeEnd)
             {
                 //Console.WriteLine($" --> Ignoring dead store: ([{storeStart}, {storeEnd}] does not overlap with load");
                 return skip();
@@ -608,6 +614,8 @@ namespace Dna.Passes
                 initialOffset = (long)(loadOffset - newBaseAndOffset.Offset);
             }
 
+            initialOffset += loadIndex;
+
             // Constant fold
             if (storeVal.IsConstant())
             {
@@ -615,11 +623,6 @@ namespace Dna.Passes
                 var value = LLVMValueRef.CreateConstInt(LLVMTypeRef.Int8, bytes[initialOffset]);
                 storeVal = value;
                 initialOffset = 0;
-            }
-
-            else
-            {
-                initialOffset += loadIndex;
             }
 
             //initialOffset += unhandledIndex;
@@ -631,6 +634,14 @@ namespace Dna.Passes
         private PeepholeResult ProcessLoad(LLVMValueRef loadInst, MemorySSAUpdater updater, int depth)
         {
             /*
+            if (loadInst.ToString().Contains("%292 = load i64, ptr %71"))
+            {
+                loadInst.GetFunction().GlobalParent.PrintToFile("translatedFunction.ll");
+                Debugger.Break();
+
+            }
+      
+            
             if (loadInst.GetOperand(0).Is(LLVMOpcode.LLVMGetElementPtr) && loadInst.GetOperand(0).OperandCount == 2 && loadInst.GetOperand(0).GetOperand(1).IsConstant(0xFFFFFFFFFFFFFF70))
             {
                 loadInst.GetFunction().GlobalParent.PrintToFile("translatedFunction.ll");
@@ -706,10 +717,11 @@ namespace Dna.Passes
 
             if (values.Count == loadSize)
             {
+                //Debugger.Break();
                 return CreateFullReplacementOfLoad(loadInst, values);
             }
-            
             */
+
 
             while (true)
             {
@@ -844,6 +856,38 @@ namespace Dna.Passes
             // If all bytes of the load are known:
             if (handledBytesToValue.Count == loadSize)
             {
+                bool TryFoldByteSources(StoreOffsetMapping byteSources, out ulong constant)
+                {
+                    constant = 0;
+
+                    if (byteSources.Count != loadSize)
+                        return false;
+
+                    for (long byteOffset = 0; byteOffset < loadSize; byteOffset++)
+                    {
+                        if (!byteSources.TryGetValue(byteOffset, out var source) ||
+                            !source.byteSource.IsConstant() ||
+                            source.byteIndex >= sizeof(ulong))
+                        {
+                            return false;
+                        }
+
+                        var sourceByte = (source.byteSource.ConstIntZExt >> (8 * (int)source.byteIndex)) & 0xff;
+                        constant |= sourceByte << (8 * (int)byteOffset);
+                    }
+
+                    return true;
+                }
+
+                if (values.Count == loadSize &&
+                    TryFoldByteSources(values, out var recursiveValue) &&
+                    TryFoldByteSources(handledBytesToValue, out var iterativeValue) &&
+                    recursiveValue != iterativeValue)
+                {
+                    Debugger.Break();
+                }
+    
+
                 return CreateFullReplacementOfLoad(loadInst, handledBytesToValue);
             }
 
