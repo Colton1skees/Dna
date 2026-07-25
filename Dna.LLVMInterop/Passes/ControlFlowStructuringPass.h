@@ -67,7 +67,7 @@
 #include <llvm/Analysis/MemorySSA.h>
 #include <Passes/ClassifyingAliasAnalysisPass.h>
 namespace Dna::Passes {
-	typedef bool(__cdecl* tStructureFunction)(llvm::Function* func, llvm::LoopInfo* loopInfo, llvm::MemorySSA* memSsa, llvm::SimplifyQuery* simplifyQuery);
+	typedef bool(__cdecl* tStructureFunction)(llvm::Function* func, llvm::LoopInfo* loopInfo, llvm::DominatorTree* domTree, llvm::MemorySSA* memSsa, llvm::SimplifyQuery* simplifyQuery);
 
 	struct ControlFlowStructuringPass : public PassInfoMixin<ControlFlowStructuringPass>
 	{
@@ -99,7 +99,7 @@ namespace Dna::Passes {
 
 			llvm::SimplifyQuery SQ(DL, &TLI, &DT, &AC);
 
-			bool changed = structureFunction(&F, &LI, &mssa, &SQ);
+			bool changed = structureFunction(&F, &LI, &DT, &mssa, &SQ);
 			if (changed)
 				return llvm::PreservedAnalyses::none();
 

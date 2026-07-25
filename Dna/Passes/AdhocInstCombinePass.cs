@@ -2,6 +2,7 @@
 using Dna.DataStructures;
 using Dna.Extensions;
 using Dna.LLVMInterop.API.LLVMBindings.Analysis;
+using Dna.LLVMInterop.API.LLVMBindings.IR;
 using Dna.LLVMInterop.API.RegionAnalysis.Wrapper;
 using Dna.Passes.Mba;
 using LLVMSharp.Interop;
@@ -100,7 +101,7 @@ namespace Dna.Passes
             PtrToStoreLoadPropagation = new dgAdhocInstCombinePass(InstCombine);
         }
 
-        public unsafe bool InstCombine(LLVMOpaqueValue* function, nint loopInfo, nint mssa, nint simplifyQuery)
+        public unsafe bool InstCombine(LLVMOpaqueValue* function, nint loopInfo, nint domTree, nint mssa, nint simplifyQuery)
         {
             //return false;
             builder = LLVMBuilderRef.Create(LLVMContextRef.Global);
@@ -111,12 +112,13 @@ namespace Dna.Passes
             bool changed = true;
             changed = false;
             var sq = new SimplifyQuery(simplifyQuery);
+            var dt = new DominatorTree(domTree);
             foreach (var inst in f.GetInstructions().ToList())
             {
                 var curr = inst;
                 while (curr != null)
                 {
-                    var peephole = PeepholeInst(curr, sq);
+                    var peephole = PeepholeInst(curr, dt, sq);
                     if (peephole == null)
                     {
                         curr = null;
@@ -134,16 +136,16 @@ namespace Dna.Passes
             return changed;
         }
 
-        public PeepholeResult PeepholeInst(LLVMValueRef inst, SimplifyQuery query)
+        public PeepholeResult PeepholeInst(LLVMValueRef inst, DominatorTree domTree, SimplifyQuery query)
         {
 
             Validate(inst.InstructionParent.Parent);
-            var r = PeepholeInstInternal(inst, query);
+            var r = PeepholeInstInternal(inst, domTree, query);
             Validate(inst.InstructionParent.Parent);
             return r;
         }
 
-        public PeepholeResult PeepholeInstInternal(LLVMValueRef inst, SimplifyQuery simplifyQuery)
+        public PeepholeResult PeepholeInstInternal(LLVMValueRef inst, DominatorTree domTree, SimplifyQuery simplifyQuery)
         {
             if (inst.TypeOf.IntWidth > 64)
                 return null;
@@ -287,6 +289,8 @@ namespace Dna.Passes
             changed = TrySimplifyCmp(inst);
             if (changed != null)
                 return changed;
+
+            changed = TryCreateBranchAssumptions(domTree, inst);
 
             return changed;
 
@@ -703,7 +707,7 @@ return peephole;
             return null;
         }
 
-        private static readonly LLVMOpcode[] kbFolds = { LLVMOpcode.LLVMAdd, LLVMOpcode.LLVMSub, LLVMOpcode.LLVMMul, LLVMOpcode.LLVMAnd, LLVMOpcode.LLVMOr, LLVMOpcode.LLVMXor, LLVMOpcode.LLVMShl, LLVMOpcode.LLVMLShr, LLVMOpcode.LLVMAShr };
+        private static readonly LLVMOpcode[] kbFolds = { LLVMOpcode.LLVMAdd, LLVMOpcode.LLVMSub, LLVMOpcode.LLVMMul, LLVMOpcode.LLVMAnd, LLVMOpcode.LLVMOr, LLVMOpcode.LLVMXor, LLVMOpcode.LLVMShl, LLVMOpcode.LLVMLShr, LLVMOpcode.LLVMAShr, LLVMOpcode.LLVMTrunc, LLVMOpcode.LLVMZExt };
 
 
         private LLVMValueRef BuildIntrinsicCall(LLVMValueRef originalCall, LLVMValueRef newArg0)
@@ -1031,12 +1035,14 @@ return peephole;
             if (!inst.Is(kbFolds))
                 return null;
 
-            if (inst.TypeOf.IntWidth <= 1)
-                return null;
+            //if (inst.ToString().Contains("263 = and i32 %262, 1"))
 
             var kb = NativeKnownBits.Get(inst, simplifyQuery);
             if (kb.GetUnknownBitCount() != 1)
                 return null;
+            if (kb.GetUnknownMask() != 1)
+                return null;
+
 
             var users = inst.GetUsers().ToList();
             if (users.All(x => x.Is(LLVMOpcode.LLVMICmp)))
@@ -1704,9 +1710,7 @@ return peephole;
                 return null;
 
             var predicate = icmp.ICmpPredicate;
-            bool isUnsignedRange = predicate == LLVMIntPredicate.LLVMIntUGT || predicate == LLVMIntPredicate.LLVMIntULT;
-            bool isEquality = predicate == LLVMIntPredicate.LLVMIntEQ || predicate == LLVMIntPredicate.LLVMIntNE;
-            if (!isUnsignedRange && !isEquality)
+            if (!IsComplementablePredicate(predicate))
                 return null;
 
             var curr = icmp.PreviousInstruction;
@@ -1719,11 +1723,7 @@ return peephole;
                 if (!curr.Is(LLVMOpcode.LLVMCall))
                     depth++;
 
-                bool isMatch = isUnsignedRange
-                    ? AreComplementaryUnsignedComparisons(curr, icmp)
-                    : AreComplementaryEqualityComparisons(curr, icmp);
-
-                if (!isMatch)
+                if (!AreComplementaryComparisons(curr, icmp))
                 {
                     curr = curr.PreviousInstruction;
                     continue;
@@ -1740,57 +1740,81 @@ return peephole;
             return null;
         }
 
-        // %261 = icmp eq i32 %259, 2
-        // %299 = icmp ne i32 %259, 2
-        // (or the reverse order: icmp ne then icmp eq)
-        private static bool AreComplementaryEqualityComparisons(LLVMValueRef first, LLVMValueRef second)
+        private static bool IsComplementablePredicate(LLVMIntPredicate predicate)
+            => predicate is LLVMIntPredicate.LLVMIntEQ or LLVMIntPredicate.LLVMIntNE or
+               LLVMIntPredicate.LLVMIntUGT or LLVMIntPredicate.LLVMIntUGE or
+               LLVMIntPredicate.LLVMIntULT or LLVMIntPredicate.LLVMIntULE or
+               LLVMIntPredicate.LLVMIntSGT or LLVMIntPredicate.LLVMIntSGE or
+               LLVMIntPredicate.LLVMIntSLT or LLVMIntPredicate.LLVMIntSLE;
+
+        // Covers exact complements such as `eq`/`ne`, `slt`/`sge`, and `ugt`/`ule`,
+        // plus the adjacent-boundary forms emitted by the flag reconstruction:
+        // `sgt x, K - 1` <=> `not (slt x, K)` and `ugt x, K` <=> `not (ult x, K + 1)`.
+        private static bool AreComplementaryComparisons(LLVMValueRef first, LLVMValueRef second)
         {
-            LLVMValueRef eq;
-            LLVMValueRef ne;
-            if (first.ICmpPredicate == LLVMIntPredicate.LLVMIntEQ &&
-                second.ICmpPredicate == LLVMIntPredicate.LLVMIntNE)
-            {
-                eq = first;
-                ne = second;
-            }
-            else if (first.ICmpPredicate == LLVMIntPredicate.LLVMIntNE &&
-                     second.ICmpPredicate == LLVMIntPredicate.LLVMIntEQ)
-            {
-                ne = first;
-                eq = second;
-            }
-            else
-            {
+            if (!first.Is(LLVMOpcode.LLVMICmp) || !second.Is(LLVMOpcode.LLVMICmp))
                 return false;
+
+            if (HasSameSignFlag(first) != HasSameSignFlag(second))
+                return false;
+
+            bool inversePredicates = AreInversePredicates(first.ICmpPredicate, second.ICmpPredicate);
+            bool equalityPair = first.ICmpPredicate is LLVMIntPredicate.LLVMIntEQ or LLVMIntPredicate.LLVMIntNE;
+            bool sameOperands = equalityPair
+                ? HasSameCommutativeOperands(first, second)
+                : first.GetOperand(0) == second.GetOperand(0) && first.GetOperand(1) == second.GetOperand(1);
+            if (sameOperands && inversePredicates)
+            {
+                return true;
             }
 
-            return HasSameCommutativeOperands(eq, ne);
+            return AreAdjacentRangeComplements(first, second, HasSameSignFlag(first));
         }
 
-        private static bool AreComplementaryUnsignedComparisons(LLVMValueRef first, LLVMValueRef second)
+        private static bool AreInversePredicates(LLVMIntPredicate first, LLVMIntPredicate second)
+            => (first, second) is
+                (LLVMIntPredicate.LLVMIntEQ, LLVMIntPredicate.LLVMIntNE) or
+                (LLVMIntPredicate.LLVMIntNE, LLVMIntPredicate.LLVMIntEQ) or
+                (LLVMIntPredicate.LLVMIntUGT, LLVMIntPredicate.LLVMIntULE) or
+                (LLVMIntPredicate.LLVMIntULE, LLVMIntPredicate.LLVMIntUGT) or
+                (LLVMIntPredicate.LLVMIntUGE, LLVMIntPredicate.LLVMIntULT) or
+                (LLVMIntPredicate.LLVMIntULT, LLVMIntPredicate.LLVMIntUGE) or
+                (LLVMIntPredicate.LLVMIntSGT, LLVMIntPredicate.LLVMIntSLE) or
+                (LLVMIntPredicate.LLVMIntSLE, LLVMIntPredicate.LLVMIntSGT) or
+                (LLVMIntPredicate.LLVMIntSGE, LLVMIntPredicate.LLVMIntSLT) or
+                (LLVMIntPredicate.LLVMIntSLT, LLVMIntPredicate.LLVMIntSGE);
+
+        private static bool AreAdjacentRangeComplements(LLVMValueRef first, LLVMValueRef second, bool sameSign)
         {
-            LLVMValueRef ugt;
-            LLVMValueRef ult;
-            if (first.ICmpPredicate == LLVMIntPredicate.LLVMIntUGT &&
-                second.ICmpPredicate == LLVMIntPredicate.LLVMIntULT)
+            LLVMValueRef greater;
+            LLVMValueRef less;
+            bool signed;
+            if ((first.ICmpPredicate is LLVMIntPredicate.LLVMIntUGT or LLVMIntPredicate.LLVMIntSGT) &&
+                (second.ICmpPredicate is LLVMIntPredicate.LLVMIntULT or LLVMIntPredicate.LLVMIntSLT))
             {
-                ugt = first;
-                ult = second;
+                greater = first;
+                less = second;
+                signed = first.ICmpPredicate == LLVMIntPredicate.LLVMIntSGT;
             }
-            else if (first.ICmpPredicate == LLVMIntPredicate.LLVMIntULT &&
-                     second.ICmpPredicate == LLVMIntPredicate.LLVMIntUGT)
+            else if ((second.ICmpPredicate is LLVMIntPredicate.LLVMIntUGT or LLVMIntPredicate.LLVMIntSGT) &&
+                     (first.ICmpPredicate is LLVMIntPredicate.LLVMIntULT or LLVMIntPredicate.LLVMIntSLT))
             {
-                ult = first;
-                ugt = second;
+                greater = second;
+                less = first;
+                signed = second.ICmpPredicate == LLVMIntPredicate.LLVMIntSGT;
             }
             else
+                return false;
+
+            if ((signed && less.ICmpPredicate != LLVMIntPredicate.LLVMIntSLT) ||
+                (!signed && less.ICmpPredicate != LLVMIntPredicate.LLVMIntULT))
             {
                 return false;
             }
 
-            if (!IsICmp(ugt, LLVMIntPredicate.LLVMIntUGT, out var ugtValue, out var lowerBound) ||
-                !IsICmp(ult, LLVMIntPredicate.LLVMIntULT, out var ultValue, out var upperBound) ||
-                ugtValue != ultValue ||
+            var lowerBound = greater.GetOperand(1);
+            var upperBound = less.GetOperand(1);
+            if (greater.GetOperand(0) != less.GetOperand(0) ||
                 !lowerBound.IsConstant() ||
                 !upperBound.IsConstant() ||
                 lowerBound.TypeOf.Handle != upperBound.TypeOf.Handle)
@@ -1802,21 +1826,28 @@ return peephole;
             if (bitWidth == 0 || bitWidth > 64)
                 return false;
 
-            var lower = lowerBound.ConstIntZExt;
-            var upper = upperBound.ConstIntZExt;
             var maxValue = ModuloReducer.GetMask(bitWidth);
-            if (lower == maxValue || upper != lower + 1)
+            var lower = lowerBound.ConstIntZExt & maxValue;
+            var upper = upperBound.ConstIntZExt & maxValue;
+            if (upper != ((lower + 1) & maxValue))
                 return false;
 
-            // `samesign` changes the poison domain, so both comparisons must
-            // carry the flag and their constants must have the same sign, or
-            // neither comparison may carry it.
-            var ugtSameSign = HasSameSignFlag(ugt);
-            var ultSameSign = HasSameSignFlag(ult);
-            if (ugtSameSign != ultSameSign)
+            if (signed)
+            {
+                var signedMax = (1UL << ((int)bitWidth - 1)) - 1;
+                if (lower == signedMax)
+                    return false;
+            }
+            else if (lower == maxValue)
+            {
                 return false;
+            }
 
-            if (ugtSameSign)
+            // `samesign` asserts both operands share the same sign bit at every dominated use.
+            // That assumption is only observable at the sign-bit boundary (e.g. 0x7FFF.. ->
+            // 0x8000..), so adjacent bounds crossing it cannot be folded under the flag; ordinary
+            // in-range bounds like 2047/2048 don't cross it and remain safe to fold.
+            if (sameSign)
             {
                 var signBit = 1UL << ((int)bitWidth - 1);
                 if ((lower & signBit) != (upper & signBit))
@@ -1849,6 +1880,114 @@ return peephole;
             lhs = value.GetOperand(0);
             rhs = value.GetOperand(1);
             return true;
+        }
+
+        // If a conditional branch's block is the sole gateway into one of its successors
+        // (i.e. it dominates that successor), then every execution reaching the successor
+        // must have taken that specific edge. Record that fact via an `llvm.assume` at the
+        // top of the successor so later folds/simplifications can make use of it.
+        private PeepholeResult TryCreateBranchAssumptions(DominatorTree domTree, LLVMValueRef branchInst)
+        {
+            if (!branchInst.Is(LLVMOpcode.LLVMBr))
+                return null;
+            if (branchInst.OperandCount != 3)
+                return null;
+
+            var block = branchInst.InstructionParent;
+            var cond = branchInst.GetOperand(0);
+
+            for (uint i = 0; i < 2; i++)
+            {
+                // GetSuccessor(0) is the true destination, GetSuccessor(1) is the false destination.
+                var succ = branchInst.GetSuccessor(i);
+                bool isTrueEdge = i == 0;
+
+                if (!domTree.ProperlyDominates(block, succ))
+                    continue;
+
+                // Don't insert a redundant assume if an equivalent one already exists.
+                if (BlockHasLeadingAssumeOf(succ, cond, isTrueEdge))
+                    continue;
+
+                var insertBefore = GetFirstNonPhiInstruction(succ);
+                if (insertBefore.Handle == 0)
+                    continue;
+
+                builder.PositionBefore(insertBefore);
+                var peephole = new PeepholeResult();
+
+                var assumedCond = cond;
+                if (!isTrueEdge)
+                {
+                    assumedCond = builder.BuildXor(cond, LLVMValueRef.CreateConstInt(cond.TypeOf, 1));
+                    peephole.Add(assumedCond);
+                }
+
+                var assumeFn = GetAssumeIntrinsic(branchInst.GetFunction().GlobalParent);
+                var call = builder.BuildCall2(assumeFn.GetFunctionPrototype(), assumeFn, new LLVMValueRef[] { assumedCond });
+                peephole.Add(call);
+
+                // Do not return the peephole because there's nothing to replace. We only added new facts
+                return null;
+            }
+
+            return null;
+        }
+
+        private static LLVMValueRef GetFirstNonPhiInstruction(LLVMBasicBlockRef block)
+        {
+            var inst = block.FirstInstruction;
+            while (inst.Handle != 0 && inst.Is(LLVMOpcode.LLVMPHI))
+                inst = inst.NextInstruction;
+
+            return inst;
+        }
+
+        // Checks whether `block` already begins with an `llvm.assume` that asserts the same
+        // fact we're about to insert (either `cond` itself, or its logical negation).
+        private static bool BlockHasLeadingAssumeOf(LLVMBasicBlockRef block, LLVMValueRef cond, bool wantTrue)
+        {
+            var inst = GetFirstNonPhiInstruction(block);
+            while (inst.Handle != 0 && IsAssumeCall(inst))
+            {
+                var arg = inst.GetOperand(0);
+                if (wantTrue ? arg == cond : IsLogicalNotOf(arg, cond))
+                    return true;
+
+                inst = inst.NextInstruction;
+            }
+
+            return false;
+        }
+
+        private static bool IsAssumeCall(LLVMValueRef inst)
+        {
+            if (!inst.Is(LLVMOpcode.LLVMCall))
+                return false;
+
+            var target = inst.GetCallInstTarget();
+            return target.Kind == LLVMValueKind.LLVMFunctionValueKind && target.Name == "llvm.assume";
+        }
+
+        private static bool IsLogicalNotOf(LLVMValueRef value, LLVMValueRef cond)
+        {
+            if (!value.Is(LLVMOpcode.LLVMXor))
+                return false;
+
+            var op0 = value.GetOperand(0);
+            var op1 = value.GetOperand(1);
+            return (op0 == cond && op1.IsConstant(1)) || (op1 == cond && op0.IsConstant(1));
+        }
+
+        private LLVMValueRef GetAssumeIntrinsic(LLVMModuleRef module)
+        {
+            var assume = module.GetNamedFunction("llvm.assume");
+            if (assume.Handle != 0)
+                return assume;
+
+            var ctx = module.GetCtx();
+            var prototype = LLVMTypeRef.CreateFunction(ctx.VoidType, new LLVMTypeRef[] { ctx.Int1Type});
+            return module.AddFunction("llvm.assume", prototype);
         }
 
         static HashSet<LLVMOpcode> opcodes = new();

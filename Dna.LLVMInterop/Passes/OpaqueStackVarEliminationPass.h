@@ -68,7 +68,7 @@
 #include <llvm/Analysis/MemorySSA.h>
 #include <Passes/ClassifyingAliasAnalysisPass.h>
 namespace Dna::Passes {
-	typedef bool(__cdecl* tEliminateStackVars)(llvm::Function* func, llvm::LoopInfo* loopInfo, llvm::MemorySSA* memSsa, llvm::SimplifyQuery* sq);
+	typedef bool(__cdecl* tEliminateStackVars)(llvm::Function* func, llvm::LoopInfo* loopInfo, llvm::DominatorTree* domTree, llvm::MemorySSA* memSsa, llvm::SimplifyQuery* sq);
 
 	struct OpaqueStackVarEliminationPass : public llvm::PassInfoMixin<OpaqueStackVarEliminationPass>
 	{
@@ -100,7 +100,7 @@ namespace Dna::Passes {
 
 			llvm::SimplifyQuery SQ(DL, &TLI, &DT, &AC);
 
-			bool changed = structureFunction(&F, &LI, &mssa, &SQ);
+			bool changed = structureFunction(&F, &LI, &DT, &mssa, &SQ);
 			if (changed)
 				return llvm::PreservedAnalyses::none();
 

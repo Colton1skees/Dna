@@ -103,10 +103,10 @@ namespace Dna.Passes
             PtrToStoreLoadPropagation = new dgCombinedFixedpointPass(StoreToLoadPropagation);
         }
 
-        private unsafe bool StoreToLoadPropagation(LLVMOpaqueValue* function, nint loopInfo, nint mssa, nint simplifyQuery)
+        private unsafe bool StoreToLoadPropagation(LLVMOpaqueValue* function, nint loopInfo, nint domTree, nint mssa, nint simplifyQuery)
         {
             builder = LLVMBuilderRef.Create(LLVMContextRef.Global);
-            return Run(function, new LoopInfo(loopInfo), new MemorySSA(mssa), new SimplifyQuery(simplifyQuery));
+            return Run(function, new LoopInfo(loopInfo), new DominatorTree(domTree), new MemorySSA(mssa), new SimplifyQuery(simplifyQuery));
         }
 
         private BaseWithOffset GetCanonicalBasePlusOffsetOld(LLVMValueRef current)
@@ -312,7 +312,7 @@ namespace Dna.Passes
             return new BaseWithOffset(currentBase, currentOffset);
         }
 
-        private bool Run(LLVMValueRef function, LoopInfo loopInfo, MemorySSA mssa, SimplifyQuery simplifyQuery)
+        private bool Run(LLVMValueRef function, LoopInfo loopInfo, DominatorTree domTree, MemorySSA mssa, SimplifyQuery simplifyQuery)
         {
             this.function = function;
             this.mssa = mssa;
@@ -429,7 +429,7 @@ namespace Dna.Passes
                         if (config.AdhocInstcombine)
                         {
                         
-                            var peephole = instcombine.PeepholeInst(nextInstr, simplifyQuery);
+                            var peephole = instcombine.PeepholeInst(nextInstr, domTree, simplifyQuery);
                             if (TryReplaceAndRemove2(peephole))
                                 continue;
                         }

@@ -88,7 +88,7 @@ namespace Dna::Passes {
 
 		llvm::PreservedAnalyses run(llvm::Function& F, llvm::FunctionAnalysisManager& fam)
 		{
-			bool changed = structureFunction(&F, nullptr, nullptr, nullptr);
+			bool changed = structureFunction(&F, nullptr, nullptr, nullptr, nullptr);
 			if (changed)
 				return llvm::PreservedAnalyses::none();
 

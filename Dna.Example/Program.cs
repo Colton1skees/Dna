@@ -74,10 +74,10 @@ if (genDsl)
 //LazyLLVMFixes.InstallValueToStringBugFix(RemillUtils.LLVMValueToString);
 
 
-bool dbgCode = false;
+bool dbgCode = true;
 if (dbgCode)
 {
-    var irPath = "C:\\Users\\user\\Downloads\\debugme14.ll";
+    var irPath = "C:\\Users\\user\\Downloads\\debugme_noassume.ll";
     var t = File.ReadAllText(irPath);
     Console.WriteLine(irPath);
 
@@ -110,7 +110,7 @@ if (dbgCode)
             //existingFunc.GlobalParent.PrintToFile("instcombine.ll");
             if (false)
             {
-                new AdhocInstCombinePass().InstCombine((LLVMOpaqueValue*)existingFunc.Handle, 0, 0, 0);
+                new AdhocInstCombinePass().InstCombine((LLVMOpaqueValue*)existingFunc.Handle, 0, 0, 0, 0);
                 MultiUseCloningPass.Run(existingFunc);
                 MbaDeobfuscationPass.Run(existingFunc);
                 var bar = new CombinedFixedpointOptPass(null, new FixedpointPassConfig());
@@ -129,7 +129,7 @@ if (dbgCode)
         while (true)
         {
             var sw2 = Stopwatch.StartNew();
-            for (int i = 0; i < 10; i++)
+            for (int i = 0; i < 11; i++)
             {
                 PassPipeline.Run(vmpBin, existingFunc, false, true, true);
                 PassPipeline.Run(vmpBin, existingFunc, false, false, false);

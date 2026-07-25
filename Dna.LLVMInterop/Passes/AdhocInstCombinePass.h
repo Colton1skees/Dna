@@ -96,7 +96,7 @@ namespace Dna::Passes {
 			auto& DT = fam.getResult<llvm::DominatorTreeAnalysis>(F);
 
 			llvm::SimplifyQuery SQ(DL, &TLI, &DT, &AC);
-			bool changed = structureFunction(&F, nullptr, nullptr, &SQ);
+			bool changed = structureFunction(&F, nullptr, &DT, nullptr, &SQ);
 			if (changed)
 				return llvm::PreservedAnalyses::none();
 
