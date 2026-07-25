@@ -74,10 +74,10 @@ if (genDsl)
 //LazyLLVMFixes.InstallValueToStringBugFix(RemillUtils.LLVMValueToString);
 
 
-bool dbgCode = false;
+bool dbgCode = true;
 if (dbgCode)
 {
-    var irPath = "C:\\Users\\user\\Downloads\\debug_1042_why_isnt_assume_working.ll";
+    var irPath = "C:\\Users\\user\\Downloads\\1100_or_something.ll";
     var t = File.ReadAllText(irPath);
     Console.WriteLine(irPath);
 
