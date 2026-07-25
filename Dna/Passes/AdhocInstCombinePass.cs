@@ -707,7 +707,7 @@ return peephole;
             return null;
         }
 
-        private static readonly LLVMOpcode[] kbFolds = { LLVMOpcode.LLVMAdd, LLVMOpcode.LLVMSub, LLVMOpcode.LLVMMul, LLVMOpcode.LLVMAnd, LLVMOpcode.LLVMOr, LLVMOpcode.LLVMXor, LLVMOpcode.LLVMShl, LLVMOpcode.LLVMLShr, LLVMOpcode.LLVMAShr, LLVMOpcode.LLVMTrunc, LLVMOpcode.LLVMZExt };
+        private static readonly LLVMOpcode[] kbFolds = { LLVMOpcode.LLVMAdd, LLVMOpcode.LLVMSub, LLVMOpcode.LLVMMul, LLVMOpcode.LLVMAnd, LLVMOpcode.LLVMOr, LLVMOpcode.LLVMXor, LLVMOpcode.LLVMShl, LLVMOpcode.LLVMLShr, LLVMOpcode.LLVMAShr, LLVMOpcode.LLVMZExt };
 
 
         private LLVMValueRef BuildIntrinsicCall(LLVMValueRef originalCall, LLVMValueRef newArg0)
@@ -1035,14 +1035,14 @@ return peephole;
             if (!inst.Is(kbFolds))
                 return null;
 
-            //if (inst.ToString().Contains("263 = and i32 %262, 1"))
+            var isI1 = inst.TypeOf.IntWidth <= 1;
+            //var isAnd1 = inst.Is(LLVMOpcode.LLVMAnd) && inst.GetOperand(1).IsConstant() && inst.GetOperand(1).ConstIntZExt == 1;
+            if (inst.TypeOf.IntWidth <= 1)
+                return null;
 
             var kb = NativeKnownBits.Get(inst, simplifyQuery);
             if (kb.GetUnknownBitCount() != 1)
                 return null;
-            if (kb.GetUnknownMask() != 1)
-                return null;
-
 
             var users = inst.GetUsers().ToList();
             if (users.All(x => x.Is(LLVMOpcode.LLVMICmp)))
