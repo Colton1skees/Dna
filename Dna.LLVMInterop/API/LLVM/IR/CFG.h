@@ -103,4 +103,10 @@ namespace Dna::API {
 		function->setDSOLocal(dsoLocal);
 	}
 
+	DNA_EXPORT bool HasSameSign(llvm::ICmpInst* icmp)
+	{
+		return icmp->hasSameSign();
+	}
+
+
 }

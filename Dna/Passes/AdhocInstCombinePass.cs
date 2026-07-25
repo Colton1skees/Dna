@@ -1,6 +1,7 @@
 ﻿using Dna.Binary;
 using Dna.DataStructures;
 using Dna.Extensions;
+using Dna.LLVMInterop.API.LLVMBindings;
 using Dna.LLVMInterop.API.LLVMBindings.Analysis;
 using Dna.LLVMInterop.API.LLVMBindings.IR;
 using Dna.LLVMInterop.API.RegionAnalysis.Wrapper;
@@ -291,6 +292,13 @@ namespace Dna.Passes
                 return changed;
 
             changed = TryCreateBranchAssumptions(domTree, inst);
+            if (changed != null)
+                return changed;
+
+
+            changed = TryCreateBranchAssumptions2(domTree, inst);
+            if (changed != null)
+                return changed;
 
             return changed;
 
@@ -1858,7 +1866,8 @@ return peephole;
         }
 
         private static bool HasSameSignFlag(LLVMValueRef icmp)
-            => icmp.ToString().Contains("icmp samesign ", StringComparison.Ordinal);
+            => LLVMUtilApi.HasSameSign(icmp);
+        // => icmp.ToString().Contains("icmp samesign ", StringComparison.Ordinal);
 
 
         private static bool IsICmp(
@@ -1934,6 +1943,107 @@ return peephole;
             return null;
         }
 
+        // If every predecessor of a block reaches it by enforcing the exact same condition
+        // (e.g. every predecessor branches on `icmp eq %x, 0`, always taking the edge into
+        // this block on the same truth value), then that fact holds unconditionally at the
+        // top of the block - regardless of which predecessor was actually taken. Unlike
+        // TryCreateBranchAssumptions, this does not require a single dominating branch: it
+        // instead requires unanimous agreement across all incoming edges.
+        private PeepholeResult TryCreateBranchAssumptions2(DominatorTree domTree, LLVMValueRef inst)
+        {
+            var block = inst.InstructionParent;
+            if (block.Handle == 0)
+                return null;
+
+            // This is a block-level fact, not an instruction-level one. Only evaluate it once
+            // per block, when visiting the first instruction eligible to host the assume.
+            if (inst != GetFirstNonPhiInstruction(block))
+                return null;
+
+            var predecessors = block.GetPredecessors();
+            if (predecessors.Count == 0)
+                return null;
+
+            LLVMValueRef canonicalCond = null;
+            bool canonicalWantTrue = false;
+
+            foreach (var pred in predecessors)
+            {
+                var terminator = pred.LastInstruction;
+                if (!terminator.Is(LLVMOpcode.LLVMBr) || terminator.OperandCount != 3)
+                    return null;
+
+                // GetSuccessor(0) is the true destination, GetSuccessor(1) is the false destination.
+                var trueDest = terminator.GetSuccessor(0);
+                var falseDest = terminator.GetSuccessor(1);
+                if (trueDest == falseDest)
+                    return null;
+
+                bool wantTrue;
+                if (trueDest == block)
+                    wantTrue = true;
+                else if (falseDest == block)
+                    wantTrue = false;
+                else
+                    return null;
+
+                var cond = terminator.GetOperand(0);
+                if (canonicalCond == null)
+                {
+                    canonicalCond = cond;
+                    canonicalWantTrue = wantTrue;
+                    continue;
+                }
+
+                if (wantTrue != canonicalWantTrue || !AreSameCondition(canonicalCond, cond))
+                    return null;
+            }
+
+            if (canonicalCond == null)
+                return null;
+
+            // Don't insert a redundant assume if an equivalent one already exists.
+            if (BlockHasLeadingAssumeOf(block, canonicalCond, canonicalWantTrue))
+                return null;
+
+            builder.PositionBefore(inst);
+            var peephole = new PeepholeResult();
+
+            var assumedCond = canonicalCond;
+            if (!canonicalWantTrue)
+            {
+                assumedCond = builder.BuildXor(canonicalCond, LLVMValueRef.CreateConstInt(canonicalCond.TypeOf, 1));
+                peephole.Add(assumedCond);
+            }
+
+            var assumeFn = GetAssumeIntrinsic(block.Parent.GlobalParent);
+            var call = builder.BuildCall2(assumeFn.GetFunctionPrototype(), assumeFn, new LLVMValueRef[] { assumedCond });
+            peephole.Add(call);
+
+            // Do not return the peephole because there's nothing to replace. We only added new facts
+            return null;
+        }
+
+        // True if `a` and `b` are guaranteed to evaluate to the same boolean result: either the
+        // exact same value, or structurally identical icmp instructions (same predicate, and -
+        // respecting commutativity only for eq/ne - the same operands).
+        private static bool AreSameCondition(LLVMValueRef a, LLVMValueRef b)
+        {
+            if (a == b)
+                return true;
+
+            if (!a.Is(LLVMOpcode.LLVMICmp) || !b.Is(LLVMOpcode.LLVMICmp))
+                return false;
+
+            if (a.ICmpPredicate != b.ICmpPredicate)
+                return false;
+
+            bool equalityPair = a.ICmpPredicate is LLVMIntPredicate.LLVMIntEQ or LLVMIntPredicate.LLVMIntNE;
+            return equalityPair
+                ? HasSameCommutativeOperands(a, b)
+                : a.GetOperand(0) == b.GetOperand(0) && a.GetOperand(1) == b.GetOperand(1);
+        }
+
         private static LLVMValueRef GetFirstNonPhiInstruction(LLVMBasicBlockRef block)
         {
             var inst = block.FirstInstruction;
@@ -1986,7 +2096,7 @@ return peephole;
                 return assume;
 
             var ctx = module.GetCtx();
-            var prototype = LLVMTypeRef.CreateFunction(ctx.VoidType, new LLVMTypeRef[] { ctx.Int1Type});
+            var prototype = LLVMTypeRef.CreateFunction(ctx.VoidType, new LLVMTypeRef[] { ctx.Int1Type });
             return module.AddFunction("llvm.assume", prototype);
         }
 

@@ -86,5 +86,10 @@ namespace Dna.LLVMInterop.API.LLVMBindings.IR
         {
             LLVMUtilApi.MakeArgNoAlias(arg);
         }
+
+        public static unsafe bool HasSameSign(LLVMValueRef icmp)
+        {
+            return LLVMUtilApi.HasSameSign(icmp);
+        }
     }
 }

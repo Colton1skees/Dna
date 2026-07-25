@@ -41,5 +41,11 @@ namespace Dna.LLVMInterop.API.LLVMBindings
         [DllImport("Dna.LLVMInterop")]
         public unsafe static extern void AddNoSideEffectAttributes(LLVMOpaqueValue* value);
 
+
+        [DllImport("Dna.LLVMInterop", CallingConvention = CallingConvention.Cdecl)]
+        [return: MarshalAs(UnmanagedType.U1)]
+        public unsafe static extern bool HasSameSign(LLVMOpaqueValue* inst);
+
+
     }
 }
