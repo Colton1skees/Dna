@@ -12,7 +12,7 @@ namespace Dna.LLVMInterop.API.LLVMBindings.Analysis
     public static unsafe class NativeLoopInfoApi
     {
         [DllImport("Dna.LLVMInterop", CallingConvention = CallingConvention.Cdecl, EntryPoint = "LoopInfo_Constructor")]
-        public unsafe static extern LLVMOpaqueLoopInfo* Constructor();
+        public unsafe static extern LLVMOpaqueLoopInfo* Constructor(LLVMValueRef func);
 
         [DllImport("Dna.LLVMInterop", CallingConvention = CallingConvention.Cdecl, EntryPoint = "LoopInfo_GetLoopsInPreorder")]
         public unsafe static extern OpaqueManagedVector<LLVMOpaqueLoop>* GetLoopsInPreOrder(LLVMOpaqueLoopInfo* loopInfo);
@@ -32,5 +32,10 @@ namespace Dna.LLVMInterop.API.LLVMBindings.Analysis
 
         [DllImport("Dna.LLVMInterop", CallingConvention = CallingConvention.Cdecl, EntryPoint = "LoopInfo_GetTopLevelLoops")]
         public unsafe static extern OpaqueManagedVector<LLVMOpaqueLoop>* GetTopLevelLoops(LLVMOpaqueLoopInfo* loopInfo);
+
+
+        [DllImport("Dna.LLVMInterop", CallingConvention = CallingConvention.Cdecl)]
+        [return: MarshalAs(UnmanagedType.U1)]
+        public unsafe static extern bool IsLoopEntryPoint(LLVMOpaqueLoopInfo* loopInfo, LLVMOpaqueValue* phiNode);
     }
 }

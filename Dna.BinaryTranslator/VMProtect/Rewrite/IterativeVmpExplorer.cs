@@ -1,4 +1,5 @@
-﻿using Dna.Binary;
+﻿using Bitwuzla;
+using Dna.Binary;
 using Dna.BinaryTranslator.JmpTables;
 using Dna.BinaryTranslator.Lifting;
 using Dna.BinaryTranslator.Unsafe;
@@ -17,13 +18,20 @@ using Dna.LLVMInterop.API.RegionAnalysis.Wrapper;
 using Dna.LLVMInterop.API.Remill.Arch;
 using Dna.LLVMInterop.API.Remill.BC;
 using Dna.Passes;
+using Dna.Passes.Mba;
 using Dna.Relocation;
 using Dna.SEH;
 using Dna.Utilities;
 using FASTER.core;
 using Iced.Intel;
 using LLVMSharp.Interop;
+using Mba.Common.Ast;
+using Mba.Simplifier;
+using Mba.Simplifier.Bindings;
+using Mba.Simplifier.Utility;
 using Mba.Utility;
+using Microsoft.Msagl.Core.ProjectionSolver;
+using Microsoft.Z3;
 using OneOf.Types;
 using System;
 using System.Collections.Generic;
@@ -34,6 +42,7 @@ using System.Runtime.InteropServices;
 using System.Text;
 using System.Text.RegularExpressions;
 using System.Threading.Tasks;
+using TritonTranslator.Ast;
 using WebAssembly.Instructions;
 using static Dna.BinaryTranslator.VMProtect.VmpJmpTableSolver;
 using static Iced.Intel.AssemblerRegisters;
@@ -252,6 +261,9 @@ namespace Dna.BinaryTranslator.VMProtect.Rewrite
                 Console.WriteLine($"Lifting iteration {ii++} at {sw.ElapsedMilliseconds}ms");
                 Console.WriteLine($"{numFast} / {numFast + numHeavy} solvers finished");
 
+                if (liftedFunction.Handle != 0)
+                    liftedFunction.GlobalParent.PrintToFile("translatedFunction.ll");
+
                 serialize();
 
                 var text = new BinjaVmCfgViewerV2(vCfg).Run(handlerRipToRegisters, handlerToVkey);
@@ -307,7 +319,7 @@ namespace Dna.BinaryTranslator.VMProtect.Rewrite
                     liftedFunction.Handle = 0;
                 }
                 AdhocInstCombinePass.Validate(liftedFunction);
-                liftedFunction = new IterativeCfgBuilder(outModule, arch, stateStruct, vCfg, handlerLifter, vmexitHandlerRips, handlerVips, handlerToVkey, handlerToImagebase, handlerRipToRegisters).Run(liftedFunction, handlers.First());
+                liftedFunction = new IterativeCfgBuilder(dna, outModule, arch, stateStruct, vCfg, handlerLifter, vmexitHandlerRips, handlerVips, handlerToVkey, handlerToImagebase, handlerRipToRegisters).Run(liftedFunction, handlers.First());
                 AdhocInstCombinePass.Validate(liftedFunction);
                 FixMemPtr(liftedFunction.GlobalParent);
 
@@ -643,6 +655,8 @@ namespace Dna.BinaryTranslator.VMProtect.Rewrite
             // Attempt to solve the handler RIPs    
             var solver = new VmpSolver(arch, liftedFunction);
             var ripResult = solver.SolveRIPs(stateStruct);
+            //var solver2 = new VmpSolver2(dna, liftedFunction);
+            //var ripResult = solver2.SolveRIPs(arch, stateStruct);
             if (ripResult is not Ok<Dictionary<ulong, HashSet<ulong>>> dests)
                 return new Err<InvalidOperationException>(ripResult.Err());
 
@@ -1222,6 +1236,8 @@ namespace Dna.BinaryTranslator.VMProtect.Rewrite
 
     public class IterativeCfgBuilder
     {
+        IDna dna;
+
         private readonly LLVMModuleRef module;
 
         private readonly RemillArch arch;
@@ -1240,8 +1256,9 @@ namespace Dna.BinaryTranslator.VMProtect.Rewrite
         private readonly Dictionary<ulong, HandlerData> handlerRipToRegisters;
         private LLVMBuilderRef builder;
 
-        public IterativeCfgBuilder(LLVMModuleRef module, RemillArch arch, VmpParameterizedStateStructure stateStruct, VmCfg vCfg, HandlerLifter handlerCache, IReadOnlySet<ulong> vmexitHandlerRips, Dictionary<VmHandler, RemillRegister> handlerVips, Dictionary<VmHandler, ulong> handlerToVkey, Dictionary<VmHandler, ulong> handlerToVbase, Dictionary<ulong, HandlerData> handlerRipToRegisters)
+        public IterativeCfgBuilder(IDna dna, LLVMModuleRef module, RemillArch arch, VmpParameterizedStateStructure stateStruct, VmCfg vCfg, HandlerLifter handlerCache, IReadOnlySet<ulong> vmexitHandlerRips, Dictionary<VmHandler, RemillRegister> handlerVips, Dictionary<VmHandler, ulong> handlerToVkey, Dictionary<VmHandler, ulong> handlerToVbase, Dictionary<ulong, HandlerData> handlerRipToRegisters)
         {
+            this.dna = dna;
             this.module = module;
             this.arch = arch;
             this.stateStruct = stateStruct;
@@ -1380,10 +1397,12 @@ namespace Dna.BinaryTranslator.VMProtect.Rewrite
                 // In this case the instruction is marked as complete
                 //
                 // In some cases we have a complete block jumping to a complete block, case where edges did not change.
-                var defaultBlock = blockMapping[outgoingAddresses.First()];
+                //var defaultBlock = blockMapping[outgoingAddresses.First()];
+                var defaultBlock = CreateCaseBlock(translatedFunction, destIp, outgoingAddresses.First(), blockMapping);
                 var liftedCases = new HashSet<VmHandler>() { outgoingAddresses.First() };
 
-
+              
+                //builder.PositionAtEnd(caller.InstructionParent);
 
                 var swtch = builder.BuildSwitch(destIp, defaultBlock, (uint)outgoingAddresses.Count);
 
@@ -1393,9 +1412,18 @@ namespace Dna.BinaryTranslator.VMProtect.Rewrite
                         continue;
 
                     liftedCases.Add(target);
+
+                    /*
                     var targetBlock = blockMapping.Single(x => x.Key.BytecodeRip == target.BytecodeRip).Value;
 
                     swtch.AddCase(LLVMValueRef.CreateConstInt(module.Context.Int64Type, target.BytecodeRip), targetBlock);
+                    */
+
+                    var targetHandler = blockMapping.Single(x => x.Key.BytecodeRip == target.BytecodeRip).Key;
+                    var targetBlock = CreateCaseBlock(translatedFunction, destIp, targetHandler, blockMapping);
+
+                    var key = LLVMValueRef.CreateConstInt(module.Context.Int64Type, target.BytecodeRip);
+                    swtch.AddCase(key, targetBlock);
                 }
 
                 LLVMUtil.SplitBlockAt(caller.InstructionParent, caller, "split", true);
@@ -1518,6 +1546,61 @@ namespace Dna.BinaryTranslator.VMProtect.Rewrite
                         }
 
                     }
+
+                    if (handlerToVbase.TryGetValue(handler, out var existing3))
+                    {
+                        var incomingBaseReg = regInfo.ImgBaseReg;
+
+                        if (incomingBaseReg == null)
+                        {
+                            //Console.WriteLine($"Failed to concretize vkey for handler: {handler.NativeRip}");
+                        }
+
+                        else
+                        {
+                            var vkeyConst = LLVMValueRef.CreateConstInt(LLVMTypeRef.Int64, existing3);
+                            var index = stateStruct.RegisterArgumentIndices[incomingBaseReg];
+                            liftedHandler.GetParam((uint)index).ReplaceAllUsesWith(vkeyConst);
+                        }   
+
+                    }
+
+
+                    /*
+                    var func = module.GetNamedFunction("SaveUnknown");
+                    if (func.Handle == 0)
+                    {
+                        var prototype = LLVMTypeRef.CreateFunction(LLVMTypeRef.Void, new[] { LLVMTypeRef.Int64 });
+                        func = module.AddFunction("SaveUnknown", prototype);
+                        LLVMUtilApi.AddNoSideEffectAttributes(func);
+                    }
+                   
+                    Console.WriteLine($"Visiting at {liftedHandler.Name}\n");
+                    Console.WriteLine($"\n\n");
+                    //VmpPassPipeline.Run(dna.Binary, liftedHandler);
+                    for (int i = 0; i < 5; i++)
+                    {
+                        liftedHandler.GlobalParent.PrintToFile("translatedFunction.ll");
+
+                        var storeToLoad = new CombinedFixedpointOptPass(dna.Binary, new FixedpointPassConfig());
+                        var pStoreToLoad = Marshal.GetFunctionPointerForDelegate(storeToLoad.PtrToStoreLoadPropagation);
+                        OptimizationApi.OptimizeModuleVmp(liftedHandler.GlobalParent, liftedHandler, false, false, 0, false, 0, false, false, 0, pStoreToLoad, 0, 0, fastPipeline: true);
+                    }
+
+                    if (liftedHandler.GetInstructions().Any(x => x.Is(LLVMOpcode.LLVMCall) && (x.ToString().Contains("bswap") || x.ToString().Contains("fshl"))))
+                    {
+
+                        var tgtLoad = liftedHandler.GetInstructions().First(x => x.Is(LLVMOpcode.LLVMLoad) && x.GetOperand(0).Is(LLVMOpcode.LLVMGetElementPtr));
+
+                        liftedHandler.GlobalParent.PrintToFile("translatedFunction.ll");
+                        var temp = LLVMBuilderRef.Create(module.GetCtx());
+                        temp.PositionBefore(tgtLoad.NextInstruction);
+                        var call2 = temp.BuildCall2(func.GetFunctionPrototype(), func, new LLVMValueRef[] { tgtLoad });
+
+                        Debugger.Break();
+                    }
+                    */
+
                 }
 
                 var getSaveVip = () =>
@@ -1537,7 +1620,7 @@ namespace Dna.BinaryTranslator.VMProtect.Rewrite
 
                 var call = VmPartialBlockLifter.CallVmHandler(builder, function, liftedHandler, registerAllocaMapping, stateStruct);
 
-                bool dbgIntrins = true;
+                bool dbgIntrins = false;
 
 
                 builder.PositionBefore(call);
@@ -1613,6 +1696,23 @@ namespace Dna.BinaryTranslator.VMProtect.Rewrite
             return blockMapping;
         }
 
+        private static LLVMBasicBlockRef CreateCaseBlock(LLVMValueRef func, LLVMValueRef bytecodePtr, VmHandler handler, Dictionary<VmHandler, LLVMBasicBlockRef> blockMapping)
+        {
+            var module = func.GlobalParent;
+            var builder = LLVMBuilderRef.Create(func.GetFunctionCtx());
+            var assumeBlock = func.AppendBasicBlock($"{handler.BytecodeRip.ToString("X")}_assumption");
+            builder.PositionAtEnd(assumeBlock);
+
+            var key = LLVMValueRef.CreateConstInt(module.Context.Int64Type, handler.BytecodeRip);
+            var assumedCond = builder.BuildICmp(LLVMIntPredicate.LLVMIntEQ, bytecodePtr, key);
+
+            var assumeFn = GetAssumeIntrinsic(assumeBlock.Parent.GlobalParent);
+            var call = builder.BuildCall2(assumeFn.GetFunctionPrototype(), assumeFn, new LLVMValueRef[] { assumedCond });
+
+            builder.BuildBr(blockMapping[handler]);
+            return assumeBlock;
+        }
+
         private void LiftInstEdges(VmHandler handler, LLVMValueRef function, LLVMBasicBlockRef exitBlock, Dictionary<VmHandler, LLVMBasicBlockRef> blockMapping, IReadOnlyDictionary<RemillRegister, LLVMValueRef> registerAllocaMapping)
         {
             var llvmBlock = blockMapping[handler];
@@ -1636,6 +1736,13 @@ namespace Dna.BinaryTranslator.VMProtect.Rewrite
             var liftedCases = new HashSet<VmHandler>();
             LLVMBasicBlockRef defaultBlock = null;
             var outgoingAddresses = info.Successors.OrderBy(x => x).ToList();
+            builder.PositionAtEnd(llvmBlock);
+
+            var none = vCfg.Instructions[handler].Successors.Count == 0;
+            var bytecodeRegister = none ? null : vCfg.Instructions[handler].Successors.Select(x => handlerRipToRegisters[x.NativeRip].Vip).Distinct().Single();
+            var indirectPc = none ? null : VmCfgLifter.LoadBytecodePointer(builder, bytecodeRegister, registerAllocaMapping);
+
+
             // If the jump table is considered incomplete(we know some edges but potentially not all), then we lift the jump table as a switch statement
             // where the known values get their own 'case', and the default case points to an remill_jump intrinsic.
             if (!isComplete)
@@ -1653,23 +1760,20 @@ namespace Dna.BinaryTranslator.VMProtect.Rewrite
             // then we make the default case for the jump table point to a randomly selected(first) jump table outgoing block.
             else
             {
-                defaultBlock = blockMapping[outgoingAddresses.First()];
+                defaultBlock = CreateCaseBlock(function, indirectPc, outgoingAddresses.First(), blockMapping);
                 liftedCases.Add(outgoingAddresses.First());
             }
 
 
             // If no edges are known, jump to the default block
-            builder.PositionAtEnd(llvmBlock);
-            if (vCfg.Instructions[handler].Successors.Count == 0)
+            if (none)
             {
                 builder.BuildBr(defaultBlock);
                 return;
             }
 
             //var bytecodeRegister = handlerVips[handler];
-            var bytecodeRegister = vCfg.Instructions[handler].Successors.Select(x => handlerRipToRegisters[x.NativeRip].Vip).Distinct().Single();
-            var indirectPc = VmCfgLifter.LoadBytecodePointer(builder, bytecodeRegister, registerAllocaMapping);
-
+            builder.PositionAtEnd(llvmBlock);
             var swtch = builder.BuildSwitch(indirectPc, defaultBlock, (uint)outgoingAddresses.Count);
 
             foreach (var target in outgoingAddresses)
@@ -1678,10 +1782,36 @@ namespace Dna.BinaryTranslator.VMProtect.Rewrite
                     continue;
 
                 liftedCases.Add(target);
-                var targetBlock = blockMapping.Single(x => x.Key.BytecodeRip == target.BytecodeRip).Value;
+                //var targetBlock = blockMapping.Single(x => x.Key.BytecodeRip == target.BytecodeRip).Value;
+                var targetHandler = blockMapping.Single(x => x.Key.BytecodeRip == target.BytecodeRip).Key;
+                var targetBlock = CreateCaseBlock(function, indirectPc, targetHandler, blockMapping);
 
-                swtch.AddCase(LLVMValueRef.CreateConstInt(module.Context.Int64Type, target.BytecodeRip), targetBlock);
+                var key = LLVMValueRef.CreateConstInt(module.Context.Int64Type, target.BytecodeRip);
+                swtch.AddCase(key, targetBlock);
+
+
             }
+        }
+
+        private static LLVMValueRef GetFirstNonPhiInstruction(LLVMBasicBlockRef block)
+        {
+            var inst = block.FirstInstruction;
+            while (inst.Handle != 0 && inst.Is(LLVMOpcode.LLVMPHI))
+                inst = inst.NextInstruction;
+
+            return inst;
+        }
+
+
+        private static LLVMValueRef GetAssumeIntrinsic(LLVMModuleRef module)
+        {
+            var assume = module.GetNamedFunction("llvm.assume");
+            if (assume.Handle != 0)
+                return assume;
+
+            var ctx = module.GetCtx();
+            var prototype = LLVMTypeRef.CreateFunction(ctx.VoidType, new LLVMTypeRef[] { ctx.Int1Type });
+            return module.AddFunction("llvm.assume", prototype);
         }
 
 
@@ -1799,6 +1929,8 @@ namespace Dna.BinaryTranslator.VMProtect.Rewrite
 
             var cfg = HandlerLifter.DisHandler(dna, handlerRip);
 
+            //if (cfg.GetInstructions().Any(x => x.ToString().Contains("pushfq")))
+            //    Debugger.Break();
 
 
             var scopeTable = IterativeFunctionTranslator.GetScopeTable(dna.Binary, handlerRip);
@@ -2153,6 +2285,354 @@ namespace Dna.BinaryTranslator.VMProtect.Rewrite
 
     public record JmpTablesWithHandlerRips2(IReadOnlyList<VmpJmpTable> Tables, IReadOnlyDictionary<ulong, (ulong rip, ulong? vkey, ulong? vbase)> bytecodePtrToRip);
 
+    // VMP solver but using bitwuzla
+    public class VmpSolver2
+    {
+        private readonly IDna dna;
+        private readonly LLVMValueRef func;
+
+        private readonly MbaDeobfuscationPass converter;
+
+        private readonly BitwuzlaTranslator translator;
+
+        public TermManager Tm => translator.z3Ctx;
+
+        private readonly AstCtx ctx;
+
+
+        public VmpSolver2(IDna dna, LLVMValueRef func)
+        {
+            this.dna = dna;
+            this.func = func;
+            converter = new(func);
+            translator = new(converter.ctx);
+            AstIdx.ctx = converter.ctx;
+            ctx = converter.ctx;
+        }
+
+        public Result<Dictionary<ulong, HashSet<ulong>>, InvalidOperationException> SolveRIPs(RemillArch arch, VmpParameterizedStateStructure stateStruct)
+        {
+            var target = VmpSolver.GetBranchIntrinsic(func.GlobalParent);
+            if (target.Handle == 0)
+                return new Err<InvalidOperationException>(new InvalidOperationException("No jump tables to solve"));
+
+
+            var calls = RemillUtils.CallersOf(target);
+            var ripIndex = (uint)stateStruct.RegisterArgumentIndices[arch.GetRegisterByName(arch.ProgramCounterRegisterName)];
+
+            var output = new Dictionary<ulong, HashSet<ulong>>();
+            foreach (var call in calls)
+            {
+                var jmpFromVip = call.GetOperand((uint)call.OperandCount - 2);
+                if (jmpFromVip.Kind != LLVMValueKind.LLVMConstantIntValueKind)
+                    throw new InvalidOperationException($"Jumping from unknown VIP {jmpFromVip}");
+
+                var rips = new HashSet<ulong>();
+                var rip = call.GetOperand(ripIndex);
+                if (rip.Kind == LLVMValueKind.LLVMConstantIntValueKind)
+                {
+                    rips.Add(rip.ConstIntZExt);
+                }
+
+                else if (rip.Kind == LLVMValueKind.LLVMInstructionValueKind && rip.InstructionOpcode == LLVMOpcode.LLVMSelect)
+                {
+                    var constants = new LLVMValueRef[] { rip.GetOperand(1), rip.GetOperand(2) };
+                    if (!constants.All(x => x.Kind == LLVMValueKind.LLVMConstantIntValueKind))
+                        return new Err<InvalidOperationException>(new InvalidOperationException($"Cannot solve RIP for {rip}"));
+                    rips.AddRange(constants.Select(x => x.ConstIntZExt));
+                }
+
+                else
+                {
+                    var solutions = SolveVip(func, rip);
+                    rips.AddRange(solutions);
+                }
+
+
+                output.TryAdd(jmpFromVip.ConstIntZExt, new());
+                output[jmpFromVip.ConstIntZExt].AddRange(rips);
+
+            }
+
+            return new Ok<Dictionary<ulong, HashSet<ulong>>>(output);
+        }
+
+
+        public void Simplify(LLVMValueRef func)
+        {
+            File.WriteAllText("llvmconstraints.py", new LLVMToBinjaGraph(func).Process());
+            var li = new LoopInfo(func);
+
+
+            List<AstIdx> toVisit = new();
+            var targets = MbaDeobfuscationPass.GetTargets(func);
+            foreach (var target in func.GetInstructions())
+                toVisit.Add(converter.GetAst(target));
+
+            int simplCount = 0;
+
+            foreach (var block in converter.defMap.Where(x => x.Key.Is(LLVMValueKind.LLVMInstructionValueKind)).Select(x => x.Key.InstructionParent))
+                Visit(li, block);
+
+            List<(AstIdx, LLVMValueRef) > simplifications = new();
+            foreach(var (value, idx) in converter.defMap)
+            {
+                if (value.ToString().Contains("%local_state_struct.sroa.229.2328.extract.trunc.i.i ="))
+                    Debugger.Break();
+                //if (ctx.GetCost(idx) < 5)
+                if (false)
+                {
+                    Console.WriteLine($"Skipping {idx}");
+                    continue;
+                }
+
+                var cost = ctx.GetCost(idx);
+
+                if (ctx.GetWidth(idx) <= 0)
+                    continue;
+                Console.WriteLine($"Visiting {idx}");
+
+                var translated = translator.Translate(idx);
+
+                var tempSolver = MkSolver(1000);
+                if (!value.Is(LLVMValueKind.LLVMInstructionValueKind))
+                    continue;
+
+                var blockInfo = Visit(li, value.InstructionParent);
+                //continue;
+
+                var cond = translator.Translate(blockInfo.assumptions);
+                cond = Tm.MkIte(cond == 1, Tm.MkTrue(), Tm.MkFalse());
+                cond = tempSolver.Simplify(cond);
+                tempSolver.Assert(cond);
+                
+
+                var solutions = EnumerateSolutions(tempSolver, translated, 3);
+                if (solutions.Count != 1)
+                    continue;
+
+                var constInt = LLVMValueRef.CreateConstInt(LLVMTypeRef.CreateInt(ctx.GetWidth(idx)), solutions.First());
+                value.ReplaceAllUsesWith(constInt);
+                //Debugger.Break();
+                simplCount++;
+                simplifications.Add((idx, constInt));
+            }
+
+
+            Console.WriteLine($"Found {simplCount} simplifications");
+            Debugger.Break();
+        }
+
+        public record BlockInfo
+        {
+            // BlockPC varirable to specify which predecessor is true
+            // This is an index variable specifying which predecessor was taken
+            public AstIdx predSelector;
+
+            // Assumptions that hold if this block is reached
+            public AstIdx assumptions;
+        }
+
+        Dictionary<LLVMBasicBlockRef, BlockInfo> BlockMap = new();
+
+        public BlockInfo Visit(LoopInfo loopInfo, LLVMBasicBlockRef block)
+        {
+            // Return the existing info if we've already computed it
+            if (BlockMap.TryGetValue(block, out var existing))
+                return existing;
+
+            var preds = block.GetPredecessors().ToList();
+            var info = new BlockInfo();
+            info.predSelector = ctx.Symbol($"pc{BlockMap.Count}", 8);
+            info.assumptions = ctx.ICmp(Predicate.Ule, info.predSelector, ctx.Constant(preds.Count == 0 ? 0 : (ulong)preds.Count - 1, 8));
+            BlockMap[block] = info;
+
+            // Stop collecting constraints if this is a loop header.
+            if (loopInfo.IsLoopHeader(block))
+                return info;
+
+            List<AstIdx> assumptions = new();
+            assumptions.Add(ctx.True());
+            for(var i = 0; i < preds.Count; i++)
+            {
+                var pred = preds[i];
+                var predInfo = Visit(loopInfo, pred);
+
+                var getImplication = (AstIdx cond) =>
+                {
+                    // Imply the path constraints of the predecessor
+                    cond = ctx.And(cond, predInfo.assumptions);
+
+                    // If the ith predecessor was taken, apply the condition.
+                    assumptions.Add(Implies(ctx.ICmp(Predicate.Eq, info.predSelector, ctx.Constant((ulong)i, 8)), cond));
+                };
+
+                // If it's an unconditional branch, forward the constraints of the predecessor.
+                var term = pred.LastInstruction;
+                if (term.Is(LLVMOpcode.LLVMBr) && term.OperandCount == 1)
+                {
+                    getImplication(ctx.Constant(1, 1));
+                }
+
+                else if (term.Is(LLVMOpcode.LLVMBr) && term.OperandCount == 3)
+                {
+                    // If this block is the false destination, we need to invert the condition.
+                    var cond = converter.GetAst(term.GetOperand(0));
+                    var trueBlock = term.GetOperand(2).AsBasicBlock();
+                    var falseBlock = term.GetOperand(1).AsBasicBlock();
+                    if (block != trueBlock)
+                        cond = ctx.Neg(cond);
+                    Debug.Assert(trueBlock != falseBlock);
+
+                    // Add the implication
+                    getImplication(cond);
+                }
+
+                else if (term.Is(LLVMOpcode.LLVMSwitch))
+                {
+                    throw new InvalidOperationException();
+                }
+
+                else
+                {
+                    Debugger.Break();
+                }
+            }
+
+            // Assert that a valid predecessor must be chosen.
+            assumptions.Add(ctx.ICmp(Predicate.Ule, info.predSelector, ctx.Constant((ulong)preds.Count - 1, 8)));
+
+            foreach(var phi in block.GetInstructions().Where(x => x.Is(LLVMOpcode.LLVMPHI)))
+            {
+                // TODO: Handle PHIs
+                //Debugger.Break();
+            }
+
+            // Create the assumptions that are true when this block is taken.
+            // It's implemented as and AND of implications.
+            info.assumptions = ctx.And(assumptions);
+            return info;
+        }
+
+        private AstIdx Implies(AstIdx a, AstIdx b)
+        {
+            return ctx.Or(ctx.Neg(a), b);
+        }
+
+        public HashSet<ulong> SolveVip(LLVMValueRef func, LLVMValueRef value)
+        {
+            func.GlobalParent.PrintToFile("translatedFunction.ll");
+            var ast = converter.GetAst(value);
+            var inputVars = ctx.CollectVariables(ast);
+            var loadIndices = inputVars.Where(x => converter.inverseSubstMap[x].Is(LLVMOpcode.LLVMLoad)).ToList();
+            if (!loadIndices.Any())
+                throw new InvalidOperationException();
+
+            var loadIdx = loadIndices.Single();
+            var loadInst = converter.inverseSubstMap[loadIdx];
+            var loadNode = translator.Translate(loadIdx);
+            var gep = loadInst.GetOperand(0);
+            if (!gep.Is(LLVMOpcode.LLVMGetElementPtr))
+                throw new InvalidOperationException();
+
+            var gepInst = gep.GetOperand(1);
+            var gepIdx = converter.GetAst(gepInst);
+            var translated = translator.Translate(gepIdx);
+
+
+            // Need to associate addresses with their values. VMProtect does math directly over the pointers
+            var solver = MkSolver();
+            var gepSolutions = EnumerateSolutions(MkSolver(), translated).ToList();
+            HashSet<ulong> solutions = new();
+            for (var i = 0; i < gepSolutions.Count; i++)
+            {
+                var deref = BinaryContentsReader.Dereference(dna.Binary, gepSolutions[i], loadInst.TypeOf.IntWidth);
+                solver.Assert(Tm.MkImplies(translated == gepSolutions[i], loadNode == deref));
+                solutions.Add(deref);
+            }
+            //var solutions = DereferenceAddresses(gepSolutions, loadInst.TypeOf.IntWidth);
+          
+            var constraint = ConstrainValues(translator.Translate(loadIdx), solutions);
+            solver.Assert(constraint);
+
+            var results = EnumerateSolutions(solver, translator.Translate(ast));
+
+            return results;
+        }
+
+
+        /// <summary>
+        /// Given a set of jump table solutions(aka &jumpTable[index]), return the set of dereferenced values.
+        /// </summary>
+        private IReadOnlyList<ulong> DereferenceAddresses(IReadOnlyList<ulong> addresses, uint bitWidth)
+            => addresses.Select(x => BinaryContentsReader.Dereference(dna.Binary, x, bitWidth)).ToList().AsReadOnly();
+
+        private BvSolver MkSolver(int timeout = 200)
+        {
+            var options = new Options();
+            options.Set(BitwuzlaOption.BITWUZLA_OPT_PRODUCE_MODELS, true);
+            options.Set(BitwuzlaOption.BITWUZLA_OPT_TIME_LIMIT_PER, 200);
+            var solver = new BvSolver(Tm, options);
+            return solver;
+        }
+
+        private HashSet<ulong> EnumerateSolutions(
+        BvSolver solver,
+        Term translated,
+        uint? max = null)
+        {
+            if (!translated.Sort.IsBv)
+                throw new ArgumentException("The enumerated term must be a bit-vector.", nameof(translated));
+
+            if (translated.Sort.BvSize > 64)
+                throw new NotSupportedException(
+                    "Enumerating bit-vectors wider than 64 bits requires a wider result type.");
+
+            var values = new HashSet<ulong>();
+
+            while (!max.HasValue || (ulong)values.Count < max.Value)
+            {
+                switch (solver.CheckSat())
+                {
+                    case Result.Unsat:
+                        return values;
+
+                    case Result.Unknown:
+                        throw new InvalidOperationException(
+                            "Bitwuzla returned Unknown before solution enumeration completed.");
+
+                    case Result.Sat:
+                        var modelValue = Tm.GetIntegerValue(solver.GetValue(translated));
+
+                        if (!values.Add(modelValue))
+                        {
+                            throw new InvalidOperationException(
+                                "Bitwuzla returned a value that was already blocked.");
+                        }
+
+                        // Exclude this value while allowing any assignment to other
+                        // variables that produces a different value for translated.
+                        solver.Assert(translated != modelValue);
+                        break;
+
+                    default:
+                        throw new InvalidOperationException(
+                            "Bitwuzla returned an unrecognized result.");
+                }
+            }
+
+            return values;
+        }
+
+        private Term ConstrainValues(Term variable, IEnumerable<ulong> values)
+        {
+            var initial = Tm.MkFalse();
+            foreach (var v in values)
+                initial |= (variable == v);
+            return initial;
+        }
+    }
+
     public class VmpSolver
     {
         private readonly RemillArch arch;
@@ -2168,7 +2648,7 @@ namespace Dna.BinaryTranslator.VMProtect.Rewrite
         // For each bytecode RIP, collect a set of unique handler RIPs it can branch to
         public Result<Dictionary<ulong, HashSet<ulong>>, InvalidOperationException> SolveRIPs(VmpParameterizedStateStructure stateStruct)
         {
-            var target = GetBranchIntrinsic();
+            var target = GetBranchIntrinsic(function.GlobalParent);
             if (target.Handle == 0)
                 return new Err<InvalidOperationException>(new InvalidOperationException("No jump tables to solve"));
 
@@ -2213,7 +2693,7 @@ namespace Dna.BinaryTranslator.VMProtect.Rewrite
 
         public Result<JmpTablesWithHandlerRips2, InvalidOperationException> Solve(Dictionary<ulong, HandlerData> handlerRipToRegisters, VmpParameterizedStateStructure stateStructure)
         {
-            var targetFunc = GetBranchIntrinsic();
+            var targetFunc = GetBranchIntrinsic(function.GlobalParent);
             if (targetFunc.Handle == 0)
             {
                 function.GlobalParent.PrintToFile(ArtifactPaths.Resolve("translatedFunction.ll"));
@@ -2439,8 +2919,8 @@ namespace Dna.BinaryTranslator.VMProtect.Rewrite
             return true;
         }
 
-        private LLVMValueRef GetBranchIntrinsic()
-            => function.GlobalParent.GetFunctions().SingleOrDefault(x => x.Name.Contains("vmp_branch"));
+        public static LLVMValueRef GetBranchIntrinsic(LLVMModuleRef module)
+            => module.GetFunctions().SingleOrDefault(x => x.Name.Contains("vmp_branch"));
     }
 
     // TODO: Implement check. Is vip/vkey solvable, bail if early

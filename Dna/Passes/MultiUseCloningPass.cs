@@ -179,6 +179,8 @@ namespace Dna.Passes
 
         public static bool Run(LLVMValueRef function)
         {
+            //Console.WriteLine("Skipping multi-use cloning!");
+            //return false;
             return Run3(function);
             //return Run2(function);
             //return MbaDeobfuscationPass.Run(function);

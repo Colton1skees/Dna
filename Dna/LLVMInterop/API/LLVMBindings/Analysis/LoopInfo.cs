@@ -17,9 +17,9 @@ namespace Dna.LLVMInterop.API.LLVMBindings.Analysis
 
         public IReadOnlyList<Loop> TopLevelLoops => GetTopLevelLoops();
 
-        public unsafe LoopInfo()
+        public unsafe LoopInfo(LLVMValueRef func)
         {
-            Handle = (nint)NativeLoopInfoApi.Constructor();
+            Handle = (nint)NativeLoopInfoApi.Constructor(func);
         }
 
         public LoopInfo(nint handle)
@@ -75,6 +75,9 @@ namespace Dna.LLVMInterop.API.LLVMBindings.Analysis
             // Return the read only list.
             return managedVec.Items;
         }
+
+
+        public unsafe bool IsLoopEntrypoint(LLVMValueRef phiNode) => NativeLoopInfoApi.IsLoopEntryPoint(this, phiNode);
 
         public unsafe static implicit operator LLVMOpaqueLoopInfo*(LoopInfo pass)
         {

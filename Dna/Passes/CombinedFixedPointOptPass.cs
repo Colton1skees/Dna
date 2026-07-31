@@ -655,7 +655,7 @@ namespace Dna.Passes
 
 
 
-            var repl = ProcessBinaryLoad(loadInst);
+            var repl = ProcessBinaryLoad(loadInst, updater);
             if (repl != null)
             {
                 return repl;
@@ -1035,7 +1035,7 @@ namespace Dna.Passes
             return peephole;
         }
 
-        private PeepholeResult ProcessBinaryLoad(LLVMValueRef loadInst)
+        private PeepholeResult ProcessBinaryLoad(LLVMValueRef loadInst, MemorySSAUpdater updater)
         {
             // Type check
             if (loadInst.TypeOf.Kind != LLVMTypeKind.LLVMIntegerTypeKind)
@@ -1048,7 +1048,7 @@ namespace Dna.Passes
 
             // If this is not a binary section access, do a last-ditch attempt with a load-of-select.
             if (!BinaryAccessMatcher.IsConstantWithinBinarySection(bin, gep.GetOperand(1)))
-                return TryProcessAsLoadOfTwoPossibleAddresses(gep, loadInst);
+                return TryProcessAsLoadOfTwoPossibleAddresses(gep, loadInst, updater);
 
             //Console.WriteLine(gep);
 
@@ -1088,7 +1088,7 @@ namespace Dna.Passes
             return peephole;
         }
 
-        private PeepholeResult TryProcessAsLoadOfTwoPossibleAddresses(LLVMValueRef gep, LLVMValueRef loadInst)
+        private PeepholeResult TryProcessAsLoadOfTwoPossibleAddresses(LLVMValueRef gep, LLVMValueRef loadInst, MemorySSAUpdater updater)
         {
             // If this is not a select, return.
             var selectPtr = gep.GetOperand(1);
@@ -1110,6 +1110,22 @@ namespace Dna.Passes
             var gep2 = builder.BuildGEP2(ptrTy, gep.GetOperand(0), new LLVMValueRef[] { op2 });
             var load1 = builder.BuildLoad2(loadInst.TypeOf, gep1);
             var load2 = builder.BuildLoad2(loadInst.TypeOf, gep2);
+
+
+            // Update MSSA to be aware of the second load.
+            // Note that we set the insert point to be right before the original load.
+            var insertPoint2 = mssa.GetMemoryAccess(loadInst);
+            var mssaLoad2 = updater.CreateMemoryAccessBefore(load2, null, insertPoint2);
+            updater.InsertUse(mssaLoad2, false);
+
+
+            // Update MSSA to be aware of the first load.
+            // Note that because the loads are in the order of "load1, load2, original" (and we only have the createbefore api implemented),
+            // we set the insert point of the first load to be before the second load.
+            var insertPoint1 = mssa.GetMemoryAccess(load2);
+            var mssaLoad1 = updater.CreateMemoryAccessBefore(load1, null, insertPoint1);
+            updater.InsertUse(mssaLoad1, false);
+
 
             var select = builder.BuildSelect(selectPtr.GetOperand(0), load1, load2);
             peephole.Add(gep1, gep2, load1, load2, select);

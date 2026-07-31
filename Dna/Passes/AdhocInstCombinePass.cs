@@ -166,6 +166,12 @@ namespace Dna.Passes
             if (changed != null)
                 return changed;
 
+            changed = TryFoldConstantGepChain(inst);
+            if (changed != null)
+                return changed;
+
+
+            //return null;
 
             /*
             if (opc == LLVMOpcode.LLVMShl || opc == LLVMOpcode.LLVMAShr || opc == LLVMOpcode.LLVMShl)
@@ -291,6 +297,7 @@ namespace Dna.Passes
             if (changed != null)
                 return changed;
 
+            /*
             changed = TryCreateBranchAssumptions(domTree, inst);
             if (changed != null)
                 return changed;
@@ -299,6 +306,7 @@ namespace Dna.Passes
             changed = TryCreateBranchAssumptions2(domTree, inst);
             if (changed != null)
                 return changed;
+            */
 
             return changed;
 
@@ -315,6 +323,40 @@ namespace Dna.Passes
 
 
             return null;
+        }
+
+        private unsafe PeepholeResult TryFoldConstantGepChain(LLVMValueRef inst)
+        {
+            if (!inst.Is(LLVMOpcode.LLVMGetElementPtr) || inst.OperandCount != 2)
+                return null;
+
+            var innerGep = inst.GetOperand(0);
+            if (!innerGep.Is(LLVMOpcode.LLVMGetElementPtr) || innerGep.OperandCount != 2)
+                return null;
+
+            var outerIndex = inst.GetOperand(1);
+            var innerIndex = innerGep.GetOperand(1);
+            if (outerIndex.Kind != LLVMValueKind.LLVMConstantIntValueKind ||
+                innerIndex.Kind != LLVMValueKind.LLVMConstantIntValueKind ||
+                outerIndex.TypeOf.Handle != innerIndex.TypeOf.Handle)
+                return null;
+
+            var outerElementType = new LLVMTypeRef((IntPtr)LLVM.GetGEPSourceElementType(inst));
+            var innerElementType = new LLVMTypeRef((IntPtr)LLVM.GetGEPSourceElementType(innerGep));
+  
+            var combinedIndex = LLVMValueRef.CreateConstInt(
+                outerIndex.TypeOf,
+                unchecked(innerIndex.ConstIntZExt + outerIndex.ConstIntZExt));
+
+            builder.PositionBefore(inst);
+            var isInBounds = LLVM.IsInBounds(inst) != 0 && LLVM.IsInBounds(innerGep) != 0;
+            var replacement = isInBounds
+                ? builder.BuildInBoundsGEP2(outerElementType, innerGep.GetOperand(0), new[] { combinedIndex })
+                : builder.BuildGEP2(outerElementType, innerGep.GetOperand(0), new[] { combinedIndex });
+
+            var peephole = new PeepholeResult();
+            peephole.Add(replacement);
+            return peephole;
         }
 
         private static readonly LLVMOpcode[] UnaryOpcodes = { LLVMOpcode.LLVMTrunc, LLVMOpcode.LLVMZExt, LLVMOpcode.LLVMSExt, LLVMOpcode.LLVMCall };

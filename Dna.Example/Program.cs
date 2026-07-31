@@ -58,7 +58,7 @@ using Dna.Passes.Mba;
 using Mba.Simplifier.DSL;
 using Dna.BinaryTranslator.VMProtect.Rewrite;
 
-
+/*
 bool genDsl = false;
 if (genDsl)
 {
@@ -67,6 +67,7 @@ if (genDsl)
     backend.Generate();
     Debugger.Break();
 }
+*/
 
 // Regrettably, install some runtime hooks to fix some FFI issues w/ LLVMSharp
 //LazyLLVMFixes.InstallModuleToStringBugFix(RemillUtils.LLVMModuleToString);
@@ -77,7 +78,7 @@ if (genDsl)
 bool dbgCode = true;
 if (dbgCode)
 {
-    var irPath = "C:\\Users\\user\\Downloads\\1100_or_something.ll";
+    var irPath = "C:\\Users\\user\\Downloads\\test4.ll";
     var t = File.ReadAllText(irPath);
     Console.WriteLine(irPath);
 
@@ -124,15 +125,22 @@ if (dbgCode)
         var vmpDna = new Dna.Dna(vmpBin);
 
 
+        //new VmpSolver2(vmpDna, existingFunc).SolveVip(existingFunc, existingFunc.GetInstructions().Single(x => x.ToString().Contains("%add.i.i125.i.i.i = a")));
+        new VmpSolver2(vmpDna, existingFunc).Simplify(existingFunc);
+
+        //MbaDeobfuscationPass.Run(existingFunc);
+
+
         //MbaDeobfuscationPass.Run(existingFunc);
         tempNewMod.PrintToFile(("translatedFunction.ll"));
         while (true)
         {
             var sw2 = Stopwatch.StartNew();
-            for (int i = 0; i < 11; i++)
+            for (int i = 0; i < 3; i++)
             {
                 PassPipeline.Run(vmpBin, existingFunc, false, true, true);
                 PassPipeline.Run(vmpBin, existingFunc, false, false, false);
+                //new VmpSolver2(vmpDna, existingFunc).Simplify(existingFunc);
             }
             sw2.Stop();
             tempNewMod.PrintToFile(("translatedFunction.ll"));
@@ -146,9 +154,13 @@ if (dbgCode)
             //new AdhocInstCombinePass().InstCombine((LLVMOpaqueValue*)existingFunc.Handle, 0, 0, 0);
         }
         //MbaDeobfuscationPass.Run(existingFunc);
+
+        //MbaDeobfuscationPass.Run(existingFunc);
         tempNewMod.PrintToFile(("translatedFunction.ll"));
         PassPipeline.Run(vmpBin, existingFunc, false, false, fastPipeline: false);
         //  PassPipeline.Run(vmpBin, existingFunc);
+
+
 
         tempNewMod.PrintToFile("instcombine.ll");
 
@@ -420,7 +432,7 @@ if(prototypeBounds)
     fromFile.PrintToFile(ArtifactPaths.Resolve("nolshr.ll"));
 
 
-    var loopInfo = new LoopInfo();
+    var loopInfo = new LoopInfo(fromFunc);
     var slicer = new SymbolicExpressionSlicer(sliceBlk.AsValue(), toSlice, loopInfo, null);
 
     var possiblyBoundedIndex = slicer.GetDefinition(toSlice);
