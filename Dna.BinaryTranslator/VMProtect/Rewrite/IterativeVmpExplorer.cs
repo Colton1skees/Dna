@@ -2357,15 +2357,35 @@ namespace Dna.BinaryTranslator.VMProtect.Rewrite
             return new Ok<Dictionary<ulong, HashSet<ulong>>>(output);
         }
 
+        public IReadOnlySet<LLVMValueRef> GetVmpTargets(LLVMValueRef func)
+        {
+            HashSet<LLVMValueRef> targets = new();
+            foreach(var inst in func.GetInstructions())
+            {
+                if (inst.Is(LLVMOpcode.LLVMGetElementPtr))
+                {
+                    targets.AddRange(inst.GetOperands().Where(x => MbaDeobfuscationPass.IsValidIntegerInst(x)));
+                    continue;
+                }
 
+                if (inst.Is(LLVMOpcode.LLVMCall) && inst.GetCallInstTarget().Name == "vmp_branch")
+                {
+                    targets.AddRange(inst.GetOperands().Where(x => MbaDeobfuscationPass.IsValidIntegerInst(x)));
+                    continue;
+                }
+            }
+
+            return targets;
+        }
         public void Simplify(LLVMValueRef func)
         {
             File.WriteAllText("llvmconstraints.py", new LLVMToBinjaGraph(func).Process());
             var li = new LoopInfo(func);
-
+            var dt = new DominatorTree(func);
 
             List<AstIdx> toVisit = new();
-            var targets = MbaDeobfuscationPass.GetTargets(func);
+            //var targets = MbaDeobfuscationPass.GetTargets(func);
+            var targets = GetVmpTargets(func);
             foreach (var target in func.GetInstructions())
                 toVisit.Add(converter.GetAst(target));
 
@@ -2374,53 +2394,96 @@ namespace Dna.BinaryTranslator.VMProtect.Rewrite
             foreach (var block in converter.defMap.Where(x => x.Key.Is(LLVMValueKind.LLVMInstructionValueKind)).Select(x => x.Key.InstructionParent))
                 Visit(li, block);
 
-            List<(AstIdx, LLVMValueRef) > simplifications = new();
-            foreach(var (value, idx) in converter.defMap)
+            List<(AstIdx, LLVMValueRef)> simplifications = new();
+
+            var sw = Stopwatch.StartNew();
+            //foreach(var (value, idx) in converter.defMap)
+            var solver = MkSolver(100);
+            solver.Push();
+            LLVMBasicBlockRef currBlock = null;
+            int rejected = 0;
+            while (true)
             {
-                if (value.ToString().Contains("%local_state_struct.sroa.229.2328.extract.trunc.i.i ="))
-                    Debugger.Break();
-                //if (ctx.GetCost(idx) < 5)
-                if (false)
+                foreach (var value in LLVMUtil.GetRpoInstructions(func))
                 {
-                    Console.WriteLine($"Skipping {idx}");
-                    continue;
+                    //if (!targets.Contains(value))
+                    //    continue;
+                    // Skip if this is not 
+                    if (!converter.defMap.TryGetValue(value, out var idx))
+                        continue;
+                    if (ctx.IsSymbol(idx) || ctx.IsConstant(idx))
+                        continue;
+
+                    // If we enter a new block, throw away the previous constraints.
+                    if (currBlock.Handle != 0 && currBlock != value.InstructionParent && !dt.ProperlyDominates(currBlock, value.InstructionParent))
+                    {
+                        solver.Pop();
+                        solver.Push();
+                    }
+
+                    currBlock = value.InstructionParent;
+
+                    //Console.WriteLine($"Visiting {value}");
+
+                    //if (value.ToString().Contains("%local_state_struct.sroa.229.2328.extract.trunc.i.i ="))
+                    //    Debugger.Break();
+                    //if (ctx.GetCost(idx) < 5)
+                    if (false)
+                    {
+                        Console.WriteLine($"Skipping {idx}");
+                        continue;
+                    }
+
+                    var cost = ctx.GetCost(idx);
+
+                    if (ctx.GetWidth(idx) <= 0)
+                        continue;
+                    //Console.WriteLine($"Visiting {idx}");
+
+                    var translated = translator.Translate(idx);
+
+                    if (!value.Is(LLVMValueKind.LLVMInstructionValueKind))
+                        continue;
+
+                    var blockInfo = Visit(li, value.InstructionParent);
+                    //continue;
+
+                    var cond = translator.Translate(blockInfo.assumptions);
+                    cond = Tm.MkIte(cond == 1, Tm.MkTrue(), Tm.MkFalse());
+                    cond = solver.Simplify(cond);
+                    solver.Assert(cond);
+
+
+                    var solutions = EnumerateSolutions(solver, translated, 2);
+                    if (solutions == null)
+                    {
+                        //Console.WriteLine($"Rejected: {idx}");
+                        rejected++;
+                        continue;
+                    }
+                    if (solutions.Count != 1)
+                    {
+                        //Console.WriteLine($"Rejected: {idx}");
+                        rejected++;
+                        continue;
+                    }
+
+
+                    var constInt = LLVMValueRef.CreateConstInt(LLVMTypeRef.CreateInt(ctx.GetWidth(idx)), solutions.First());
+                    value.ReplaceAllUsesWith(constInt);
+                    //Debugger.Break();
+                    simplCount++;
+                    simplifications.Add((idx, constInt));
                 }
 
-                var cost = ctx.GetCost(idx);
+                sw.Stop();
 
-                if (ctx.GetWidth(idx) <= 0)
-                    continue;
-                Console.WriteLine($"Visiting {idx}");
-
-                var translated = translator.Translate(idx);
-
-                var tempSolver = MkSolver(1000);
-                if (!value.Is(LLVMValueKind.LLVMInstructionValueKind))
-                    continue;
-
-                var blockInfo = Visit(li, value.InstructionParent);
-                //continue;
-
-                var cond = translator.Translate(blockInfo.assumptions);
-                cond = Tm.MkIte(cond == 1, Tm.MkTrue(), Tm.MkFalse());
-                cond = tempSolver.Simplify(cond);
-                tempSolver.Assert(cond);
-                
-
-                var solutions = EnumerateSolutions(tempSolver, translated, 3);
-                if (solutions.Count != 1)
-                    continue;
-
-                var constInt = LLVMValueRef.CreateConstInt(LLVMTypeRef.CreateInt(ctx.GetWidth(idx)), solutions.First());
-                value.ReplaceAllUsesWith(constInt);
+                Console.WriteLine($"Found {simplCount} simplifications in {sw.ElapsedMilliseconds}ms");
+                break;
                 //Debugger.Break();
-                simplCount++;
-                simplifications.Add((idx, constInt));
             }
 
-
-            Console.WriteLine($"Found {simplCount} simplifications");
-            Debugger.Break();
+            //Debugger.Break();
         }
 
         public record BlockInfo
@@ -2571,7 +2634,7 @@ namespace Dna.BinaryTranslator.VMProtect.Rewrite
         {
             var options = new Options();
             options.Set(BitwuzlaOption.BITWUZLA_OPT_PRODUCE_MODELS, true);
-            options.Set(BitwuzlaOption.BITWUZLA_OPT_TIME_LIMIT_PER, 200);
+            options.Set(BitwuzlaOption.BITWUZLA_OPT_TIME_LIMIT_PER, (ulong)timeout);
             var solver = new BvSolver(Tm, options);
             return solver;
         }
@@ -2590,14 +2653,18 @@ namespace Dna.BinaryTranslator.VMProtect.Rewrite
 
             var values = new HashSet<ulong>();
 
+            solver.Push();
             while (!max.HasValue || (ulong)values.Count < max.Value)
             {
                 switch (solver.CheckSat())
                 {
                     case Result.Unsat:
+                        solver.Pop();
                         return values;
 
                     case Result.Unknown:
+                        solver.Pop();
+                        return null;
                         throw new InvalidOperationException(
                             "Bitwuzla returned Unknown before solution enumeration completed.");
 
@@ -2621,6 +2688,7 @@ namespace Dna.BinaryTranslator.VMProtect.Rewrite
                 }
             }
 
+            solver.Pop();
             return values;
         }
 

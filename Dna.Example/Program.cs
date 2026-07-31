@@ -140,7 +140,7 @@ if (dbgCode)
             {
                 PassPipeline.Run(vmpBin, existingFunc, false, true, true);
                 PassPipeline.Run(vmpBin, existingFunc, false, false, false);
-                //new VmpSolver2(vmpDna, existingFunc).Simplify(existingFunc);
+                new VmpSolver2(vmpDna, existingFunc).Simplify(existingFunc);
             }
             sw2.Stop();
             tempNewMod.PrintToFile(("translatedFunction.ll"));

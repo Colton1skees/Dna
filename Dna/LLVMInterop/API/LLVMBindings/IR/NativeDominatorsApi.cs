@@ -32,6 +32,9 @@ namespace Dna.LLVMInterop.API.LLVMBindings.IR
     public static class NativeDominatorTreeApi
     {
         [DllImport("Dna.LLVMInterop", CallingConvention = CallingConvention.Cdecl)]
+        public unsafe static extern LLVMOpaqueDominatorTree* DominatorTree_Constructor(LLVMValueRef func);
+
+        [DllImport("Dna.LLVMInterop", CallingConvention = CallingConvention.Cdecl)]
         [return: MarshalAs(UnmanagedType.U1)] 
         public unsafe static extern bool DominatorTree_BlockDominatesUse(LLVMOpaqueDominatorTree* treeBase, LLVMOpaqueBasicBlock* block, LLVMOpaqueUse* use);
 

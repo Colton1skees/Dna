@@ -9,7 +9,7 @@ namespace Dna.LLVMInterop.API.LLVMBindings.IR
 {
     public unsafe class DominatorTreeBase
     {
-        public readonly nint Handle;
+        public nint Handle;
 
         public DominatorTreeBase(nint handle)
         {

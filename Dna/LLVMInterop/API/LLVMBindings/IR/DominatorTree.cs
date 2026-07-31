@@ -13,6 +13,11 @@ namespace Dna.LLVMInterop.API.LLVMBindings.IR
         {
         }
 
+        public unsafe DominatorTree(LLVMValueRef func) : base(0)
+        {
+            Handle = (nint)NativeDominatorTreeApi.DominatorTree_Constructor(func);
+        }
+
         /// <summary>
         /// Return true if the (end of the) basic block BB dominates the use U.
         /// </summary>

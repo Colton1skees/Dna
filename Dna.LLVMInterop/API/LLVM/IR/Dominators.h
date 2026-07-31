@@ -50,6 +50,11 @@ namespace Dna::API {
 
 // llvm::DominatorTree
 namespace Dna::API {
+	DNA_EXPORT DomTree DominatorTree_Constructor(llvm::Function* func)
+	{
+		return new llvm::DominatorTree(*func);
+	}
+
 	DNA_EXPORT bool DominatorTree_BlockDominatesUse(DomTree domTree, const Block block, const llvm::Use* use)
 	{
 		return domTree->dominates(block, *use);

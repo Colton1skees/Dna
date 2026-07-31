@@ -149,19 +149,26 @@ namespace Dna.Passes.Mba
             {
                 foreach (var operand in user.GetOperands())
                 {
-                    if (operand.TypeOf.Kind != LLVMTypeKind.LLVMIntegerTypeKind)
-                        continue;
-                    if (operand.Kind != LLVMValueKind.LLVMInstructionValueKind)
-                        continue;
-                    if (operand.TypeOf.IntWidth > 64)
-                        continue;
-                    if (operand.InstructionOpcode == LLVMOpcode.LLVMTrunc && operand.TypeOf.IntWidth > 64)
+                    if (!IsValidIntegerInst(operand))
                         continue;
                     targets.Add(operand);
                 }
             }
 
             return targets;
+        }
+
+        public static bool IsValidIntegerInst(LLVMValueRef operand)
+        {
+            if (operand.TypeOf.Kind != LLVMTypeKind.LLVMIntegerTypeKind)
+                return false;
+            if (operand.Kind != LLVMValueKind.LLVMInstructionValueKind)
+                return false;
+            if (operand.TypeOf.IntWidth > 64)
+                return false;
+            if (operand.InstructionOpcode == LLVMOpcode.LLVMTrunc && operand.TypeOf.IntWidth > 64)
+                return false;
+            return true;
         }
 
         private static bool IsTarget(LLVMOpcode opcode)
