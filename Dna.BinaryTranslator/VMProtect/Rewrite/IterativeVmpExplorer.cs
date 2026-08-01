@@ -168,6 +168,7 @@ namespace Dna.BinaryTranslator.VMProtect.Rewrite
             handlerVips[handlers.First()] = bytecodeRegister;
 
             bool optHeavy = false;
+            int numRebuilds = 0;
 
             var serialize = () =>
             {
@@ -229,8 +230,8 @@ namespace Dna.BinaryTranslator.VMProtect.Rewrite
             //handlerLifter.LiftHandler(0x140048BBD, false);
             while (true)
             {
-                Console.WriteLine($"Lifting iteration {ii++} at {sw.ElapsedMilliseconds}ms");
-                Console.WriteLine($"{numFast} / {numFast + numHeavy} solvers finished");
+                Console.WriteLine($"Lifting iteration {ii++} at {sw.ElapsedMilliseconds}ms. ");
+                Console.WriteLine($"{numFast} / {numFast + numHeavy} solvers finished. Rebuilt {numRebuilds} times");
 
                 //if (liftedFunction.Handle != 0)
                 //   liftedFunction.GlobalParent.PrintToFile("translatedFunction.ll");
@@ -505,6 +506,8 @@ namespace Dna.BinaryTranslator.VMProtect.Rewrite
                     Console.WriteLine("Forcing rebuild!");
                     liftedFunction.DeleteFunction();
                     liftedFunction = null;
+
+                    numRebuilds++;
                 }
 
                 //Debugger.Break();
