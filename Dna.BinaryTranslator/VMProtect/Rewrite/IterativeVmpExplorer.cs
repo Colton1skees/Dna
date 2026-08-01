@@ -2453,16 +2453,24 @@ namespace Dna.BinaryTranslator.VMProtect.Rewrite
                         solver.Push();
                         solver.Assert(translated == solutions[0]);
                         var s = solver.CheckSat();
+                        if (s != Result.Sat)
+                        {
+                            solver.Pop();
+                            goto done;
+                        }
                         //Debug.Assert(s == Result.Sat);
-                        var succ = s == Result.Sat;
                         var values0 = cmps.Select(x => solver.GetValue(translator.Translate(converter.defMap[x]))).ToList();
                         solver.Pop();
 
                         solver.Push();
                         solver.Assert(translated == solutions[1]);
                         s = solver.CheckSat();
+                        if (s != Result.Sat)
+                        {
+                            solver.Pop();
+                            goto done;
+                        }
                         //Debug.Assert(s == Result.Sat);
-                        succ &= (s == Result.Sat);
                         var values1 = cmps.Select(x => (solver.GetValue(translator.Translate(converter.defMap[x])))).ToList();
                         solver.Pop();
 
@@ -2470,8 +2478,7 @@ namespace Dna.BinaryTranslator.VMProtect.Rewrite
 
                         for (var cmpIdx = 0; cmpIdx < values0.Count; cmpIdx++)
                         {
-                            if (succ == false)
-                                break;
+
                             var v0 = values0[cmpIdx];
                             if (v0.Kind != BitwuzlaKind.BITWUZLA_KIND_VALUE)
                                 continue;
@@ -2719,7 +2726,7 @@ namespace Dna.BinaryTranslator.VMProtect.Rewrite
         private IReadOnlyList<ulong> DereferenceAddresses(IReadOnlyList<ulong> addresses, uint bitWidth)
             => addresses.Select(x => BinaryContentsReader.Dereference(dna.Binary, x, bitWidth)).ToList().AsReadOnly();
 
-        private BvSolver MkSolver(int timeout = 200)
+        private BvSolver MkSolver(int timeout = 500)
         {
             var options = new Options();
             options.Set(BitwuzlaOption.BITWUZLA_OPT_PRODUCE_MODELS, true);
