@@ -228,6 +228,8 @@ if (useVmp)
     // complex_loop_64
     vmpAddr = 0x140003862;
 
+    vmpAddr = 0x140003BC2;
+
 
     var vmpBin = WindowsBinary.From(vmpPath);
     var vmpDna = new Dna.Dna(vmpBin);

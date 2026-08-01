@@ -380,6 +380,8 @@ namespace Dna.BinaryTranslator.VMProtect.Rewrite
                         newCfg.AddEdge(handler, getHandler(succ));
                 }
 
+                UpdateCfg(vCfg, newCfg);
+
                 //if (ii == 529)
                 //   Debugger.Break();
 
@@ -396,6 +398,9 @@ namespace Dna.BinaryTranslator.VMProtect.Rewrite
                         var incomingVip = info.Predecessors.Select(x => handlerVips[x]).DistinctBy(x => x.Name).Single();
                         handlerVips[handler] = handlerLifter.GetBytecodeRegister(HandlerLifter.DisHandler(dna, handler.NativeRip), stateStruct2, handlerLifter.LiftHandler(handler.NativeRip, false), false, incomingVip);
 
+                        if (!info.Metadata.IsComplete && info.Successors.Any(x => newCfg.Instructions[x].Metadata.IsComplete))
+                            Debugger.Break();
+
                         continue;
                     }
 
@@ -407,23 +412,67 @@ namespace Dna.BinaryTranslator.VMProtect.Rewrite
                         isRebuildRequired = true;
                         continue;
                     }
+
+                    // If an incomplete node jumps to a complete node, a full rebuild is required
+                    if (!info.Metadata.IsComplete && info.Successors.Any(x => newCfg.Instructions[x].Metadata.IsComplete))
+                        isRebuildRequired = true;
                 }
 
                 // Get all reachable nodes starting from the worklist
                 // (this is includes the changed worklist members themselves)
-
-
-
                 var reachableNodes = GetReachableNodes(newCfg, worklist);
                 foreach (var (handler, info) in newCfg.Instructions)
                 {
+                    var old = info.Metadata.IsComplete;
                     info.Metadata.IsComplete = !reachableNodes.Contains(handler);
 
                     // If a formerly complete node becomes incomplete, we need to rebuild the full CFG!
                     if (reachableNodes.Contains(handler) && vCfg.Contains(handler))
                         isRebuildRequired = true;
 
+                    if (old && !info.Metadata.IsComplete)
+                    {
+                        //if (ii >= 1138)
+                        //    Debugger.Break();
+                        isRebuildRequired = true;
+
+               
+                    }
                 }
+
+                if(!isRebuildRequired)
+                {
+                    // if any block was formerly incomplete, is now complete, and jumps to a complete block, we need to rebuild
+                    foreach (var (handler, info) in newCfg.Instructions)
+                    {
+                        if (!vCfg.Instructions.TryGetValue(handler, out var old))
+                            continue;
+                        if (!info.Metadata.IsComplete)
+                            continue;
+
+                        if (old.Metadata.IsComplete)
+                            continue;
+
+                        if (old.Metadata.IsComplete && !info.Metadata.IsComplete)
+                            Debugger.Break();
+
+                        // Formerly incomplete block jumps to a complete block
+                        //
+                        if (info.Successors.Any(x => newCfg.Instructions[x].Metadata.IsComplete))
+                        {
+                            /*
+                            var wl = new WorkList<VmHandler>();
+                            wl.AddToFront(handler);
+                            var reachable = GetReachableNodes(newCfg, worklist);
+                            foreach (var key in reachable)
+                                newCfg.Instructions[key].Metadata.IsComplete = false;
+                            */
+
+                            isRebuildRequired = true;
+                        }
+                    }
+                }
+
 
                 var (oldCfg, oldLabels) = GetCfg(vCfg, handlers.First());
 
@@ -464,6 +513,30 @@ namespace Dna.BinaryTranslator.VMProtect.Rewrite
             // TODO tomorrow: Hook up incremental algorithm
             Debugger.Break();
             return default;
+        }
+
+        // if any block was formerly incomplete, is now complete, and jumps to a complete block, we need to rebuild
+        private void UpdateCfg(VmCfg vCfg, VmCfg newCfg)
+        {
+            // A node is complete if it's successor and predecessor lists have not changed
+            foreach(var (handler, info) in newCfg.Instructions)
+            {
+                // If we just added this handler, it is complete.
+                if (!vCfg.Instructions.TryGetValue(handler, out var existing))
+                {
+                    info.Metadata.IsComplete = false;
+                    continue;
+                }
+
+                // Mark this block as incomplete if the predecessors changed
+                if(!existing.Predecessors.SetEquals(info.Predecessors))
+                {
+                    info.Metadata.IsComplete = false;
+                    continue;
+                }
+            }
+
+            // Now we need to propagate the incompleteness.
         }
 
         static int numFast = 0;
@@ -1293,6 +1366,9 @@ namespace Dna.BinaryTranslator.VMProtect.Rewrite
 
 
                 var outgoingAddresses = vNode.Successors.OrderBy(x => x).ToList();
+
+                var isComplete = outgoingAddresses.Select(x => vCfg.Instructions[x].Metadata.IsComplete).ToArray();
+
                 // If this lookup fails, an incremental rebuild was not possible. TODO: Set `incremental` to false and clear CFG in this case
                 // In this case the instruction is marked as complete
                 //
@@ -1950,7 +2026,7 @@ namespace Dna.BinaryTranslator.VMProtect.Rewrite
             foreach (var call in rdtscs)
             {
                 // Erase rdtscs used in the entry handler. These are dead code
-                Debug.Assert(isVmEnter);
+                //Debug.Assert(isVmEnter);
                 call.InstructionEraseFromParent();
             }
 
@@ -2392,7 +2468,11 @@ namespace Dna.BinaryTranslator.VMProtect.Rewrite
             //var targets = MbaDeobfuscationPass.GetTargets(func);
             var targets = GetVmpTargets(func);
             foreach (var target in func.GetInstructions())
-                toVisit.Add(converter.GetAst(target));
+            {
+                Console.WriteLine(target);
+                if (MbaDeobfuscationPass.IsValidIntegerInst(target))
+                    toVisit.Add(converter.GetAst(target));
+            }
 
             int simplCount = 0;
 

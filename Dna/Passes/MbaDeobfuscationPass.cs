@@ -270,6 +270,8 @@ namespace Dna.Passes.Mba
                 return val;
             };
 
+
+
             AstIdx def = inst.InstructionOpcode switch
             {
                 LLVMOpcode.LLVMAnd => ctx.And(op1(), op2()),
@@ -284,7 +286,7 @@ namespace Dna.Passes.Mba
                 LLVMOpcode.LLVMSExt => inst.TypeOf.IntWidth > 64 ? GetUnsupportedInstruction(inst) : SExt(ctx, op1(), (byte)inst.TypeOf.IntWidth),
                 LLVMOpcode.LLVMCall => GetCallAst(inst),
                 LLVMOpcode.LLVMSelect => ctx.Select(op1(), op2(), op3()),
-                LLVMOpcode.LLVMICmp => ctx.ICmp(ConvPredicate(inst.ICmpPredicate), op1(), op2()),
+                LLVMOpcode.LLVMICmp => inst.GetOperand(1).TypeOf.Kind != LLVMTypeKind.LLVMIntegerTypeKind || inst.GetOperand(1).TypeOf.IntWidth > 64 ? GetUnsupportedInstruction(inst) : ctx.ICmp(ConvPredicate(inst.ICmpPredicate), op1(), op2()),
                 LLVMOpcode.LLVMAdd => ctx.Add(op1(), op2()),
                 LLVMOpcode.LLVMMul => ctx.Mul(op1(), op2()),
                 LLVMOpcode.LLVMFreeze => op1(),
