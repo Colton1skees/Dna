@@ -14,6 +14,7 @@
 #include "llvm/Analysis/MemoryDependenceAnalysis.h"
 #include "llvm/Analysis/DemandedBits.h"
 #include "llvm/IR/DataLayout.h"
+#include "llvm/IR/Instructions.h"
 #include "llvm/IR/LegacyPassManager.h"
 #include "llvm/IR/Verifier.h"
 #include "llvm/Support/CommandLine.h"
@@ -382,7 +383,7 @@ namespace Dna::Pipeline
 		llvm::cl::ParseCommandLineOptions(11, args99999);
 		*/
 
-		
+
 		const char* argv67[12] = { "mesa", "-simplifycfg-sink-common=false",
 				"-memdep-block-number-limit=10000000",
 				"-dse-memoryssa-defs-per-block-limit=10000000",
@@ -397,7 +398,7 @@ namespace Dna::Pipeline
 		};
 
 		llvm::cl::ParseCommandLineOptions(12, argv67);
-			
+
 
 		if (justGVN)
 		{
@@ -467,7 +468,7 @@ namespace Dna::Pipeline
 		FPM.addPass(llvm::CorrelatedValuePropagationPass());
 		FPM.addPass(llvm::SimplifyCFGPass());
 
-	
+
 		//FPM.addPass(llvm::CallSiteSplittingPass());
 
 		//FPM.addPass(llvm::createIPSCCPPass());
@@ -476,7 +477,7 @@ namespace Dna::Pipeline
 		FPM.addPass(llvm::PromotePass());
 		FPM.addPass(llvm::InstCombinePass());
 		FPM.addPass(llvm::SpeculativeExecutionPass());
-		
+
 		//FPM.addPass(llvm::LazyValueInfo());
 		FPM.addPass(llvm::JumpThreadingPass(999999));
 		FPM.addPass(llvm::JumpThreadingPass(-1));
@@ -487,7 +488,7 @@ namespace Dna::Pipeline
 		FPM.addPass(llvm::GVNPass(llvm::GVNOptions()));
 		FPM.addPass(llvm::SCCPPass());
 		FPM.addPass(llvm::BDCEPass());
-		
+
 
 		// Add various optimization passes.
 		FPM.addPass(llvm::InstCombinePass());
@@ -537,7 +538,7 @@ namespace Dna::Pipeline
 				FPM.addPass(llvm::createLoopUnrollPass(3, false, false, 9999999999, -1, 1));
 				*/
 
-			//LPM.addPass((llvm::LoopUnrollPass*)llvm::createLoopUnrollPass(3, false, false, 2000, -1, 1));
+				//LPM.addPass((llvm::LoopUnrollPass*)llvm::createLoopUnrollPass(3, false, false, 2000, -1, 1));
 			FPM.addPass(llvm::LoopUnrollPass(llvm::LoopUnrollOptions(3, false, false)));
 		}
 
@@ -572,7 +573,7 @@ namespace Dna::Pipeline
 			FPM.addPass(llvm::SimplifyCFGPass());
 			//FPM.addPass(new llvm::sl::ControlledNodeSplittingPass());
 			FPM.addPass(llvm::SimplifyCFGPass());
-		//	FPM.addPass(llvm::sl::createUnswitchPass());
+			//	FPM.addPass(llvm::sl::createUnswitchPass());
 		}
 
 		//FPM.addPass(llvm::createLoopRotatePass());
@@ -601,12 +602,12 @@ namespace Dna::Pipeline
 
 			FPM.addPass(llvm::sl::ControlledNodeSplittingPass());
 
-		//	FPM.addPass(new Dna::Passes::ControlFlowStructuringPass());
+			//	FPM.addPass(new Dna::Passes::ControlFlowStructuringPass());
 		}
 
 		printf("running.");
 		//if (count == 13 || count == 14 || count == 15 || count == 16 || count == 17)
-		if(structureFunction != nullptr)
+		if (structureFunction != nullptr)
 		{
 			printf("countcf.");
 			//llvm::FunctionPass* fp = new Dna::Passes::ControlFlowStructuringPass(structureFunction);
@@ -809,7 +810,15 @@ void OptimizeVmpModule(llvm::Module* module,
 	llvm::LoopPassManager LPM;
 	llvm::PassBuilder PB;
 
+
+
+
 	FPM.addPass(llvm::SROAPass({}));
+	if (llvm::any_of(*f, [](const llvm::BasicBlock& block)
+		{ return llvm::isa<llvm::SwitchInst>(block.getTerminator()); }))
+	{
+		FPM.addPass(llvm::LowerSwitchPass());
+	}
 
 
 	if (eliminateStackVars != nullptr)
@@ -908,7 +917,7 @@ void OptimizeVmpModuleOld(llvm::Module* module,
 	Dna::Passes::tStructureFunction structureFunction,
 	Dna::Passes::tEliminateStackVars eliminateStackVars,
 	Dna::Passes::tStructureFunction adhocInstCombine,
-	Dna::Passes::tEliminateStackVars multiUseCloning, 
+	Dna::Passes::tEliminateStackVars multiUseCloning,
 	bool fastPipeline)
 {
 	Initialize();
@@ -926,7 +935,7 @@ void OptimizeVmpModuleOld(llvm::Module* module,
 	llvm::ModuleAnalysisManager MAM;
 	llvm::LoopPassManager LPM;
 	llvm::PassBuilder PB;
-	
+
 
 	if (fastPipeline) {
 		FPM.addPass(llvm::SROAPass({}));

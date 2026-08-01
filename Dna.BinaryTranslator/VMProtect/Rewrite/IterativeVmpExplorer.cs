@@ -617,7 +617,11 @@ namespace Dna.BinaryTranslator.VMProtect.Rewrite
                 }
 
                 OptimizeHeavy(function);
+                new VmpSolver2(dna, function).Simplify(function);
                 numHeavy += 1;
+
+                function.GlobalParent.PrintToFile("heavy.ll");
+
                 if (solution is Ok<JmpTablesWithHandlerRips2> ok1)
                     return ok1;
 
@@ -652,6 +656,7 @@ namespace Dna.BinaryTranslator.VMProtect.Rewrite
 
         private Result<JmpTablesWithHandlerRips2, InvalidOperationException> TrySolve(VmpParameterizedStateStructure stateStruct, ParameterizedStateStructure stateStruct2, LLVMValueRef liftedFunction, HandlerLifter handlerLifter, Dictionary<ulong, HandlerData> handlerRipToRegisters)
         {
+            liftedFunction.GlobalParent.PrintToFile("heavyBeforeSolving.ll");
             // Attempt to solve the handler RIPs    
             var solver = new VmpSolver(arch, liftedFunction);
             var ripResult = solver.SolveRIPs(stateStruct);
@@ -2373,6 +2378,9 @@ namespace Dna.BinaryTranslator.VMProtect.Rewrite
                     targets.AddRange(inst.GetOperands().Where(x => MbaDeobfuscationPass.IsValidIntegerInst(x)));
                     continue;
                 }
+
+                if (inst.Is(LLVMOpcode.LLVMBr) && inst.OperandCount == 3)
+                    targets.Add(inst.GetOperand(0));
             }
 
             return targets;
@@ -2464,7 +2472,7 @@ namespace Dna.BinaryTranslator.VMProtect.Rewrite
                     }
 
                     // If there are two solutions, try to find a select.
-                    if (solutions.Count() == 2 && currBlock.ToString().Contains("; preds = %split16847"))
+                    if (solutions.Count() == 2)
                     {
                         var cmps = currBlock.GetInstructions().Where(x => x.TypeOf.Kind == LLVMTypeKind.LLVMIntegerTypeKind && x.TypeOf.IntWidth == 1 && converter.defMap.ContainsKey(x)).ToList();
 
@@ -2487,7 +2495,6 @@ namespace Dna.BinaryTranslator.VMProtect.Rewrite
                         for(var cmpIdx = 0; cmpIdx < values0.Count; cmpIdx++)
                         {
                             var v0 = values0[cmpIdx];
-                            Console.WriteLine($"Kind: {v0.Kind}");
                             if (v0.Kind != BitwuzlaKind.BITWUZLA_KIND_VALUE)
                                 continue;
                             var v1 = values1[cmpIdx];
@@ -2514,20 +2521,24 @@ namespace Dna.BinaryTranslator.VMProtect.Rewrite
                                 {
                                     var synthesizedCond = cmps[cmpIdx];
 
-                                    builder.PositionBefore(value);
-                                    var intTy = value.TypeOf;
-                                    var select = builder.BuildSelect(synthesizedCond, LLVMValueRef.CreateConstInt(intTy, solutions[0]), LLVMValueRef.CreateConstInt(intTy, solutions[1]));
-                                    value.ReplaceAllUsesWith(select);
-                                    simplifications.Add((idx, select));
 
                                     solver.Push();
                                     var zero = Tm.MkBvValue(0, translated.Sort.BvSize);
-                                    solver.Assert(translated == Tm.MkIte(ToBool(translatedCmp), zero + solutions[0], zero + solutions[1]));
+                                    solver.Assert(translated != Tm.MkIte(ToBool(translatedCmp), zero + solutions[0], zero + solutions[1]));
                                     s = solver.CheckSat();
                                     solver.Pop();
-                                    if (s == Result.Sat)
+
+                                    if (s == Result.Unsat)
+                                    {
+
+                                        builder.PositionBefore(value);
+                                        var intTy = value.TypeOf;
+                                        var select = builder.BuildSelect(synthesizedCond, LLVMValueRef.CreateConstInt(intTy, solutions[0]), LLVMValueRef.CreateConstInt(intTy, solutions[1]));
+                                        value.ReplaceAllUsesWith(select);
+                                        simplifications.Add((idx, select));
                                         goto done;
-                                    
+                                    }
+
                                 }
 
                                 solutions.Reverse();
