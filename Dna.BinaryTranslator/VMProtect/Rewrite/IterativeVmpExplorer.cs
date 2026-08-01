@@ -892,7 +892,7 @@ namespace Dna.BinaryTranslator.VMProtect.Rewrite
                 var arr = options.OrderBy(x => x.Value).ToArray();
                 Console.WriteLine($"Warning: Handler at RIP 0x{rip.ToString("X")} has two VIP registers candidates: [{arr[0]}], [{arr[1]}]. Picked the second one.");
                 cands.Remove(arr[0].Key);
-                Debugger.Break();
+                //Debugger.Break();
             }
 
             // There should only be one candidate.
@@ -2470,7 +2470,7 @@ namespace Dna.BinaryTranslator.VMProtect.Rewrite
                             solver.Pop();
                             goto done;
                         }
-                        //Debug.Assert(s == Result.Sat);
+
                         var values1 = cmps.Select(x => (solver.GetValue(translator.Translate(converter.defMap[x])))).ToList();
                         solver.Pop();
 
