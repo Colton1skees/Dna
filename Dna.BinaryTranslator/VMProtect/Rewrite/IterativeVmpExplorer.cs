@@ -2400,7 +2400,7 @@ namespace Dna.BinaryTranslator.VMProtect.Rewrite
 
             int simplCount = 0;
 
-            foreach (var block in converter.defMap.Where(x => x.Key.Is(LLVMValueKind.LLVMInstructionValueKind)).Select(x => x.Key.InstructionParent))
+            foreach (var block in converter.defMap.Where(x => x.Key.Is(LLVMValueKind.LLVMInstructionValueKind)).Select(x => x.Key.InstructionParent).ToList())
                 Visit(li, block);
 
             List<(AstIdx, LLVMValueRef)> simplifications = new();
@@ -2415,8 +2415,8 @@ namespace Dna.BinaryTranslator.VMProtect.Rewrite
             {
                 foreach (var value in LLVMUtil.GetRpoInstructions(func))
                 {
-                    if (!targets.Contains(value))
-                        continue;
+                    //if (!targets.Contains(value))
+                    //    continue;
                     // Skip if this is not 
                     if (!converter.defMap.TryGetValue(value, out var idx))
                         continue;
@@ -2599,7 +2599,7 @@ namespace Dna.BinaryTranslator.VMProtect.Rewrite
 
         Dictionary<LLVMBasicBlockRef, BlockInfo> BlockMap = new();
 
-        public BlockInfo Visit(LoopInfo loopInfo, LLVMBasicBlockRef block)
+        public unsafe BlockInfo Visit(LoopInfo loopInfo, LLVMBasicBlockRef block)
         {
             // Return the existing info if we've already computed it
             if (BlockMap.TryGetValue(block, out var existing))
@@ -2668,8 +2668,19 @@ namespace Dna.BinaryTranslator.VMProtect.Rewrite
 
             foreach(var phi in block.GetInstructions().Where(x => x.Is(LLVMOpcode.LLVMPHI)))
             {
-                // TODO: Handle PHIs
-                //Debugger.Break();
+                if (loopInfo.IsLoopEntrypoint(phi))
+                    continue;
+                // Constraint the value of the phi based on incoming values
+                var incomingCount = LLVM.CountIncoming(phi);
+                for (uint i = 0; i < incomingCount; i++)
+                {
+                    var iv = converter.GetAst(LLVM.GetIncomingValue(phi, i));
+                    var ib = LLVM.GetIncomingBlock(phi, i);
+                    var predIdx = ctx.Constant((ulong)preds.IndexOf(ib), 8);
+                    assumptions.Add(Implies(ctx.ICmp(Predicate.Eq, info.predSelector, predIdx), ctx.ICmp(Predicate.Eq, iv, converter.GetAst(phi))));
+                }
+
+               // Debugger.Break();
             }
 
             // Create the assumptions that are true when this block is taken.

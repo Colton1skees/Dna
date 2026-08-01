@@ -851,6 +851,8 @@ void OptimizeVmpModule(llvm::Module* module,
 
 	FPM.addPass(llvm::NewGVNPass());
 
+
+
 	FPM.addPass(llvm::SCCPPass());
 	// Using this pass to add nsw/nuw annotations to instructions
 	FPM.addPass(llvm::CorrelatedValuePropagationPass());
@@ -874,6 +876,9 @@ void OptimizeVmpModule(llvm::Module* module,
 	LPM.addPass(llvm::LICMPass(500, 500, true));
 	LPM.addPass(llvm::IndVarSimplifyPass());
 	LPM.addPass(llvm::LoopDeletionPass());
+
+
+	llvm::cantFail(PB.parsePassPipeline(FPM, "lcssa,loop-mssa(licm),gvn-hoist,simplifycfg,loop(indvars),gvn"));
 
 	FPM.addPass(llvm::BDCEPass());
 	FPM.addPass(llvm::ADCEPass());

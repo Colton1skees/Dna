@@ -28,7 +28,8 @@ namespace Dna.BinaryTranslator.VMProtect
         {
             this.function = function;
             var global = function.GlobalParent.GetNamedGlobal("memory");
-            this.memPtr = function.GetInstructions().Single(x => x.InstructionOpcode == LLVMOpcode.LLVMLoad && x.GetOperand(0) == global);
+            var temp = function.GetInstructions().Single(x => x.InstructionOpcode == LLVMOpcode.LLVMLoad && x.GetOperand(0) == global);
+            this.memPtr = function.GetInstructions().Single(x => x.ToString().Contains("%34 = getelementptr i8, ptr %mem"));
             builder = LLVMBuilderRef.Create(function.GetFunctionCtx());
         }
 
@@ -119,16 +120,12 @@ namespace Dna.BinaryTranslator.VMProtect
             List<(LLVMValueRef ptr, LLVMValueRef constIntOffset)> ptrs = new();
             foreach(var gep in geps)
             {
-                // Skip if we are not adding an offset to something.
-                var ptr = gep.GetOperand(1);
-                if (ptr.Kind != LLVMValueKind.LLVMInstructionValueKind || ptr.InstructionOpcode != LLVMOpcode.LLVMAdd)
-                    continue;
                 // Skip if we are not adding a constant to rsp.
-                if (ptr.GetOperand(0) != rsp || ptr.GetOperand(1).Kind != LLVMValueKind.LLVMConstantIntValueKind)
+                if (!gep.GetOperand(1).IsConstant())
                     continue;
 
                 // Fetch the offset.
-                var constantInt = ptr.GetOperand(1);
+                var constantInt = gep.GetOperand(1);
                 var offset = (long)constantInt.ConstIntZExt;
 
                 // Skip if the GEP is not within the vmp context struct.

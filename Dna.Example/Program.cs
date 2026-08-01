@@ -75,10 +75,10 @@ if (genDsl)
 //LazyLLVMFixes.InstallValueToStringBugFix(RemillUtils.LLVMValueToString);
 
 
-bool dbgCode = false;
+bool dbgCode = true;
 if (dbgCode)
 {
-    var irPath = "C:\\Users\\user\\Downloads\\synth_625.ll";
+    var irPath = "C:\\Users\\user\\Downloads\\polished.ll";
     var t = File.ReadAllText(irPath);
     Console.WriteLine(irPath);
 
@@ -161,6 +161,8 @@ if (dbgCode)
         //  PassPipeline.Run(vmpBin, existingFunc);
 
 
+        VmpContextRemovalPass.Run(existingFunc);
+
 
         tempNewMod.PrintToFile("instcombine.ll");
 
@@ -175,9 +177,11 @@ if (dbgCode)
         tempNewMod.PrintToFile((name));
 
 
+
+
         var compiledPath3 = ClangCompiler.Compile(name);
 
-        Console.WriteLine("Loading into IDA.    ");
+        Console.WriteLine("Loading into IDA.     ");
         var exePath3 = IDALoader.Load(compiledPath3, true);
 
 
@@ -187,7 +191,7 @@ if (dbgCode)
         //File.WriteAllText("binja.py", new LLVMToBinjaGraph(existingFunc).Process());
 
         sw.Stop();
-            Console.WriteLine($"Pass took {sw.ElapsedMilliseconds}ms ");
+            Console.WriteLine($"Pass took {sw.ElapsedMilliseconds}ms");
         Debugger.Break();
     }
     Debugger.Break();

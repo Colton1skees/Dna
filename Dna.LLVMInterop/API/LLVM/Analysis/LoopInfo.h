@@ -162,14 +162,14 @@ namespace Dna::API {
 	// Return true if the Basic Block containing the passed Phi node is
 	// a loop entry point, either the loop header for a natural loop or
 	// a entry point for an irreducible CFG.
-	DNA_EXPORT bool IsLoopEntryPoint(llvm::LoopInfo* li, llvm::Instruction* Phi) {
+	DNA_EXPORT bool IsLoopEntryPoint(llvm::LoopInfo* li, llvm::PHINode* Phi) {
 		BasicBlock* BB = Phi->getParent();
 		// If LLVM can determine if BB is a loop header, simply return true.
 		// Presumably, this should handle structured loops.
 		if (li->isLoopHeader(BB))
 			return true;
-		//if (Phi->getNumIncomingValues() <= 1)
-		//	return false;
+		if (Phi->getNumIncomingValues() <= 1)
+		return false;
 
 		bool Loop = false;
 		std::unordered_set<const llvm::BasicBlock*> VisitedBBs;
