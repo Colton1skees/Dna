@@ -2463,7 +2463,7 @@ namespace Dna.BinaryTranslator.VMProtect.Rewrite
                     solver.Assert(cond);
 
 
-                    var solutions = EnumerateSolutions(solver, translated, 2).ToArray();
+                    var solutions = EnumerateSolutions(solver, translated, 3).ToArray();
                     if (solutions == null)
                     {
                         //Console.WriteLine($"Rejected: {idx}");
@@ -2474,7 +2474,7 @@ namespace Dna.BinaryTranslator.VMProtect.Rewrite
                     // If there are two solutions, try to find a select.
                     if (solutions.Count() == 2)
                     {
-                        var cmps = currBlock.GetInstructions().Where(x => x.TypeOf.Kind == LLVMTypeKind.LLVMIntegerTypeKind && x.TypeOf.IntWidth == 1 && converter.defMap.ContainsKey(x)).ToList();
+                        var cmps = currBlock.GetInstructions().TakeWhile(x => x != value).Where(x => x.TypeOf.Kind == LLVMTypeKind.LLVMIntegerTypeKind && x.TypeOf.IntWidth == 1 && converter.defMap.ContainsKey(x)).ToList();
 
                         solver.Push();
                         solver.Assert(translated == solutions[0]);
@@ -2536,6 +2536,8 @@ namespace Dna.BinaryTranslator.VMProtect.Rewrite
                                         var select = builder.BuildSelect(synthesizedCond, LLVMValueRef.CreateConstInt(intTy, solutions[0]), LLVMValueRef.CreateConstInt(intTy, solutions[1]));
                                         value.ReplaceAllUsesWith(select);
                                         simplifications.Add((idx, select));
+
+                                        func.GlobalParent.Verify(LLVMVerifierFailureAction.LLVMAbortProcessAction);
                                         goto done;
                                     }
 
@@ -2564,6 +2566,7 @@ namespace Dna.BinaryTranslator.VMProtect.Rewrite
                     //Debugger.Break();
                     simplCount++;
                     simplifications.Add((idx, constInt));
+                    func.GlobalParent.Verify(LLVMVerifierFailureAction.LLVMAbortProcessAction);
 
                 done:
                     continue;
