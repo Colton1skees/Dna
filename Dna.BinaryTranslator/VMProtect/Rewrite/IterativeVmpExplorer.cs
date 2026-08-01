@@ -554,6 +554,7 @@ namespace Dna.BinaryTranslator.VMProtect.Rewrite
 
         private Result<JmpTablesWithHandlerRips2, InvalidOperationException> TrySolve(VmpParameterizedStateStructure stateStruct, ParameterizedStateStructure stateStruct2, LLVMValueRef liftedFunction, HandlerLifter handlerLifter, Dictionary<ulong, HandlerData> handlerRipToRegisters)
         {
+            liftedFunction.GlobalParent.PrintToFile("translatedFunction.ll");
             // Attempt to solve the handler RIPs    
             var solver = new VmpSolver(arch, liftedFunction);
             var ripResult = solver.SolveRIPs(stateStruct);
@@ -1476,6 +1477,17 @@ namespace Dna.BinaryTranslator.VMProtect.Rewrite
                         var storeToLoad = new CombinedFixedpointOptPass(dna.Binary, new FixedpointPassConfig());
                         var pStoreToLoad = Marshal.GetFunctionPointerForDelegate(storeToLoad.PtrToStoreLoadPropagation);
                         OptimizationApi.OptimizeModuleVmp(liftedHandler.GlobalParent, liftedHandler, false, false, 0, false, 0, false, false, 0, pStoreToLoad, 0, 0, fastPipeline: true);
+                        OptimizationApi.RunInstCombine(liftedHandler);
+
+
+                    }
+
+                    foreach (var (reg, inputIndex) in stateStruct.RegisterArgumentIndices)
+                    {
+                        var input = liftedHandler.GetParam((uint)inputIndex);
+                        var output = liftedHandler.GetParam((uint)stateStruct.RegisterOutputArgumentIndices[reg]);
+                        foreach (var store in liftedHandler.GetInstructions().Where(x => x.Is(LLVMOpcode.LLVMStore) && x.GetOperand(0) == input && x.GetOperand(1) == output).ToList())
+                            store.InstructionEraseFromParent();
                     }
 
 
@@ -1906,6 +1918,7 @@ namespace Dna.BinaryTranslator.VMProtect.Rewrite
             liftedFunction = FunctionIsolator.IsolateFunctionIntoNewModule(arch, liftedFunction);
 
 
+
             foreach (var inst in liftedFunction.GetInstructions())
                 ConstantFoldingAPI.DropPoisonGeneratingFlags(inst);
 
@@ -1931,6 +1944,15 @@ namespace Dna.BinaryTranslator.VMProtect.Rewrite
             EliminateStackExpansionLoop(stripped, handlerRip);
 
             EliminateStackAlignment(stripped, stateStruct);
+
+
+            var rdtscs = stripped.GetInstructions().Where(x => x.Is(LLVMOpcode.LLVMCall) && x.ToString().Contains("asm sideeffect \"rdtsc\"")).ToList();
+            foreach (var call in rdtscs)
+            {
+                // Erase rdtscs used in the entry handler. These are dead code
+                Debug.Assert(isVmEnter);
+                call.InstructionEraseFromParent();
+            }
 
 
             foreach (var inst in stripped.GetInstructions())
@@ -1982,6 +2004,8 @@ namespace Dna.BinaryTranslator.VMProtect.Rewrite
             // store i64 5368736796, ptr %out_RSI, align 8
             LLVMValueRef targetStore = constStores
                 .SingleOrDefault(x => x.GetOperand(1).Kind == LLVMValueKind.LLVMArgumentValueKind && gepConstants.Contains(x.GetOperand(0)));
+
+            lifted.GlobalParent.PrintToFile("translatedFunction.ll");
 
             // Otherwise look for a unique bytecode address that is not stored anywhere else
             if (targetStore.Handle == 0)
@@ -2387,6 +2411,8 @@ namespace Dna.BinaryTranslator.VMProtect.Rewrite
             {
                 foreach (var value in LLVMUtil.GetRpoInstructions(func))
                 {
+                    if (!MbaDeobfuscationPass.IsValidIntegerInst(value))
+                        continue;
                     //if (!targets.Contains(value))
                     //    continue;
                     // Skip if this is not 
@@ -2445,8 +2471,35 @@ namespace Dna.BinaryTranslator.VMProtect.Rewrite
 
                     var solutions = sol.ToArray();
 
-                    // If there are two solutions, try to find a select.
-                    if (solutions.Count() == 2)
+                    var isSelect = (LLVMValueRef x) => x.Is(LLVMOpcode.LLVMSelect) && x.GetOperand(1).IsConstant() && x.GetOperand(2).IsConstant();
+
+                    //   %113 = icmp ult i64 %15, 23423235
+                    // %114 = icmp ugt i64 %15, 23423234
+                    //   %144 = select i1 %113, i64 5368853935, i64 5368854175
+                    // % 145 = select i1 % 114, i64 7515984197, i64 7515984501
+                    if (isSelect(value) && solutions.Count() == 2 && isSelect(value.NextInstruction))
+                    {
+                        var curr = value;
+                        var next = value.NextInstruction;
+                        var currCondition = translator.Translate(converter.GetAst(curr.GetOperand(0)));
+                        var nextCondition = translator.Translate(converter.GetAst(next.GetOperand(0)));
+
+                        solver.Push();
+                        solver.Assert(currCondition == nextCondition);
+                        var conditionsAreInverse = solver.CheckSat() == Result.Unsat;
+                        solver.Pop();
+
+                        if (conditionsAreInverse)
+                        {
+                            var trueValue = next.GetOperand(1);
+                            var falseValue = next.GetOperand(2);
+                            next.SetOperand(0, curr.GetOperand(0));
+                            next.SetOperand(1, falseValue);
+                            next.SetOperand(2, trueValue);
+                        }
+                    }
+
+                    if (solutions.Count() == 2 && !isSelect(value))
                     {
                         var cmps = currBlock.GetInstructions().TakeWhile(x => x != value).Where(x => x.TypeOf.Kind == LLVMTypeKind.LLVMIntegerTypeKind && x.TypeOf.IntWidth == 1 && converter.defMap.ContainsKey(x)).ToList();
 
@@ -2474,7 +2527,7 @@ namespace Dna.BinaryTranslator.VMProtect.Rewrite
                         var values1 = cmps.Select(x => (solver.GetValue(translator.Translate(converter.defMap[x])))).ToList();
                         solver.Pop();
 
-                        
+
 
                         for (var cmpIdx = 0; cmpIdx < values0.Count; cmpIdx++)
                         {
@@ -2904,7 +2957,7 @@ namespace Dna.BinaryTranslator.VMProtect.Rewrite
                         var idx = (uint)stateStructure.GetRegisterArgumentIndex(handlerRipToRegisters[constantEdge.handlerRip].Vkey);
                         vkey = jmpCall.GetOperand(idx);
                         if (!vkey.IsConstant())
-                            return new Err<InvalidOperationException>(new InvalidOperationException($"Could not identify constant vkey for {vkey}"));
+                            return new Err<InvalidOperationException>(new InvalidOperationException($"Could not identify constant vkey for {vkey} in ConstantJmpTableEdge"));
                     }
 
                     if (vbase != null)
@@ -2921,15 +2974,37 @@ namespace Dna.BinaryTranslator.VMProtect.Rewrite
 
                 else if (edge.Value is TwoBytecodeOneHandlerEdge twoBytecodeOneHandlerEdge)
                 {
-                    LLVMValueRef vkey = null;
+                    LLVMValueRef vkey1 = null;
+                    LLVMValueRef vkey2 = null;
+
                     LLVMValueRef vbaseValue = null;
                     var vk = handlerRipToRegisters[twoBytecodeOneHandlerEdge.handlerRip].Vkey;
                     var vbase = handlerRipToRegisters[twoBytecodeOneHandlerEdge.handlerRip].ImgBaseReg;
+                    var vipSelect = jmpCall.GetOperand((uint)stateStructure.GetRegisterArgumentIndex(handlerRipToRegisters[twoBytecodeOneHandlerEdge.handlerRip].Vip));
                     if (vk != null)
                     {
-                        vkey = jmpCall.GetOperand((uint)stateStructure.GetRegisterArgumentIndex(vk));
-                        if (!vkey.IsConstant())
-                            return new Err<InvalidOperationException>(new InvalidOperationException($"Could not identify constant vkey for {vkey}"));
+                        var select = jmpCall.GetOperand((uint)stateStructure.GetRegisterArgumentIndex(vk));
+                        if (select.IsConstant())
+                        {
+                            vkey1 = select;
+                            vkey2 = select;
+                        }
+
+                        else if (select.Is(LLVMOpcode.LLVMSelect) && select.GetOperand(1).IsConstant() && select.GetOperand(2).IsConstant())
+                        {
+                            vkey1 = select.GetOperand(1);
+                            vkey2 = select.GetOperand(2);
+
+                            if (vipSelect.GetOperand(0) != select.GetOperand(0))
+                                throw new InvalidOperationException();
+
+
+                        }
+
+                        else
+                        {
+                            return new Err<InvalidOperationException>(new InvalidOperationException($"Could not identify constant vkey for {select} in TwoBytecodeOneHandlerEdge"));
+                        }
                     }
 
                     if (vbase != null)
@@ -2939,8 +3014,9 @@ namespace Dna.BinaryTranslator.VMProtect.Rewrite
                             return new Err<InvalidOperationException>(new InvalidOperationException($"Could not identify constant vbase for {vbaseValue}"));
                     }
 
-                    bytecodePtrToRip.Add(twoBytecodeOneHandlerEdge.bytecodePtr1, (twoBytecodeOneHandlerEdge.handlerRip, vkey.Handle == 0 ? null : vkey.ConstIntZExt, vbaseValue.Handle == 0 ? null : vbaseValue.ConstIntZExt));
-                    bytecodePtrToRip.Add(twoBytecodeOneHandlerEdge.bytecodePtr2, (twoBytecodeOneHandlerEdge.handlerRip, vkey.Handle == 0 ? null : vkey.ConstIntZExt, vbaseValue.Handle == 0 ? null : vbaseValue.ConstIntZExt));
+
+                    bytecodePtrToRip.Add(twoBytecodeOneHandlerEdge.bytecodePtr1, (twoBytecodeOneHandlerEdge.handlerRip, vkey1.Handle == 0 ? null : vkey1.ConstIntZExt, vbaseValue.Handle == 0 ? null : vbaseValue.ConstIntZExt));
+                    bytecodePtrToRip.Add(twoBytecodeOneHandlerEdge.bytecodePtr2, (twoBytecodeOneHandlerEdge.handlerRip, vkey2.Handle == 0 ? null : vkey2.ConstIntZExt, vbaseValue.Handle == 0 ? null : vbaseValue.ConstIntZExt));
                     output.Add(new VmpJmpTable(constJmpFromAddress, new List<ulong>() { twoBytecodeOneHandlerEdge.bytecodePtr1, twoBytecodeOneHandlerEdge.bytecodePtr2 }, Enumerable.Empty<ulong>().ToList(), isComplete: false));
                 }
 
@@ -2968,7 +3044,7 @@ namespace Dna.BinaryTranslator.VMProtect.Rewrite
 
 
                         if (!vkey1.IsConstant())
-                            return new Err<InvalidOperationException>(new InvalidOperationException($"Could not identify constant vkey for {vkey1}"));
+                            return new Err<InvalidOperationException>(new InvalidOperationException($"Could not identify constant vkey for {vkey1} in TwoBytecodeTwoHandlerEdge"));
                     }
 
                     if (vb1 != null && vb2 != null)

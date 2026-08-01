@@ -70,6 +70,11 @@ namespace Dna.LLVMInterop.API.Optimization
             NativeOptimizationApi.RunCfgCanonicalizationPipeline(function);
         }
 
+        public static unsafe void RunInstCombine(LLVMValueRef function)
+        {
+            NativeOptimizationApi.RunInstCombine(function);
+        }
+
         public unsafe static void RunJumpTableSolvingPass(LLVMValueRef function, dgSolveJumpTableBounds structureFunction, dgTrySolveConstant trySolveConstant)
         {
             NativeOptimizationApi.RunJumpTableSolvingPass(function, Marshal.GetFunctionPointerForDelegate(structureFunction), Marshal.GetFunctionPointerForDelegate(trySolveConstant));

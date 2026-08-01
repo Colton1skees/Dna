@@ -63,6 +63,27 @@ namespace Dna::API {
 		FPM.run(*function, FAM);
 	}
 
+	DNA_EXPORT void RunInstCombine(llvm::Function* function)
+	{
+		llvm::LoopAnalysisManager LAM;
+		llvm::FunctionAnalysisManager FAM;
+		llvm::CGSCCAnalysisManager CGAM;
+		llvm::ModuleAnalysisManager MAM;
+		llvm::FunctionPassManager FPM;
+		llvm::PassBuilder PB;
+
+		FPM.addPass(llvm::InstCombinePass());
+
+		FAM.registerPass([&] { return PB.buildDefaultAAPipeline(); });
+		PB.registerModuleAnalyses(MAM);
+		PB.registerCGSCCAnalyses(CGAM);
+		PB.registerFunctionAnalyses(FAM);
+		PB.registerLoopAnalyses(LAM);
+		PB.crossRegisterProxies(LAM, FAM, CGAM, MAM);
+
+		FPM.run(*function, FAM);
+	}
+
 	DNA_EXPORT llvm::BasicBlock* CloneBasicBlock(llvm::BasicBlock* block)
 	{
 		llvm::ValueToValueMapTy VMap;

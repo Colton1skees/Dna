@@ -78,7 +78,7 @@ if (genDsl)
 bool dbgCode = false;
 if (dbgCode)
 {
-    var irPath = "C:\\Users\\user\\Downloads\\polished.ll";
+    var irPath = "C:\\Users\\user\\Downloads\\select_vkey.ll";
     var t = File.ReadAllText(irPath);
     Console.WriteLine(irPath);
 
@@ -103,6 +103,7 @@ if (dbgCode)
 
     while (true)
     {
+        bool opt = true;
         var sw = Stopwatch.StartNew();
         unsafe
         {
@@ -126,14 +127,15 @@ if (dbgCode)
 
 
         //new VmpSolver2(vmpDna, existingFunc).SolveVip(existingFunc, existingFunc.GetInstructions().Single(x => x.ToString().Contains("%add.i.i125.i.i.i = a")));
-        new VmpSolver2(vmpDna, existingFunc).Simplify(existingFunc);
+        if (opt)
+            new VmpSolver2(vmpDna, existingFunc).Simplify(existingFunc);
 
         //MbaDeobfuscationPass.Run(existingFunc);
 
 
         //MbaDeobfuscationPass.Run(existingFunc);
         tempNewMod.PrintToFile(("translatedFunction.ll"));
-        while (true)
+        while (true && opt)
         {
             var sw2 = Stopwatch.StartNew();
             for (int i = 0; i < 3; i++)
@@ -157,11 +159,12 @@ if (dbgCode)
 
         //MbaDeobfuscationPass.Run(existingFunc);
         tempNewMod.PrintToFile(("translatedFunction.ll"));
-        PassPipeline.Run(vmpBin, existingFunc, false, false, fastPipeline: false);
+        if (opt)
+            PassPipeline.Run(vmpBin, existingFunc, false, false, fastPipeline: false);
         //  PassPipeline.Run(vmpBin, existingFunc);
 
 
-        VmpContextRemovalPass.Run(existingFunc);
+        //VmpContextRemovalPass.Run(existingFunc);
 
 
         tempNewMod.PrintToFile("instcombine.ll");
@@ -221,6 +224,10 @@ if (useVmp)
 
     // complex_loop_32
     vmpAddr = 0x1400037AF;
+
+    // complex_loop_64
+    vmpAddr = 0x140003862;
+
 
     var vmpBin = WindowsBinary.From(vmpPath);
     var vmpDna = new Dna.Dna(vmpBin);

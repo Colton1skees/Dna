@@ -299,7 +299,10 @@ namespace Dna.BinaryTranslator.Unsafe
                     }
 
 
-                    OptimizationApi.OptimizeModule(function.GlobalParent, function, false, false, 0, false, 0, false);
+                    //OptimizationApi.OptimizeModule(function.GlobalParent, function, false, false, 0, false, 0, false);
+
+                    // TODO: Stop using the VMP pipeline. Currently using it here because `OptimizeModule` tries to apply IPSCCP across the entire module, and the module has thousands of handlers.
+                    OptimizationApi.OptimizeModuleVmp(function.GlobalParent, function, false, false, 0, false, 0, false, false, 0, 0, 0, 0, fastPipeline: true);
 
                     if (!LIFT_SEH)
                         continue;

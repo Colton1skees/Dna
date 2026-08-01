@@ -46,6 +46,9 @@ namespace Dna.LLVMInterop
         public unsafe static extern IntPtr RunCfgCanonicalizationPipeline(LLVMOpaqueValue* function);
 
         [DllImport("Dna.LLVMInterop", CallingConvention = CallingConvention.Cdecl)]
+        public unsafe static extern void RunInstCombine(LLVMOpaqueValue* function);
+
+        [DllImport("Dna.LLVMInterop", CallingConvention = CallingConvention.Cdecl)]
         public unsafe static extern void RunJumpTableSolvingPass(LLVMOpaqueValue* function, nint solveJumpTableBounds, nint trySolveConstant);
     }
 }
