@@ -386,10 +386,12 @@ namespace Dna.BinaryTranslator.Unsafe
 
             for (int x = 0; x < 2; x++)
             {
+                /*
                 var storeToLoad = new CombinedFixedpointOptPass(dna.Binary, new FixedpointPassConfig());
                 var pStoreToLoad = Marshal.GetFunctionPointerForDelegate(storeToLoad.PtrToStoreLoadPropagation);
                 OptimizationApi.OptimizeModuleVmp(function.GlobalParent, function, false, false, 0, false, 0, false, false, 0, 0, 0, 0, fastPipeline: true);
-                //OptimizationApi.OptimizeModule(function.GlobalParent, function, false, false, 0, false, 0, false);
+                */
+                OptimizationApi.OptimizeModule(function.GlobalParent, function, false, false, 0, false, 0, false);
             }
 
             return (function, parameterizedStateStruct);

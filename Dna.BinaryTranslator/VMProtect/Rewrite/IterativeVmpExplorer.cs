@@ -1795,7 +1795,7 @@ namespace Dna.BinaryTranslator.VMProtect.Rewrite
             if (File.Exists(cacheName))
             {
                 cacheModule = RemillUtils.LoadModuleFromFile(LLVMContextRef.Global, cacheName).Value;
-                foreach (var f in cacheModule.GetFunctions().Where(x => x.Name.StartsWith("Parameterized_TranslatedFrom") && !x.Name.Contains("from_cache") && !x.Name.Contains("vip")))
+                foreach (var f in cacheModule.GetFunctions().Where(x => x.Name.StartsWith("Parameterized_TranslatedFrom") && !x.Name.Contains("_from_cache") && !x.Name.Contains("_vip_")))
                 {
                     var split = f.Name.Split(new string[] { "Parameterized_TranslatedFrom", "_" }, StringSplitOptions.RemoveEmptyEntries);
                     var parsed = ulong.Parse(split[0], System.Globalization.NumberStyles.HexNumber);
