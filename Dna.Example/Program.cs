@@ -184,7 +184,7 @@ if (dbgCode)
 
         var compiledPath3 = ClangCompiler.Compile(name);
 
-        Console.WriteLine("Loading into IDA.     ");
+        Console.WriteLine("Loading into IDA.      ");
         var exePath3 = IDALoader.Load(compiledPath3, true);
 
 
