@@ -2379,6 +2379,7 @@ namespace Dna.BinaryTranslator.VMProtect.Rewrite
         }
         public void Simplify(LLVMValueRef func)
         {
+            LLVMBuilderRef builder = func.GetFunctionCtx().CreateBuilder();
             File.WriteAllText("llvmconstraints.py", new LLVMToBinjaGraph(func).Process());
             var li = new LoopInfo(func);
             var dt = new DominatorTree(func);
@@ -2398,7 +2399,7 @@ namespace Dna.BinaryTranslator.VMProtect.Rewrite
 
             var sw = Stopwatch.StartNew();
             //foreach(var (value, idx) in converter.defMap)
-            var solver = MkSolver(100);
+            var solver = MkSolver(200);
             solver.Push();
             LLVMBasicBlockRef currBlock = null;
             int rejected = 0;
@@ -2406,8 +2407,8 @@ namespace Dna.BinaryTranslator.VMProtect.Rewrite
             {
                 foreach (var value in LLVMUtil.GetRpoInstructions(func))
                 {
-                    //if (!targets.Contains(value))
-                    //    continue;
+                    if (!targets.Contains(value))
+                        continue;
                     // Skip if this is not 
                     if (!converter.defMap.TryGetValue(value, out var idx))
                         continue;
@@ -2454,14 +2455,92 @@ namespace Dna.BinaryTranslator.VMProtect.Rewrite
                     solver.Assert(cond);
 
 
-                    var solutions = EnumerateSolutions(solver, translated, 2);
+                    var solutions = EnumerateSolutions(solver, translated, 2).ToArray();
                     if (solutions == null)
                     {
                         //Console.WriteLine($"Rejected: {idx}");
                         rejected++;
                         continue;
                     }
-                    if (solutions.Count != 1)
+
+                    // If there are two solutions, try to find a select.
+                    if (solutions.Count() == 2 && currBlock.ToString().Contains("; preds = %split16847"))
+                    {
+                        var cmps = currBlock.GetInstructions().Where(x => x.TypeOf.Kind == LLVMTypeKind.LLVMIntegerTypeKind && x.TypeOf.IntWidth == 1 && converter.defMap.ContainsKey(x)).ToList();
+
+                        solver.Push();
+                        solver.Assert(translated == solutions[0]);
+                        var s = solver.CheckSat();
+                        Debug.Assert(s == Result.Sat);
+                        var values0 = cmps.Select(x => solver.GetValue(translator.Translate(converter.defMap[x]))).ToList();
+                        solver.Pop();
+
+                        solver.Push();
+                        solver.Assert(translated == solutions[1]);
+                        s = solver.CheckSat();
+                        Debug.Assert(s == Result.Sat);
+                        var values1 = cmps.Select(x => (solver.GetValue(translator.Translate(converter.defMap[x])))).ToList();
+                        solver.Pop();
+
+                        func.GlobalParent.PrintToFile("translatedFunction.ll");
+
+                        for(var cmpIdx = 0; cmpIdx < values0.Count; cmpIdx++)
+                        {
+                            var v0 = values0[cmpIdx];
+                            Console.WriteLine($"Kind: {v0.Kind}");
+                            if (v0.Kind != BitwuzlaKind.BITWUZLA_KIND_VALUE)
+                                continue;
+                            var v1 = values1[cmpIdx];
+                            if (v1.Kind != BitwuzlaKind.BITWUZLA_KIND_VALUE)
+                                continue;
+
+                            var int0 = Tm.GetIntegerValue(v0);
+                            var int1 = Tm.GetIntegerValue(v1);
+                            if (int0 == int1)
+                                continue;
+
+                            var translatedCmp =  translator.Translate(converter.GetAst(cmps[cmpIdx]));
+
+                            var before = solutions.ToArray();
+                            for (int i = 0; i < 2; i++)
+                            {
+                                solver.Push();
+                                solver.Assert(Tm.MkImplies(translated == solutions[0], ToBool(translatedCmp)));
+                                solver.Assert(Tm.MkImplies(translated == solutions[1], ToBool(~translatedCmp)));
+                                s = solver.CheckSat();
+                                solver.Pop();
+
+                                if (s == Result.Sat)
+                                {
+                                    var synthesizedCond = cmps[cmpIdx];
+
+                                    builder.PositionBefore(value);
+                                    var intTy = value.TypeOf;
+                                    var select = builder.BuildSelect(synthesizedCond, LLVMValueRef.CreateConstInt(intTy, solutions[0]), LLVMValueRef.CreateConstInt(intTy, solutions[1]));
+                                    value.ReplaceAllUsesWith(select);
+                                    simplifications.Add((idx, select));
+
+                                    solver.Push();
+                                    var zero = Tm.MkBvValue(0, translated.Sort.BvSize);
+                                    solver.Assert(translated == Tm.MkIte(ToBool(translatedCmp), zero + solutions[0], zero + solutions[1]));
+                                    s = solver.CheckSat();
+                                    solver.Pop();
+                                    if (s == Result.Sat)
+                                        goto done;
+                                    
+                                }
+
+                                solutions.Reverse();
+                              
+                            }
+                        }
+
+                        Console.WriteLine("FAIL");
+
+        
+                    }
+
+                    if (solutions.Count() != 1)
                     {
                         //Console.WriteLine($"Rejected: {idx}");
                         rejected++;
@@ -2474,6 +2553,9 @@ namespace Dna.BinaryTranslator.VMProtect.Rewrite
                     //Debugger.Break();
                     simplCount++;
                     simplifications.Add((idx, constInt));
+
+                done:
+                    continue;
                 }
 
                 sw.Stop();
@@ -2485,6 +2567,11 @@ namespace Dna.BinaryTranslator.VMProtect.Rewrite
 
             //Debugger.Break();
         }
+
+
+        private Term ToBool(Term term)
+           => Tm.MkExtract(0, 0, term) == 1;
+
 
         public record BlockInfo
         {

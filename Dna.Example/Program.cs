@@ -75,10 +75,10 @@ if (genDsl)
 //LazyLLVMFixes.InstallValueToStringBugFix(RemillUtils.LLVMValueToString);
 
 
-bool dbgCode = false;
+bool dbgCode = true;
 if (dbgCode)
 {
-    var irPath = "C:\\Users\\user\\Downloads\\test4.ll";
+    var irPath = "C:\\Users\\user\\Downloads\\synth_625.ll";
     var t = File.ReadAllText(irPath);
     Console.WriteLine(irPath);
 

@@ -161,10 +161,11 @@ namespace Dna.Passes
 
             PeepholeResult changed = null;
 
-
+            /*
             changed = TrySimplifyInstruction(inst);
             if (changed != null)
                 return changed;
+            */
 
             changed = TryFoldConstantGepChain(inst);
             if (changed != null)
@@ -204,23 +205,17 @@ namespace Dna.Passes
                 return changed;
 
 
-            changed = TryMergeSameConditionBinarySelect(inst);
-            if (changed != null)
-                return changed;
-
             changed = TryDistributeBinarySelect(inst);
             if (changed != null)
                 return changed;
 
+            /*
             changed = TryCollapseRedundantSelectRound(inst);
             if (changed != null)
                 return changed;
+            */
 
             changed = TryDistributeTernarySelect(inst);
-            if (changed != null)
-                return changed;
-
-            changed = TrySimplifySharedConditionSelect(inst);
             if (changed != null)
                 return changed;
 
@@ -287,11 +282,11 @@ namespace Dna.Passes
             if (changed != null)
                 return changed;
 
-
+            /*
             changed = TryCanonicalizeInverseCmp(inst);
             if (changed != null)
                 return changed;
-
+            */
 
             changed = TrySimplifyCmp(inst);
             if (changed != null)
@@ -470,7 +465,6 @@ return peephole;
         }
 
 
-
         private PeepholeResult TryDistributeBinarySelect(LLVMValueRef inst)
         {
             var opcode = inst.InstructionOpcode;
@@ -489,34 +483,18 @@ return peephole;
             var op1 = inst.GetOperand(0);
             var op2 = inst.GetOperand(1);
 
-            bool op1IsSelect = op1.Is(LLVMOpcode.LLVMSelect);
-            bool op2IsSelect = op2.Is(LLVMOpcode.LLVMSelect);
-
-            // Distributing through independent selects materializes their Cartesian product.
-            // Same-condition selects were merged immediately before this pass, so leave every
-            // remaining select/select operation intact rather than growing a shared DAG into an
-            // exponential tree.
-            if (op1IsSelect && op2IsSelect)
+            // At least one operand must be a select of two constants
+            if (!IsSelect(op1) && !IsSelect(op2))
                 return null;
 
-            var selectIndex = op1IsSelect ? 0 : 1;
+            var selectIndex = IsSelect(op1) ? 0 : 1;
             var selectOperand = selectIndex == 0 ? op1 : op2;
-            var otherOperand = selectIndex == 0 ? op2 : op1;
-            if (!selectOperand.Is(LLVMOpcode.LLVMSelect))
-                return null;
-
-            // IsSelect() intentionally remains the literal constant-arm predicate. Also accept
-            // a trivially constant arm such as `sext i32 K`: unary select distribution creates
-            // this form immediately before an add/xor needs to be distributed and folded. A
-            // plain constant sibling still permits the historical shallow-select case, but not
-            // a nested select: recursively distributing the latter is what caused the blow-up.
-            bool hasConstantLikeArm = HasConstantLikeArm(selectOperand);
-            bool isShallowConstantSiblingCase = otherOperand.IsConstant() && !HasSelectArm(selectOperand);
-            if (!hasConstantLikeArm && !isShallowConstantSiblingCase)
-                return null;
+            var otherIndex = IsSelect(op1) ? 1 : 0;
+            var otherOperand = otherIndex == 0 ? op1 : op2;
 
             builder.PositionBefore(inst);
             var clone0 = Clone(inst);
+            builder.PositionBefore(inst);
             builder.PositionBefore(inst);
             var clone1 = Clone(inst);
 
@@ -532,14 +510,6 @@ return peephole;
             peephole.Add(clone0, clone1, res);
             return peephole;
         }
-
-        private static bool HasConstantLikeArm(LLVMValueRef select)
-            => IsConstantLike(select.GetOperand(1)) || IsConstantLike(select.GetOperand(2));
-
-        private static bool HasSelectArm(LLVMValueRef select)
-            => select.GetOperand(1).Is(LLVMOpcode.LLVMSelect) ||
-               select.GetOperand(2).Is(LLVMOpcode.LLVMSelect);
-
         // Restrict this to expressions which are guaranteed to fold once their children are
         // visited. It preserves the useful `sext(select(c, K0, K1))` -> add case without making
         // an arbitrary non-constant arm profitable for select distribution.
