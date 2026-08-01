@@ -144,10 +144,6 @@ namespace Dna.BinaryTranslator.VMProtect.Rewrite
 
             HashSet<ulong> vmexitHandlerRips = new();
 
-            // Mark the first handler for lifting.
-            var handlersRipsToLift = new OrderedSet<(ulong nativeRip, bool isVmEnter)>();
-            handlersRipsToLift.Add((funcRip, true));
-
             // Append the handler to the VM cfg
             var vCfg = new VmCfg();
             vCfg.GetOrAdd(handlers.First());
@@ -233,31 +229,6 @@ namespace Dna.BinaryTranslator.VMProtect.Rewrite
             //handlerLifter.LiftHandler(0x140048BBD, false);
             while (true)
             {
-
-                if (vCfg.Instructions.ContainsKey(new VmHandler(0x14000FE70, 0)))
-                {
-                    // liftedFunction.GlobalParent.PrintToFile("translatedFunction.ll");
-                    // Debugger.Break();
-                }
-
-
-                // It's failing once we hit the loop?
-                if (ii == 960)
-                {
-                    var name = Guid.NewGuid().ToString() + ".ll";
-                    liftedFunction.GlobalParent.PrintToFile((name));
-
-                    var compiledPath3 = ClangCompiler.Compile(name);
-
-                    Console.WriteLine("Loading into IDA.   ");
-                    var exePath3 = IDALoader.Load(compiledPath3, true);
-                    Debugger.Break();
-                }
-
-
-
-
-                //AdhocInstCombinePass.bar = numFast;
                 Console.WriteLine($"Lifting iteration {ii++} at {sw.ElapsedMilliseconds}ms");
                 Console.WriteLine($"{numFast} / {numFast + numHeavy} solvers finished");
 
@@ -269,55 +240,7 @@ namespace Dna.BinaryTranslator.VMProtect.Rewrite
                 var text = new BinjaVmCfgViewerV2(vCfg).Run(handlerRipToRegisters, handlerToVkey);
                 File.WriteAllText("binja.py", text);
 
-                /*
-                // see VIPs.txt
-                if (false && ii == 551)
-                {
-                    Console.WriteLine($"VIPs: ");
-                    foreach(var inst in vCfg.Instructions)
-                    {
-                        var incomingVip = inst.Key.BytecodeRip == funcRip ? bytecodeRegister : inst.Value.Predecessors.Select(x => handlerVips[x]).DistinctBy(x => x.Name).Single();
-                        var outgoingVip = handlerVips[inst.Key];
 
-                        Console.WriteLine($"{inst.Key.BytecodeRip.ToString("X")} {incomingVip} {outgoingVip}");
-                    }
-
-                    Debugger.Break();
-                }
-                */
-
-                //var join = String.Join(", ", handlerLifter.handlerRipToLlvmFunction.Keys.Select(x => "0x" + x.ToString("X")));
-                //Console.WriteLine(join);
-
-
-                //// Identify all VmExit handlers.
-                //foreach (var (rip, isVmEnter) in handlersRipsToLift)
-                //{
-                //    //handlerLifter.LiftHandler(rip, handlers.Count == 1);
-                //    var cfg = HandlerLifter.DisHandler(dna, rip);
-                //    if (HandlerLifter.IsVmexit(cfg))
-                //        vmexitHandlerRips.Add(rip);
-                //}
-
-
-                // Lift all native handlers to LLVM IR and cache them
-                //IterativeVmpTranslator.LiftHandlersIntoCache(arch, handlerCache, dna, handlersRipsToLift);
-                handlersRipsToLift.Clear();
-
-                // Lift the partial CFG
-                //var stateStruct = handlerCache.GetLiftedHandler(handlers.First().NativeRip).ParameterizedStateStructure;
-
-                // So the problem is with rebuilding???
-                // ii >= 1040 triggers it
-                //if (ii >= 1 && liftedFunction.Handle != 0)
-                //if (ii >= 620 && liftedFunction.Handle != 0)
-                //if (false)
-                //if (ii >= 730 && liftedFunction.Handle != 0)
-                if (false)
-                {
-                    liftedFunction.DeleteFunction();
-                    liftedFunction.Handle = 0;
-                }
                 AdhocInstCombinePass.Validate(liftedFunction);
                 liftedFunction = new IterativeCfgBuilder(dna, outModule, arch, stateStruct, vCfg, handlerLifter, vmexitHandlerRips, handlerVips, handlerToVkey, handlerToImagebase, handlerRipToRegisters).Run(liftedFunction, handlers.First());
                 AdhocInstCombinePass.Validate(liftedFunction);
@@ -1854,6 +1777,8 @@ namespace Dna.BinaryTranslator.VMProtect.Rewrite
 
         private readonly RemillArch arch;
 
+        public readonly string cacheName;
+
         public readonly LLVMModuleRef cacheModule;
 
         public readonly Dictionary<ulong, LLVMValueRef> handlerRipToLlvmFunction = new();
@@ -1864,9 +1789,18 @@ namespace Dna.BinaryTranslator.VMProtect.Rewrite
             this.ctx = ctx;
             this.arch = arch;
 
-            if (File.Exists("cacheModule.ll"))
+            ulong hash = 0;
+            for(var i = 0; i < dna.Binary.Bytes.Length; i++)
             {
-                cacheModule = RemillUtils.LoadModuleFromFile(LLVMContextRef.Global, "cacheModule.ll").Value;
+                var b = (ulong)dna.Binary.Bytes[i];
+                hash += (17 * b) ^ (ulong)i;
+            }
+
+            cacheName = $"cacheModule{hash.ToString()}.ll";
+
+            if (File.Exists(cacheName))
+            {
+                cacheModule = RemillUtils.LoadModuleFromFile(LLVMContextRef.Global, cacheName).Value;
                 foreach (var f in cacheModule.GetFunctions().Where(x => x.Name.StartsWith("Parameterized_TranslatedFrom") && !x.Name.Contains("from_cache")))
                 {
                     var split = f.Name.Split(new string[] { "Parameterized_TranslatedFrom", "_" }, StringSplitOptions.RemoveEmptyEntries);
@@ -1918,10 +1852,14 @@ namespace Dna.BinaryTranslator.VMProtect.Rewrite
             // TODO: Inline only the call we just created. We just need to add a pinvoke import for this.
             LLVMCloning.InlineFunction(handler);
 
+
             //cacheModule.Verify(LLVMVerifierFailureAction.LLVMAbortProcessAction);
 
             // Move the newly created function into the target module.
             newHandler = FunctionIsolator.IsolateFunctionInto(module, newHandler);
+
+
+
             return newHandler;
         }
 
@@ -1986,7 +1924,6 @@ namespace Dna.BinaryTranslator.VMProtect.Rewrite
             OptimizationApi.OptimizeModule(stripped.GlobalParent, stripped, false, false, 0, false, 0, false);
 
 
-
             foreach (var inst in stripped.GetInstructions())
                 ConstantFoldingAPI.DropPoisonGeneratingFlags(inst);
             //stripped.GlobalParent.PrintToFile("translatedFunction.ll");
@@ -1994,7 +1931,22 @@ namespace Dna.BinaryTranslator.VMProtect.Rewrite
             // Move the newly created function into the target module.
             var newHandler = FunctionIsolator.IsolateFunctionInto(cacheModule, stripped);
             handlerRipToLlvmFunction[handlerRip] = newHandler;
-            return newHandler;
+
+
+
+            // Otherwise this is probably an unsolved jump table. Error out.
+            var memPtr = cacheModule.GetNamedGlobal("memory");
+            if (memPtr.Handle != 0)
+            {
+                memPtr.Linkage = LLVMLinkage.LLVMCommonLinkage;
+                var memoryPtrNull = LLVMValueRef.CreateConstPointerNull(cacheModule.GetPtrType());
+                memPtr.Initializer = memoryPtrNull;
+            }
+
+            cacheModule.PrintToFile(cacheName);
+
+
+                return newHandler;
 
             //File.WriteAllText("binja.py", new LLVMToBinjaGraph(stripped).Process());
 
@@ -2237,6 +2189,24 @@ namespace Dna.BinaryTranslator.VMProtect.Rewrite
 
         }
 
+        private void EliminateUselessStores(LLVMValueRef func, ParameterizedStateStructure stateStruct)
+        {
+            foreach(var store in func.GetInstructions().Where(x => x.Is(LLVMOpcode.LLVMStore)).ToList())
+            {
+                if (!store.GetOperand(0).Is(LLVMValueKind.LLVMArgumentValueKind))
+                    continue;
+                if (!store.GetOperand(1).Is(LLVMValueKind.LLVMArgumentValueKind))
+                    continue;
+
+                var srcReg = stateStruct.OrderedRegisterArguments[func.GetParams().IndexOf(store.GetOperand(0))];
+                var dstReg = stateStruct.RegisterOutputArgumentIndices.Single(x => x.Value == func.GetParams().IndexOf(store.GetOperand(1))).Key;
+                if (srcReg.Name != dstReg.Name)
+                    continue;
+
+                store.InstructionEraseFromParent(); 
+            }
+        }
+
         //   %6 = add i64 %RDI, 224
         // %.not = icmp ugt i64 % 3, %6
         private static bool IsStackExpansionPredicate(LLVMValueRef x)
@@ -2381,6 +2351,10 @@ namespace Dna.BinaryTranslator.VMProtect.Rewrite
 
                 if (inst.Is(LLVMOpcode.LLVMBr) && inst.OperandCount == 3)
                     targets.Add(inst.GetOperand(0));
+
+                // Add all i1s
+                if (MbaDeobfuscationPass.IsValidIntegerInst(inst) && inst.TypeOf.IntWidth == 1)
+                    targets.Add(inst);
             }
 
             return targets;
@@ -2463,13 +2437,15 @@ namespace Dna.BinaryTranslator.VMProtect.Rewrite
                     solver.Assert(cond);
 
 
-                    var solutions = EnumerateSolutions(solver, translated, 3).ToArray();
-                    if (solutions == null)
+                    var sol = EnumerateSolutions(solver, translated, 3);
+                    if (sol == null)
                     {
                         //Console.WriteLine($"Rejected: {idx}");
                         rejected++;
                         continue;
                     }
+
+                    var solutions = sol.ToArray();
 
                     // If there are two solutions, try to find a select.
                     if (solutions.Count() == 2)
