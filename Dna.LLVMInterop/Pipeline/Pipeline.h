@@ -839,7 +839,7 @@ void OptimizeVmpModule(llvm::Module* module,
 	MPM.addPass(llvm::GlobalOptPass());
 	CGPM.addPass(llvm::PostOrderFunctionAttrsPass());
 	MPM.addPass(llvm::createModuleToPostOrderCGSCCPassAdaptor(std::move(CGPM)));
-
+	
 	FPM.addPass(llvm::DSEPass());
 	FPM.addPass(llvm::InstCombinePass());
 	FPM.addPass(llvm::EarlyCSEPass(true));

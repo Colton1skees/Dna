@@ -1,12 +1,23 @@
-﻿using Dna.ControlFlow;
+﻿using Dna.Binary;
+using Dna.BinaryTranslator.JmpTables;
+using Dna.BinaryTranslator.JmpTables.Precise;
+using Dna.BinaryTranslator.Lifting;
+using Dna.BinaryTranslator.Safe;
+using Dna.BinaryTranslator.VMProtect;
+using Dna.BinaryTranslator.X86;
+using Dna.ControlFlow;
+using Dna.ControlFlow.Extensions;
 using Dna.Extensions;
-using Dna.LLVMInterop.API.LLVMBindings.IR;
-using Dna.LLVMInterop.API.LLVMBindings.Transforms.IPO;
-using Dna.LLVMInterop.API.LLVMBindings.Transforms;
 using Dna.LLVMInterop;
+using Dna.LLVMInterop.API.LLVMBindings.IR;
+using Dna.LLVMInterop.API.LLVMBindings.Transforms;
+using Dna.LLVMInterop.API.LLVMBindings.Transforms.IPO;
 using Dna.LLVMInterop.API.Optimization;
 using Dna.LLVMInterop.API.Remill.Arch;
+using Dna.LLVMInterop.API.Remill.BC;
+using Dna.Passes;
 using Dna.Reconstruction;
+using Dna.SEH;
 using Dna.Utilities;
 using Iced.Intel;
 using LLVMSharp.Interop;
@@ -15,22 +26,12 @@ using System.Collections.Generic;
 using System.Diagnostics;
 using System.Linq;
 using System.Net.WebSockets;
+using System.Runtime.InteropServices;
 using System.Text;
 using System.Threading.Tasks;
+using Unicorn.X86;
 using JumpTableMapping = System.Collections.Generic.Dictionary<ulong, Dna.BinaryTranslator.JmpTables.JmpTable>;
 using X86Block = Dna.ControlFlow.BasicBlock<Iced.Intel.Instruction>;
-using Dna.BinaryTranslator.X86;
-using Dna.BinaryTranslator.JmpTables;
-using Dna.BinaryTranslator.JmpTables.Precise;
-using Dna.LLVMInterop.API.Remill.BC;
-using Dna.Binary;
-using Dna.SEH;
-using Dna.BinaryTranslator.Safe;
-using Dna.ControlFlow.Extensions;
-using Dna.BinaryTranslator.Lifting;
-using Unicorn.X86;
-using Dna.BinaryTranslator.VMProtect;
-using Dna.Passes;
 
 namespace Dna.BinaryTranslator.Unsafe
 {
@@ -385,7 +386,10 @@ namespace Dna.BinaryTranslator.Unsafe
 
             for (int x = 0; x < 2; x++)
             {
-                OptimizationApi.OptimizeModule(function.GlobalParent, function, false, false, 0, false, 0, false);
+                var storeToLoad = new CombinedFixedpointOptPass(dna.Binary, new FixedpointPassConfig());
+                var pStoreToLoad = Marshal.GetFunctionPointerForDelegate(storeToLoad.PtrToStoreLoadPropagation);
+                OptimizationApi.OptimizeModuleVmp(function.GlobalParent, function, false, false, 0, false, 0, false, false, 0, 0, 0, 0, fastPipeline: true);
+                //OptimizationApi.OptimizeModule(function.GlobalParent, function, false, false, 0, false, 0, false);
             }
 
             return (function, parameterizedStateStruct);

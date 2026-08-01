@@ -223,11 +223,12 @@ namespace Dna.Passes
             changed = TrySimplifyDemandedBits(inst);
             if (changed != null)
                 return changed;
-
-
+            
+            /*
             changed = TryKnownBitsFoldToSelect(inst, simplifyQuery);
             if (changed != null)
                 return changed;
+            */
 
             changed = TryRewriteVmpShifts(inst);
             if (changed != null)

@@ -191,7 +191,7 @@ if (dbgCode)
         //File.WriteAllText("binja.py", new LLVMToBinjaGraph(existingFunc).Process());
 
         sw.Stop();
-            Console.WriteLine($"Pass took {sw.ElapsedMilliseconds}ms");
+            Console.WriteLine($"Pass took {sw.ElapsedMilliseconds}ms ");
         Debugger.Break();
     }
     Debugger.Break();
@@ -247,7 +247,7 @@ if (useVmp)
     var devirtedFunc = translator.Run();
     sw.Stop();
 
-    Console.WriteLine($"Took {sw.ElapsedMilliseconds}ms ");
+    Console.WriteLine($"Took {sw.ElapsedMilliseconds}ms  ");
     Debugger.Break();
     VmpContextRemovalPass.Run(devirtedFunc);
 
