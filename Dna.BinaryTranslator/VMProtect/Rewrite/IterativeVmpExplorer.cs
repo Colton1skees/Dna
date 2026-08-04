@@ -1404,7 +1404,10 @@ namespace Dna.BinaryTranslator.VMProtect.Rewrite
             // If this is an exit node, store all register values and exit.
             if ((isComplete && info.Successors.Count == 0) || info.Metadata.IsVmExit)
             {
+                builder.PositionAtEnd(llvmBlock);
                 VmPartialBlockLifter.UpdateOutputRegisters(builder, function, registerAllocaMapping, stateStruct);
+                Debug.Assert(info.Metadata.IsVmExit);
+                AddCallToVmExitIntrinsic(module, builder, registerAllocaMapping, handler.BytecodeRip, exitBlock);
                 builder.BuildRetVoid();
                 return;
             }
@@ -1490,6 +1493,30 @@ namespace Dna.BinaryTranslator.VMProtect.Rewrite
             var call = builder.BuildCall2(func.GetFunctionPrototype(), func, values);
             builder.BuildBr(exitBlock);
             return call;
+        }
+
+        public LLVMValueRef AddCallToVmExitIntrinsic(LLVMModuleRef module, LLVMBuilderRef builder, IReadOnlyDictionary<RemillRegister, LLVMValueRef> registerAllocaMapping, ulong exitFromRip, LLVMBasicBlockRef exitBlock)
+        {
+            var values = stateStruct.OrderedRegisterArguments.Select(x => builder.BuildLoad2(LLVMTypeRef.Int64, registerAllocaMapping[x]))
+                .Append(LLVMValueRef.CreateConstInt(LLVMTypeRef.Int64, exitFromRip))
+                .ToArray();
+            var func = GetOrCreateVmExitIntrinsic(module, stateStruct.OrderedRegisterArguments);
+            var call = builder.BuildCall2(func.GetFunctionPrototype(), func, values);
+            //builder.BuildBr(exitBlock);
+            return call;
+        }
+
+        public static LLVMValueRef GetOrCreateVmExitIntrinsic(LLVMModuleRef module, IReadOnlyList<RemillRegister> registers)
+        {
+            // The intrinsic accepts a list of all registers, and an additional i64 argument containing the bytecode pointer we jumped from.
+            // call(rax, rcx, ..., BYTECODE_PTR)
+            var prototype = LLVMTypeRef.CreateFunction(LLVMTypeRef.Void, registers.Select(x => LLVMTypeRef.Int64).Append(LLVMTypeRef.Int64).ToArray());
+            var func = module.GetFunctions().SingleOrDefault(x => x.Name == "vmp_vmexit");
+            if (func.Handle != 0)
+                return func;
+
+            func = module.AddFunction("vmp_vmexit", prototype);
+            return func;
         }
 
         public static LLVMValueRef GetOrCreateJmpIntrinsic(LLVMModuleRef module, IReadOnlyList<RemillRegister> registers)
@@ -2063,7 +2090,7 @@ namespace Dna.BinaryTranslator.VMProtect.Rewrite
             var targets = GetVmpTargets(func);
             foreach (var target in func.GetInstructions())
             {
-                Console.WriteLine(target);
+                //Console.WriteLine(target);
                 if (MbaDeobfuscationPass.IsValidIntegerInst(target))
                     toVisit.Add(converter.GetAst(target));
             }
