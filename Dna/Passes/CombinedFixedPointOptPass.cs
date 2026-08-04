@@ -298,6 +298,14 @@ namespace Dna.Passes
                             cont = false;
                             break;
                         }
+                    // Val = FREEZE(X) -> (X, C)
+                    // A freeze only pins down the value of a poison operand. If the operand is poison then any
+                    // access through this pointer is UB regardless, so the canonical base is the frozen operand.
+                    case LLVMOpcode.LLVMFreeze:
+                        {
+                            currentBase = currentBase.GetOperand(0);
+                            break;
+                        }
                     default:
                         cont = false;
                         break;

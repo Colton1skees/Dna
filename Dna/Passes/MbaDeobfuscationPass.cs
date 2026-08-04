@@ -408,8 +408,8 @@ namespace Dna.Passes.Mba
         // This is equivalent to (a << s) | (b >> (N - s)), where s = c % N.
         private static AstIdx Fshl(AstCtx ctx, AstIdx a, AstIdx b, AstIdx c)
         {
+     
             var width = ctx.GetWidth(a);
-
             // s = c % N. The width is a power of two, so the modulo is a bitwise AND.
             var s = ctx.And(c, ctx.Constant((ulong)(width - 1), width));
 

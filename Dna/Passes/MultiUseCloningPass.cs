@@ -51,6 +51,7 @@ namespace Dna.Passes
                 LLVMOpcode.LLVMSExt,
                 LLVMOpcode.LLVMZExt,
                 LLVMOpcode.LLVMTrunc,
+                LLVMOpcode.LLVMFreeze,
         };
 
         public static bool Run3(LLVMValueRef function)

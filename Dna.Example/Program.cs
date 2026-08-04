@@ -75,10 +75,10 @@ if (genDsl)
 //LazyLLVMFixes.InstallValueToStringBugFix(RemillUtils.LLVMValueToString);
 
 
-bool dbgCode = false;
+bool dbgCode = true;
 if (dbgCode)
 {
-    var irPath = "C:\\Users\\user\\Downloads\\output.ll";
+    var irPath = "C:\\Users\\user\\Downloads\\fail_stub.ll";
     var t = File.ReadAllText(irPath);
     Console.WriteLine(irPath);
 
@@ -98,12 +98,12 @@ if (dbgCode)
     var exePath33 = IDALoader.Load(compiledPath33, true);
     */
 
-    var existingFunc = tempNewMod.GetFunctions().Single(x => x.Name.Contains("main"));
+    var existingFunc = tempNewMod.GetFunctions().Single(x => x.Name.Contains("Part"));
 
 
     while (true)
     {
-        bool opt = false;
+        bool opt = true;
         var sw = Stopwatch.StartNew();
         unsafe
         {
@@ -149,6 +149,8 @@ if (dbgCode)
             Console.WriteLine($"Fast optimization took {sw2.ElapsedMilliseconds}ms");
             break;
         }
+        new VmpSolver2(vmpDna, existingFunc).Simplify(existingFunc);
+
         tempNewMod.PrintToFile(("translatedFunction.ll"));
         unsafe
         {

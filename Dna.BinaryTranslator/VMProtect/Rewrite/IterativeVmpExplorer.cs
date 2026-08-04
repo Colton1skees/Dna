@@ -2297,96 +2297,50 @@ namespace Dna.BinaryTranslator.VMProtect.Rewrite
                         }
                     }
 
+                    if (value.ToString().Contains(", 5368763838"))
+                        Debugger.Break();
+
                     if (solutions.Count() == 2 && !isSelect(value))
                     {
                         var cmps = currBlock.GetInstructions().TakeWhile(x => x != value).Where(x => x.TypeOf.Kind == LLVMTypeKind.LLVMIntegerTypeKind && x.TypeOf.IntWidth == 1 && converter.defMap.ContainsKey(x)).ToList();
+                        var translatedCmps = cmps.Select(x => translator.Translate(converter.defMap[x])).ToList();
+                        if (solver.CheckSat() != Result.Sat)
+                            goto done;
 
-                        solver.Push();
-                        solver.Assert(translated == solutions[0]);
-                        var s = solver.CheckSat();
-                        if (s != Result.Sat)
+                        var modelValue = Tm.GetIntegerValue(solver.GetValue(translated));
+                        if (!solutions.Contains(modelValue))
+                            goto done;
+                        var modelCmps = translatedCmps.Select(solver.GetValue).ToList();
+
+                        for (var cmpIdx = 0; cmpIdx < cmps.Count; cmpIdx++)
                         {
-                            solver.Pop();
+                            var modelCmp = modelCmps[cmpIdx];
+                            if (modelCmp.Kind != BitwuzlaKind.BITWUZLA_KIND_VALUE)
+                                continue;
+
+                            var conditionIsTrue = Tm.GetIntegerValue(modelCmp) != 0;
+                            var otherValue = solutions.Single(x => x != modelValue);
+                            var trueValue = conditionIsTrue ? modelValue : otherValue;
+                            var falseValue = conditionIsTrue ? otherValue : modelValue;
+                            var expected = Tm.MkIte(
+                                ToBool(translatedCmps[cmpIdx]),
+                                Tm.MkBvValue(translated.Sort, trueValue),
+                                Tm.MkBvValue(translated.Sort, falseValue));
+
+                            if (!AreEquivalent(solver, translated, expected))
+                                continue;
+
+                            builder.PositionBefore(value);
+                            var select = builder.BuildSelect(
+                                cmps[cmpIdx],
+                                LLVMValueRef.CreateConstInt(value.TypeOf, trueValue),
+                                LLVMValueRef.CreateConstInt(value.TypeOf, falseValue));
+                            value.ReplaceAllUsesWith(select);
+                            simplCount++;
+                            simplifications.Add((idx, select));
+                            func.GlobalParent.Verify(LLVMVerifierFailureAction.LLVMAbortProcessAction);
                             goto done;
                         }
-                        //Debug.Assert(s == Result.Sat);
-                        var values0 = cmps.Select(x => solver.GetValue(translator.Translate(converter.defMap[x]))).ToList();
-                        solver.Pop();
-
-                        solver.Push();
-                        solver.Assert(translated == solutions[1]);
-                        s = solver.CheckSat();
-                        if (s != Result.Sat)
-                        {
-                            solver.Pop();
-                            goto done;
-                        }
-
-                        var values1 = cmps.Select(x => (solver.GetValue(translator.Translate(converter.defMap[x])))).ToList();
-                        solver.Pop();
-
-
-
-                        for (var cmpIdx = 0; cmpIdx < values0.Count; cmpIdx++)
-                        {
-
-                            var v0 = values0[cmpIdx];
-                            if (v0.Kind != BitwuzlaKind.BITWUZLA_KIND_VALUE)
-                                continue;
-                            var v1 = values1[cmpIdx];
-                            if (v1.Kind != BitwuzlaKind.BITWUZLA_KIND_VALUE)
-                                continue;
-
-                            var int0 = Tm.GetIntegerValue(v0);
-                            var int1 = Tm.GetIntegerValue(v1);
-                            if (int0 == int1)
-                                continue;
-
-                            var translatedCmp = translator.Translate(converter.GetAst(cmps[cmpIdx]));
-
-                            var before = solutions.ToArray();
-                            for (int i = 0; i < 2; i++)
-                            {
-                                solver.Push();
-                                solver.Assert(Tm.MkImplies(translated == solutions[0], ToBool(translatedCmp)));
-                                solver.Assert(Tm.MkImplies(translated == solutions[1], ToBool(~translatedCmp)));
-                                s = solver.CheckSat();
-                                solver.Pop();
-
-                                if (s == Result.Sat)
-                                {
-                                    var synthesizedCond = cmps[cmpIdx];
-
-
-                                    solver.Push();
-                                    var zero = Tm.MkBvValue(0, translated.Sort.BvSize);
-                                    solver.Assert(translated != Tm.MkIte(ToBool(translatedCmp), zero + solutions[0], zero + solutions[1]));
-                                    s = solver.CheckSat();
-                                    solver.Pop();
-
-                                    if (s == Result.Unsat)
-                                    {
-
-                                        builder.PositionBefore(value);
-                                        var intTy = value.TypeOf;
-                                        var select = builder.BuildSelect(synthesizedCond, LLVMValueRef.CreateConstInt(intTy, solutions[0]), LLVMValueRef.CreateConstInt(intTy, solutions[1]));
-                                        value.ReplaceAllUsesWith(select);
-                                        simplifications.Add((idx, select));
-
-                                        func.GlobalParent.Verify(LLVMVerifierFailureAction.LLVMAbortProcessAction);
-                                        goto done;
-                                    }
-
-                                }
-
-                                solutions.Reverse();
-
-                            }
-                        }
-
-                        Console.WriteLine("FAIL");
-
-
                     }
 
                     if (solutions.Count() != 1)
@@ -2421,6 +2375,15 @@ namespace Dna.BinaryTranslator.VMProtect.Rewrite
 
         private Term ToBool(Term term)
            => Tm.MkExtract(0, 0, term) == 1;
+
+        private static bool AreEquivalent(BvSolver solver, Term lhs, Term rhs)
+        {
+            solver.Push();
+            solver.Assert(lhs != rhs);
+            var result = solver.CheckSat() == Result.Unsat;
+            solver.Pop();
+            return result;
+        }
 
 
         public record BlockInfo
