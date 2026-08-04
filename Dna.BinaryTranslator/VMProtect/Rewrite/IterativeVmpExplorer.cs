@@ -56,6 +56,10 @@ namespace Dna.BinaryTranslator.VMProtect.Rewrite
     public struct HandlerMetadata
     {
         public bool IsComplete;
+
+        public ulong? Vkey;
+
+        public ulong? Vbase;
     }
 
     public record Ok<T>(T Value);
@@ -752,10 +756,7 @@ namespace Dna.BinaryTranslator.VMProtect.Rewrite
 
         private RemillRegister GetVkeyByUsage(ulong rip, LLVMValueRef function, VmpParameterizedStateStructure stateStructure, RemillRegister vipReg)
         {
-            //if (rip == 0x1400c02e0)
-
             var vipArg = function.GetParam((uint)stateStructure.RegisterArgumentIndices[vipReg]);
-            //var loads = function.GetInstructions().Where(x => x.Is(LLVMOpcode.LLVMLoad) && IsGepRegister(x.GetOperand(0)) && DecomposeSum(x.GetOperand(0).GetOperand(1)).Contains(vipArg)).ToList();
 
             var clone = function.GetInstructions().Where(x => x.Is(LLVMOpcode.LLVMLoad) && IsGepRegister(x.GetOperand(0))).ToList();
             List<LLVMValueRef> loads = new();
@@ -800,27 +801,12 @@ namespace Dna.BinaryTranslator.VMProtect.Rewrite
 
                 bool isVkey = count >= 5;
 
-                /*
-                if (!loads.Any(load => argUsers.Any(user => user.GetOperands().Contains(load))))
-                {
-                    Debug.Assert(!isVkey);
-                    continue;
-                }
-                */
-
                 if (!isVkey)
                     continue;
-
-                //var users = loads.SelectMany(x => CollectUsers(x, 50, shouldContinue)).TOha
 
                 Debug.Assert(isVkey);
                 cands.Add(reg);
             }
-
-            //if (cands.Count != 1)
-            //   Debugger.Break();
-
-
 
             return cands.SingleOrDefault();
         }
@@ -828,20 +814,8 @@ namespace Dna.BinaryTranslator.VMProtect.Rewrite
 
         private RemillRegister GetVipByUsage(ulong rip, LLVMValueRef function, VmpParameterizedStateStructure stateStruct)
         {
-            /*
-            if (rip == 0x00000001400e6773)
-                Debugger.Break();
-            //if (rip == 0x140096818)
-           //     Debugger.Break();
-            if (rip == 0x1400e3c7d)
-                Debugger.Break();
-            */
-
-
-
             var loads = function.GetInstructions().Where(x => x.Is(LLVMOpcode.LLVMLoad) && IsGepRegister(x.GetOperand(0))).ToList();
 
-            //HashSet<(LLVMValueRef, int) > options = new();
             Dictionary<LLVMValueRef, int> options = new();
             foreach (var x in loads)
             {
@@ -850,15 +824,6 @@ namespace Dna.BinaryTranslator.VMProtect.Rewrite
                 if (count < 5)
                     continue;
 
-                /*
-                // add i64 %RSI, 1
-                // =>
-                // %RSI
-                var regArg = x.GetOperand(0).GetOperand(1);
-                if (regArg.Is(LLVMOpcode.LLVMAdd, LLVMOpcode.LLVMSub))
-                    regArg = regArg.GetOperands().Single(x => x.Is(LLVMValueKind.LLVMArgumentValueKind));
-                */
-
                 var values = new List<LLVMValueRef>();
                 UnfoldGep(x.GetOperand(0), values);
 
@@ -866,7 +831,6 @@ namespace Dna.BinaryTranslator.VMProtect.Rewrite
 
                 if (IsStoredToBase(function, regArg))
                     continue;
-
 
                 options.TryAdd(regArg, 0);
                 options[regArg] += count;
@@ -959,11 +923,6 @@ namespace Dna.BinaryTranslator.VMProtect.Rewrite
             if (unfolded.Count > 2 && !unfolded[2].IsConstant())
                 return false;
 
-            //if (IsAddRegister(reg))
-            //    return true;
-            //if (gep.GetOperand(1).Kind == LLVMValueKind.LLVMArgumentValueKind)
-            //    return true;
-
             return true;
         }
 
@@ -985,18 +944,6 @@ namespace Dna.BinaryTranslator.VMProtect.Rewrite
                 UnfoldGep(gep.GetOperand((uint)i), values);
         }
 
-
-        private bool IsAddRegister(LLVMValueRef add)
-        {
-            if (!add.Is(LLVMOpcode.LLVMAdd, LLVMOpcode.LLVMSub))
-                return false;
-            if (!add.GetOperand(1).IsConstant())
-                return false;
-            if (add.GetOperand(0).Kind != LLVMValueKind.LLVMArgumentValueKind)
-                return false;
-            return true;
-        }
-
         private RemillRegister GetReg(LLVMValueRef function, LLVMValueRef param, VmpParameterizedStateStructure stateStruct)
         {
             var index = Array.IndexOf(function.GetParams(), param);
@@ -1015,7 +962,6 @@ namespace Dna.BinaryTranslator.VMProtect.Rewrite
 
                 var seen = new List<LLVMValueRef>();
                 //foreach (var operand in gep.GetOperands())
-                //    DecomposeSum(operand, seen);
                 UnfoldGep(gep, seen);
 
                 if (seen.Contains(basePtr))
@@ -1023,25 +969,6 @@ namespace Dna.BinaryTranslator.VMProtect.Rewrite
             }
 
             return false;
-        }
-
-        private static HashSet<LLVMValueRef> DecomposeSum(LLVMValueRef value)
-        {
-            var seen = new HashSet<LLVMValueRef>();
-            DecomposeSum(value, seen);
-            return seen;
-        }
-
-        private static void DecomposeSum(LLVMValueRef value, HashSet<LLVMValueRef> seen)
-        {
-            if (!seen.Add(value))
-                return;
-
-            if (value.Is(LLVMOpcode.LLVMAdd, LLVMOpcode.LLVMSub))
-            {
-                foreach (var operand in value.GetOperands())
-                    DecomposeSum(operand, seen);
-            }
         }
 
         private HashSet<VmHandler> GetReachableNodes(VmCfg vCfg, WorkList<VmHandler> worklist)
@@ -1153,45 +1080,16 @@ namespace Dna.BinaryTranslator.VMProtect.Rewrite
             this.vmexitHandlerRips = vmexitHandlerRips;
             this.handlerToVkey = handlerToVkey;
             this.handlerToVbase = handlerToVbase;
-            //this.handlerVips = handlerVips;
             this.handlerRipToRegisters = handlerRipToRegisters;
             builder = LLVMBuilderRef.Create(module.Context);
         }
 
         public LLVMValueRef Run(LLVMValueRef translatedFunction, VmHandler entryHandler)
         {
-
-            var bar = arch.Registers;
-
             var jmpHandler = module.GetNamedFunction("vmp_branch");
             bool incremental = translatedFunction.Handle != 0;
-            //if (incremental)
-            if (false)
-            {
-                var calls = jmpHandler.Handle == 0 ? new List<LLVMValueRef>() : RemillUtils.CallersOf(jmpHandler);
 
-                // Get all complete instructions
-                var completeInstructions = vCfg.Instructions.Keys.Where(x => vCfg.Instructions[x].Metadata.IsComplete).ToHashSet();
-
-                foreach (var caller in calls)
-                {
-                    var srcIp = caller.GetOperand((uint)caller.OperandCount - 2).ConstIntZExt;
-                    var handler = vCfg.Instructions.Single(x => x.Key.BytecodeRip == srcIp).Key;
-                    var vNode = vCfg.Instructions[handler];
-                    var outgoingAddresses = vNode.Successors.OrderBy(x => x).ToList();
-
-                    // If we have a call to `vmp_branch` targeting a complete node, we need to rebuild the CFG.
-                    // This happens when the control flow graph has cycles and the edges converge.
-                    // Nvm this was a bug in my code
-                    if (outgoingAddresses.Any(x => completeInstructions.Contains(x)))
-                    {
-                        translatedFunction.Handle = 0;
-                        incremental = false;
-                        break;
-                    }
-                }
-            }
-
+\
             if (!incremental)
             {
                 translatedFunction = module.AddFunction($"PartialCfg", stateStruct.ParameterizedFunctionPrototype);
@@ -1222,24 +1120,6 @@ namespace Dna.BinaryTranslator.VMProtect.Rewrite
             {
                 builder.PositionAtEnd(translatedFunction.EntryBasicBlock);
                 builder.BuildBr(blockMapping[entryHandler]);
-                //module.Verify(LLVMVerifierFailureAction.LLVMAbortProcessAction);
-
-                /*
-                module.PrintToFile(("translatedFunction.ll"));
-                foreach (var f in toDelete)
-                {
-                    var any = translatedFunction.GetInstructions().First(x => x.InstructionOpcode == LLVMOpcode.LLVMCall && x.GetCallInstTarget() == f);
-
-                        
-
-                    var callers2 = RemillUtils.CallersOf(f);
-                    LLVMCloning.InlineFunction(f);
-                    module.PrintToFile(("translatedFunction.ll"));
-                    f.DeleteFunction();
-                }
-                */
-
-
                 return translatedFunction;
             }
 
@@ -1466,8 +1346,6 @@ namespace Dna.BinaryTranslator.VMProtect.Rewrite
                         var pStoreToLoad = Marshal.GetFunctionPointerForDelegate(storeToLoad.PtrToStoreLoadPropagation);
                         OptimizationApi.OptimizeModuleVmp(liftedHandler.GlobalParent, liftedHandler, false, false, 0, false, 0, false, false, 0, pStoreToLoad, 0, 0, fastPipeline: true);
                         OptimizationApi.RunInstCombine(liftedHandler);
-
-
                     }
 
                     foreach (var (reg, inputIndex) in stateStruct.RegisterArgumentIndices)
@@ -1556,33 +1434,6 @@ namespace Dna.BinaryTranslator.VMProtect.Rewrite
                 builder.PositionAtEnd(call.InstructionParent);
                 if (true && handler != entryHandler && handlerRipToRegisters.TryGetValue(handler.NativeRip, out var slotInfo) && slotInfo.hasVkeyStackSlot)
                 {
-
-                    /*
-                    var name = $"solve_{handler.BytecodeRip.ToString("X")}";
-                    var load = liftedHandler.GetInstructions().Skip(1).First(x => x.InstructionOpcode == LLVMOpcode.LLVMLoad);
-
-                    var glob = liftedHandler.GlobalParent.GetNamedGlobal(name);
-                    if (glob.Handle == 0)
-                    {
-                        glob = liftedHandler.GlobalParent.AddGlobal(load.TypeOf, name);
-                        glob.Initializer = LLVMValueRef.CreateConstInt(load.TypeOf, 0);
-                    }
-
-                 
-                    //var value = LLVMValueRef.CreateConstInt(load.TypeOf, handler.BytecodeRip);
-                    //load.ReplaceAllUsesWith(value);
-
-                    builder.PositionBefore(load.NextInstruction);
-
-                    builder.BuildStore(load, glob);
-
-                    liftedHandler.Name = liftedHandler.Name + Guid.NewGuid().ToString();
-
-                    liftedHandler.GlobalParent.PrintToFile("translatedFunction.ll");
-                    //Debugger.Break();
-                    */
-
-
                     var func = module.GetNamedFunction("SaveVkey");
                     if (func.Handle == 0)
                     {
@@ -1598,21 +1449,17 @@ namespace Dna.BinaryTranslator.VMProtect.Rewrite
 
                     if (dbgIntrins)
                         builder.BuildCall2(func.GetFunctionPrototype(), func, new[] { load });
-
                 }
 
 
                 builder.PositionAtEnd(call.InstructionParent);
                 LiftInstEdges(handler, function, exitBlock, blockMapping, registerAllocaMapping);
-                //module.PrintToFile("translatedFunction.ll");
 
                 IterativeVmpExplorer.FixMemPtr(module);
 
 
                 LLVMCloning.InlineFunction(liftedHandler);
-                //module.PrintToFile("translatedFunction.ll");
                 liftedHandler.DeleteFunction();
-                //toDelete.Add(liftedHandler);
             }
 
             return blockMapping;
@@ -1704,7 +1551,6 @@ namespace Dna.BinaryTranslator.VMProtect.Rewrite
                     continue;
 
                 liftedCases.Add(target);
-                //var targetBlock = blockMapping.Single(x => x.Key.BytecodeRip == target.BytecodeRip).Value;
                 var targetHandler = blockMapping.Single(x => x.Key.BytecodeRip == target.BytecodeRip).Key;
                 var targetBlock = CreateCaseBlock(function, indirectPc, targetHandler, blockMapping);
 
