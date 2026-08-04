@@ -161,13 +161,11 @@ namespace Dna.BinaryTranslator.VMProtect.Rewrite
             var stateStruct = new VmpParameterizedStateStructure(arch, ctx, false);
             var stateStruct2 = new ParameterizedStateStructure(arch, ctx, false, true, false);
             RemillRegister bytecodeRegister = handlerLifter.GetVmenterBytecodeRegister(stateStruct2, handlerLifter.LiftHandler(funcRip, true));
-            Dictionary<VmHandler, RemillRegister> handlerVips = new();
             Dictionary<ulong, HandlerData> handlerRipToRegisters = new();
 
 
             Console.WriteLine($"TODO: Stop passing bytecoderegister as vkey for first handler");
             handlerRipToRegisters[handlers.First().NativeRip] = new HandlerData(bytecodeRegister, bytecodeRegister, bytecodeRegister);
-            handlerVips[handlers.First()] = bytecodeRegister;
 
             bool optHeavy = false;
             int numRebuilds = 0;
@@ -210,7 +208,7 @@ namespace Dna.BinaryTranslator.VMProtect.Rewrite
 
 
                 AdhocInstCombinePass.Validate(liftedFunction);
-                liftedFunction = new IterativeCfgBuilder(dna, outModule, arch, stateStruct, vCfg, handlerLifter, vmexitHandlerRips, handlerVips, handlerRipToRegisters).Run(liftedFunction, handlers.First());
+                liftedFunction = new IterativeCfgBuilder(dna, outModule, arch, stateStruct, vCfg, handlerLifter, vmexitHandlerRips, handlerRipToRegisters).Run(liftedFunction, handlers.First());
                 AdhocInstCombinePass.Validate(liftedFunction);
                 FixMemPtr(liftedFunction.GlobalParent);
 
@@ -312,8 +310,8 @@ namespace Dna.BinaryTranslator.VMProtect.Rewrite
                     {
                         worklist.AddToBack(handler);
 
-                        var incomingVip = info.Predecessors.Select(x => handlerVips[x]).DistinctBy(x => x.Name).Single();
-                        handlerVips[handler] = handlerLifter.GetBytecodeRegister(HandlerLifter.DisHandler(dna, handler.NativeRip), stateStruct2, handlerLifter.LiftHandler(handler.NativeRip, false), false, incomingVip);
+                        var incomingVip = info.Predecessors.Select(x => handlerRipToRegisters[x.NativeRip].Vip).DistinctBy(x => x.Name).Single();
+                        handlerRipToRegisters[handler.NativeRip] = handlerRipToRegisters[handler.NativeRip] with { Vip = handlerLifter.GetBytecodeRegister(HandlerLifter.DisHandler(dna, handler.NativeRip), stateStruct2, handlerLifter.LiftHandler(handler.NativeRip, false), false, incomingVip) };
 
                         if (!info.Metadata.IsComplete && info.Successors.Any(x => newCfg.Instructions[x].Metadata.IsComplete))
                             Debugger.Break();
@@ -1066,11 +1064,10 @@ namespace Dna.BinaryTranslator.VMProtect.Rewrite
 
         private readonly IReadOnlySet<ulong> vmexitHandlerRips;
 
-        //private readonly Dictionary<VmHandler, RemillRegister> handlerVips;
         private readonly Dictionary<ulong, HandlerData> handlerRipToRegisters;
         private LLVMBuilderRef builder;
 
-        public IterativeCfgBuilder(IDna dna, LLVMModuleRef module, RemillArch arch, VmpParameterizedStateStructure stateStruct, VmCfg vCfg, HandlerLifter handlerCache, IReadOnlySet<ulong> vmexitHandlerRips, Dictionary<VmHandler, RemillRegister> handlerVips, Dictionary<ulong, HandlerData> handlerRipToRegisters)
+        public IterativeCfgBuilder(IDna dna, LLVMModuleRef module, RemillArch arch, VmpParameterizedStateStructure stateStruct, VmCfg vCfg, HandlerLifter handlerCache, IReadOnlySet<ulong> vmexitHandlerRips, Dictionary<ulong, HandlerData> handlerRipToRegisters)
         {
             this.dna = dna;
             this.module = module;
@@ -1619,7 +1616,6 @@ namespace Dna.BinaryTranslator.VMProtect.Rewrite
                 return;
             }
 
-            //var bytecodeRegister = handlerVips[handler];
             builder.PositionAtEnd(llvmBlock);
             var swtch = builder.BuildSwitch(indirectPc, defaultBlock, (uint)outgoingAddresses.Count);
 
