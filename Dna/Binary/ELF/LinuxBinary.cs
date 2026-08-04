@@ -69,5 +69,10 @@ namespace Dna.Binary.Windows
         {
             throw new NotImplementedException();
         }
+
+        public bool IsExecutableData(ulong address)
+        {
+            throw new NotImplementedException();
+        }
     }
 }

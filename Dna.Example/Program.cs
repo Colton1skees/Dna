@@ -233,6 +233,11 @@ if (useVmp)
     // nested_simple_loop_32
     // Has a bunch of vectorization unfortunately..
     vmpAddr = 0x140003971;
+    // one of the vm stubs
+    vmpAddr = 0x140130E2C;
+
+    vmpAddr = 0x1401311d2;
+
 
     var vmpBin = WindowsBinary.From(vmpPath);
     var vmpDna = new Dna.Dna(vmpBin);
@@ -254,14 +259,17 @@ if (useVmp)
     var vmpCtx = LLVMContextRef.Global;
     var vmpArch = new RemillArch(vmpCtx, RemillOsId.kOSLinux, RemillArchId.kArchAMD64_AVX512);
     //var translator = new IterativeVmpTranslator(vmpDna, vmpArch, vmpCtx, vmpAddr);
-    var translator = new IterativeVmpExplorer(vmpDna, vmpArch, vmpCtx, vmpAddr);
+    var translator = new VmpFunctionExplorer(vmpDna, vmpArch, vmpCtx);
     var sw = Stopwatch.StartNew();
-    var devirtedFunc = translator.Run();
+    var devirtedFunc = translator.Run(vmpAddr);
     sw.Stop();
 
     Console.WriteLine($"Took {sw.ElapsedMilliseconds}ms  ");
+
+    //Console.WriteLine($"Successfully lifted VM. Found exit targets: {String.Join(" ", exitTargets.Select(x => x.ToString("X")))}");
+
     Debugger.Break();
-    VmpContextRemovalPass.Run(devirtedFunc);
+    //VmpContextRemovalPass.Run(devirtedFunc);
 
     
 

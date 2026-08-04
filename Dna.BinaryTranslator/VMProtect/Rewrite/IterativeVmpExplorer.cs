@@ -83,6 +83,68 @@ namespace Dna.BinaryTranslator.VMProtect.Rewrite
 
     public record HandlerData(RemillRegister Vip, RemillRegister Vkey, RemillRegister ImgBaseReg, bool hasVkeyStackSlot = false);
 
+    public class VmpFunctionExplorer
+    {
+        private readonly IDna dna;
+        private readonly RemillArch arch;
+        private readonly LLVMContextRef ctx;
+        private readonly ulong funcRip;
+
+        public VmpFunctionExplorer(IDna dna, RemillArch arch, LLVMContextRef ctx)
+        {
+            this.dna = dna;
+            this.arch = arch;
+            this.ctx = ctx;
+            this.funcRip = funcRip;
+        }
+
+        public LLVMValueRef Run(ulong run)
+        {
+            var worklist = new WorkList<ulong>();
+            worklist.AddToFront(run);
+            Dictionary<ulong, LLVMValueRef> stubs = new();
+            while(worklist.Count != 0)
+            {
+                var popped = worklist.PopBack();
+                var (lifted, targets) = new IterativeVmpExplorer(dna, arch, ctx, popped).Run();
+                stubs[popped] = lifted;
+                foreach(var target in targets)
+                {
+                    var dis = dna.RecursiveDescent.ReconstructCfg(target);
+                    var block = dis.GetBlocks().Single(x => x.Instructions.Any() && x.Instructions[0].IP == target);
+                    for(int i = 0; i < block.Instructions.Count; i++)
+                    {
+                        if (i == block.Instructions.Count - 1)
+                            break;
+
+                        // Pattern match a push followed by a call
+                        var pushImm = block.Instructions[i];
+                        if (pushImm.Mnemonic != Mnemonic.Push)
+                            continue;
+                        if (!pushImm.Op0Kind.IsImmediate())
+                            continue;
+
+                        var call = block.Instructions[i + 1];
+                        if (call.Mnemonic != Mnemonic.Call)
+                            continue;
+                        if (!call.Op0Kind.IsBranchOpKind())
+                            continue;
+
+                        // Queue the push up for visitation
+                        if (stubs.ContainsKey(pushImm.IP))
+                            continue;
+                        worklist.AddToBack(pushImm.IP);
+                    }
+                }
+
+            }
+
+            Debugger.Break();
+
+            return default;
+        }
+    }
+
     public class IterativeVmpExplorer
     {
         private readonly IDna dna;
@@ -138,8 +200,32 @@ namespace Dna.BinaryTranslator.VMProtect.Rewrite
             return true;
         }
 
+        private HashSet<ulong> SolveExits(LLVMValueRef liftedFunction, VmpParameterizedStateStructure stateStruct)
+        {
+            HashSet<ulong> exitTargets = new();
+            // There should be at least one caller to the exit intrinsic
+            var intrinsic = liftedFunction.GlobalParent.GetFunctions().SingleOrDefault(x => x.Name == "vmp_vmexit");
+            var callers = RemillUtils.CallersOf(intrinsic);
+            if (callers.Count == 0)
+                throw new InvalidOperationException();
 
-        public LLVMValueRef Run()
+            var ripIdx = stateStruct.RegisterArgumentIndices[arch.Registers.Single(x => x.Name == "RIP")];
+            foreach (var caller in callers)
+            {
+                var tgt = caller.GetOperand((uint)ripIdx);
+                if (tgt.Is(LLVMOpcode.LLVMSelect))
+                    throw new InvalidOperationException("Cond vmexit; Should never happen");
+                // If the vmexit target isn't constant then it's a return
+                if (!tgt.IsConstant())
+                    continue;
+
+                exitTargets.Add(tgt.ConstIntZExt);
+            }
+
+            return exitTargets;
+        }
+
+        public (LLVMValueRef func, HashSet<ulong> exitTargets) Run()
         {
             arch.GetOrLoadSemantics();
             var outModule = IterativeVmpTranslator.CreateOutputModule(ctx, arch);
@@ -230,7 +316,15 @@ namespace Dna.BinaryTranslator.VMProtect.Rewrite
                 var solution = OptimizeAndSolve(stateStruct, stateStruct2, liftedFunction, handlerLifter, handlerRipToRegisters);
                 if (solution is Err<InvalidOperationException> err)
                 {
+                    HashSet<ulong> exitTargets = new();
                     liftedFunction.GlobalParent.PrintToFile("translatedFunction.ll");
+
+                    // In this case we solved all of the targets.
+                    if (err.ToString().Contains("No jump tables to solve"))
+                    {
+                        return (liftedFunction, SolveExits(liftedFunction, stateStruct));
+                    }
+
                     var hname = "DBG_HandlerCache.ll";
                     handlerLifter.cacheModule.PrintToFile(hname);
                     ClangCompiler.Compile(hname);
@@ -245,6 +339,9 @@ namespace Dna.BinaryTranslator.VMProtect.Rewrite
                 if (!newTables.Any())
                 {
                     OptimizeHeavy(dna, liftedFunction);
+
+                    Console.WriteLine("Solved");
+                    return (liftedFunction, SolveExits(liftedFunction, stateStruct));
 
                     Console.WriteLine($"Finished devirt");
                     outModule.PrintToFile("translatedFunction.ll");

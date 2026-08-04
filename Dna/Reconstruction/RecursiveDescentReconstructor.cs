@@ -64,6 +64,11 @@ namespace Dna.Reconstruction
             block.Address = address;
             while(true)
             {
+                if (!dna.Binary.IsExecutableData(address))
+                {
+                    Console.WriteLine($"Skipped invalid address: {address.ToString("X")}");
+                    return block;
+                }
                 // Store the current instruction.
                 var currInsn = dna.BinaryDisassembler.GetInstructionAt(address);
                 block.Instructions.Add(currInsn);
@@ -82,6 +87,8 @@ namespace Dna.Reconstruction
         private IEnumerable<ulong> GetBlockEdges(BasicBlock<Instruction> block, Func<BasicBlock<Instruction>, IEnumerable<ulong>> pGetOutgoingEdges = null)
         {
             List<ulong> edges = new List<ulong>();
+            if (block.Instructions.Count == 0)
+                return edges;
             var exitInstruction = block.ExitInstruction;
             if(exitInstruction.FlowControl.IsBranch())
             {

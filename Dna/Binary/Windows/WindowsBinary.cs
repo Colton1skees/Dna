@@ -22,6 +22,8 @@ namespace Dna.Binary.Windows
 
         private List<(ulong Start, ulong End)> ConstantData { get; } = new();
 
+        private List<(ulong Start, ulong End)> ExecutableData { get; } = new();
+
         /// <summary>
         /// Initializes a new instance of the <see cref="WindowsBinary"/> class.
         /// </summary>
@@ -40,6 +42,9 @@ namespace Dna.Binary.Windows
             ConstantData = PEFile.Sections
                 .Where(sec => !sec.Characteristics.HasFlag(SectionFlags.MemoryWrite)) // TODO: check whether MemoryRead is necessary?
                 .Select(sec => (BaseAddress + sec.Rva, BaseAddress + sec.Rva + sec.GetVirtualSize())).ToList();
+            ExecutableData = PEFile.Sections
+          .Where(sec => sec.Characteristics.HasFlag(SectionFlags.MemoryExecute)) // TODO: check whether MemoryRead is necessary?
+          .Select(sec => (BaseAddress + sec.Rva, BaseAddress + sec.Rva + sec.GetVirtualSize())).ToList();
         }
 
         /// <inheritdoc cref="IBinary.ReadBytes(ulong, int)"/>
@@ -95,6 +100,16 @@ namespace Dna.Binary.Windows
             }
             return false;
         }
+
+        public bool IsExecutableData(ulong address)
+        {
+            foreach (var tuple in ExecutableData)
+            {
+                if (address >= tuple.Start && address < tuple.End) return true;
+            }
+            return false;
+        }
+
 
         public static WindowsBinary From(string filePath, ulong? baseAddress = null)
         {

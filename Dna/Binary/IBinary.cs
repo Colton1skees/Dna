@@ -31,6 +31,13 @@ namespace Dna.Binary
         bool IsConstantData(ulong address);
 
         /// <summary>
+        /// Returns whether the data at the specified address is constant.
+        /// </summary>
+        /// <param name="address"></param>
+        /// <returns></returns>
+        bool IsExecutableData(ulong address);
+
+        /// <summary>
         /// Gets a byte at the specified address.
         /// </summary>
         byte ReadByte(ulong address) => ReadBytes(address, 1)[0];
