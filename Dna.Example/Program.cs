@@ -78,7 +78,7 @@ if (genDsl)
 bool dbgCode = false;
 if (dbgCode)
 {
-    var irPath = "C:\\Users\\user\\Downloads\\select_vkey.ll";
+    var irPath = "C:\\Users\\user\\Downloads\\output.ll";
     var t = File.ReadAllText(irPath);
     Console.WriteLine(irPath);
 
@@ -98,12 +98,12 @@ if (dbgCode)
     var exePath33 = IDALoader.Load(compiledPath33, true);
     */
 
-    var existingFunc = tempNewMod.GetFunctions().Single(x => x.Name.Contains("Part"));
+    var existingFunc = tempNewMod.GetFunctions().Single(x => x.Name.Contains("main"));
 
 
     while (true)
     {
-        bool opt = true;
+        bool opt = false;
         var sw = Stopwatch.StartNew();
         unsafe
         {
@@ -194,7 +194,7 @@ if (dbgCode)
         //File.WriteAllText("binja.py", new LLVMToBinjaGraph(existingFunc).Process());
 
         sw.Stop();
-            Console.WriteLine($"Pass took {sw.ElapsedMilliseconds}ms ");
+            Console.WriteLine($"Pass took {sw.ElapsedMilliseconds}ms  ");
         Debugger.Break();
     }
     Debugger.Break();
@@ -230,6 +230,9 @@ if (useVmp)
 
     vmpAddr = 0x140003BC2;
 
+    // nested_simple_loop_32
+    // Has a bunch of vectorization unfortunately..
+    vmpAddr = 0x140003971;
 
     var vmpBin = WindowsBinary.From(vmpPath);
     var vmpDna = new Dna.Dna(vmpBin);

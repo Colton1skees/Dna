@@ -198,48 +198,13 @@ namespace Dna.BinaryTranslator.VMProtect.Rewrite
                 File.WriteAllText($"iter/{ii}_groundTruth.txt", sb.ToString());
             };
 
-            // For each handler RIP, store the vip/vkey
-
-            if (false)
-            {
-                handlerLifter.cacheModule.PrintToFile("translatedFunction.ll");
-                foreach (var rip in handlerLifter.handlerRipToLlvmFunction)
-                {
-                    var key = rip.Key;
-                    if (rip.Key == handlers.First().BytecodeRip)
-                        continue;
-
-
-                    var vip = GetVipByUsage(rip.Key, rip.Value, stateStruct);
-                    if (vip == null)
-                    {
-                        Debugger.Break();
-                        continue;
-                    }
-
-                    //var otherReg = handlerLifter.GetBytecodeRegister(cfg)
-
-                    Console.WriteLine($"Found vip");
-
-                    var vkey = GetVkeyByUsage(rip.Key, rip.Value, stateStruct, vip);
-
-
-                }
-            }
             var sw = Stopwatch.StartNew();
-            //handlerLifter.LiftHandler(0x140048BBD, false);
             while (true)
             {
                 Console.WriteLine($"Lifting iteration {ii++} at {sw.ElapsedMilliseconds}ms. ");
                 Console.WriteLine($"{numFast} / {numFast + numHeavy} solvers finished. Rebuilt {numRebuilds} times");
 
-                //if (liftedFunction.Handle != 0)
-                //   liftedFunction.GlobalParent.PrintToFile("translatedFunction.ll");
-
                 serialize();
-
-                //var text = new BinjaVmCfgViewerV2(vCfg).Run(handlerRipToRegisters, handlerToVkey);
-                //File.WriteAllText("binja.py", text);
 
 
                 AdhocInstCombinePass.Validate(liftedFunction);
@@ -249,57 +214,8 @@ namespace Dna.BinaryTranslator.VMProtect.Rewrite
 
                 AdhocInstCombinePass.Validate(liftedFunction);
 
-                //liftedFunction.GlobalParent.PrintToFile("translatedFunction.ll");
-                //liftedFunction.GlobalParent.Verify(LLVMVerifierFailureAction.LLVMAbortProcessAction);
-
                 IterativeVmpTranslator.CanonicalizeMemoryPtr(liftedFunction);
 
-                //liftedFunction.GlobalParent.PrintToFile("translatedFunction.ll");
-
-                // Run our optimization pipeline
-                //PassPipeline.Run(dna.Binary, liftedFunction, false);
-                //VmpPassPipeline.Run(dna.Binary, liftedFunction);
-
-                //liftedFunction.GlobalParent.PrintToFile("translatedFunction.ll");
-                // Solve for any unknown indirect jumps in the control flow graph.
-                //var solver = new VmpJmpTableSolver(liftedFunction);
-                //var (newTables, bytecodePtrToRips) = solver.Solve();
-
-                /*
-                var solver = new VmpSolver(arch, liftedFunction);
-
-                var dests = solver.SolveRIPs(stateStruct);
-
-                var sum = String.Join(", ", stateStruct.RegisterArgumentIndices.OrderBy(x => x.Value).Select(x => $"{x.Key.Name} {x.Value}"));
-                Console.WriteLine($"[{sum}]");
-
-                // Compute the VIP/vkey reg for each handler
-                foreach(var (bytecodePtr, outgoingHandlers) in dests)
-                {
-                    // Compute the VIP and vkey
-                    var regs = GetHandlerRegisters(stateStruct, stateStruct2, handlers.First(), handlerLifter, bytecodePtr, outgoingHandlers, handlerRipToRegisters);
-
-                    foreach (var rip in outgoingHandlers)
-                        handlerRipToRegisters[rip] = regs;
-                }
-
-
-                var (newTables, bytecodePtrToRips) = solver.Solve(handlerRipToRegisters, stateStruct);
-                */
-
-
-                //if (ii == 107)
-                //{
-                //    handlerLifter.cacheModule.PrintToFile("dbgHandlers.ll");
-                //    liftedFunction.GlobalParent.PrintToFile("translatedFunction.ll");
-                //    Debugger.Break();
-                //}
-
-                if (ii == 531)
-                {
-                    //liftedFunction.GlobalParent.PrintToFile("translatedFunction.ll");
-                    // Debugger.Break();
-                }
 
                 if (optHeavy)
                 {
@@ -322,13 +238,6 @@ namespace Dna.BinaryTranslator.VMProtect.Rewrite
 
                 Console.WriteLine($"Target handler RIPs: {String.Join(" ", bytecodePtrToRips.Select(x => x.Value.rip.ToString("X")))}");
 
-                /*
-                if (liftedFunction.GetInstructions().Any(x => x.InstructionOpcode == LLVMOpcode.LLVMXor && x.GetOperand(1).IsConstant() && x.GetOperand(1).ConstIntZExt == 1685814885))
-                {
-                    liftedFunction.GlobalParent.PrintToFile("translatedFunction.ll");
-                    Debugger.Break();
-                }
-                */
                 if (!newTables.Any())
                 {
                     OptimizeHeavy(dna, liftedFunction);
@@ -2790,6 +2699,10 @@ namespace Dna.BinaryTranslator.VMProtect.Rewrite
             foreach (var phi in block.GetInstructions().Where(x => x.Is(LLVMOpcode.LLVMPHI)))
             {
                 if (loopInfo.IsLoopEntrypoint(phi))
+                    continue;
+                if (phi.TypeOf.Kind != LLVMTypeKind.LLVMIntegerTypeKind)
+                    continue;
+                if (phi.TypeOf.IntWidth > 64)
                     continue;
                 // Constraint the value of the phi based on incoming values
                 var incomingCount = LLVM.CountIncoming(phi);
