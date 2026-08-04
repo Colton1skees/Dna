@@ -2297,9 +2297,6 @@ namespace Dna.BinaryTranslator.VMProtect.Rewrite
                         }
                     }
 
-                    if (value.ToString().Contains(", 5368763838"))
-                        Debugger.Break();
-
                     if (solutions.Count() == 2 && !isSelect(value))
                     {
                         var cmps = currBlock.GetInstructions().TakeWhile(x => x != value).Where(x => x.TypeOf.Kind == LLVMTypeKind.LLVMIntegerTypeKind && x.TypeOf.IntWidth == 1 && converter.defMap.ContainsKey(x)).ToList();

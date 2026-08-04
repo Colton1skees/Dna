@@ -75,7 +75,7 @@ if (genDsl)
 //LazyLLVMFixes.InstallValueToStringBugFix(RemillUtils.LLVMValueToString);
 
 
-bool dbgCode = true;
+bool dbgCode = false;
 if (dbgCode)
 {
     var irPath = "C:\\Users\\user\\Downloads\\fail_stub.ll";
@@ -238,7 +238,7 @@ if (useVmp)
     // one of the vm stubs
     vmpAddr = 0x140130E2C;
 
-    vmpAddr = 0x1401311d2;
+    //vmpAddr = 0x1401311d2;
 
 
     var vmpBin = WindowsBinary.From(vmpPath);
