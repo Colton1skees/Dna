@@ -60,6 +60,10 @@ namespace Dna.BinaryTranslator.VMProtect.Rewrite
         public ulong? Vkey;
 
         public ulong? Vbase;
+
+        public bool IsVmEnter;
+
+        public bool IsVmExit;
     }
 
     public record Ok<T>(T Value);
@@ -146,8 +150,6 @@ namespace Dna.BinaryTranslator.VMProtect.Rewrite
             handlers.Add(new VmHandler(funcRip, funcRip));
             bytecodeAddrToRip[funcRip] = funcRip;
 
-            HashSet<ulong> vmexitHandlerRips = new();
-
             // Append the handler to the VM cfg
             var vCfg = new VmCfg();
             vCfg.GetOrAdd(handlers.First());
@@ -210,7 +212,7 @@ namespace Dna.BinaryTranslator.VMProtect.Rewrite
 
 
                 AdhocInstCombinePass.Validate(liftedFunction);
-                liftedFunction = new IterativeCfgBuilder(dna, outModule, arch, stateStruct, vCfg, handlerLifter, vmexitHandlerRips, handlerVips, handlerRipToRegisters).Run(liftedFunction, handlers.First());
+                liftedFunction = new IterativeCfgBuilder(dna, outModule, arch, stateStruct, vCfg, handlerLifter, handlerVips, handlerRipToRegisters).Run(liftedFunction, handlers.First());
                 AdhocInstCombinePass.Validate(liftedFunction);
                 FixMemPtr(liftedFunction.GlobalParent);
 
@@ -255,10 +257,6 @@ namespace Dna.BinaryTranslator.VMProtect.Rewrite
 
                 foreach (var entry in bytecodePtrToRips)
                 {
-                    var cfg = HandlerLifter.DisHandler(dna, entry.Value.rip);
-                    if (HandlerLifter.IsVmexit(cfg))
-                        vmexitHandlerRips.Add(entry.Value.rip);
-
                     if (bytecodeAddrToRip.TryAdd(entry.Key, entry.Value.rip) && !handlerLifter.ContainsHandler(entry.Value.rip))
                     {
                         //handlerLifter.LiftHandler(rip, handlers.Count == 1);
@@ -281,6 +279,7 @@ namespace Dna.BinaryTranslator.VMProtect.Rewrite
                 {
                     var handler = getHandler(entry.Key);
                     newCfg.GetOrAdd(handler);
+                    newCfg.Instructions[handler].Metadata.IsVmExit = HandlerLifter.IsVmexit(HandlerLifter.DisHandler(dna, entry.Value.rip));
                     if (entry.Value.vkey != null)
                         newCfg.Instructions[handler].Metadata.Vkey = entry.Value.vkey.Value;
                     if (entry.Value.vbase != null)
@@ -1008,13 +1007,11 @@ namespace Dna.BinaryTranslator.VMProtect.Rewrite
 
         private readonly HandlerLifter handlerCache;
 
-        private readonly IReadOnlySet<ulong> vmexitHandlerRips;
-
         //private readonly Dictionary<VmHandler, RemillRegister> handlerVips;
         private readonly Dictionary<ulong, HandlerData> handlerRipToRegisters;
         private LLVMBuilderRef builder;
 
-        public IterativeCfgBuilder(IDna dna, LLVMModuleRef module, RemillArch arch, VmpParameterizedStateStructure stateStruct, VmCfg vCfg, HandlerLifter handlerCache, IReadOnlySet<ulong> vmexitHandlerRips, Dictionary<VmHandler, RemillRegister> handlerVips, Dictionary<ulong, HandlerData> handlerRipToRegisters)
+        public IterativeCfgBuilder(IDna dna, LLVMModuleRef module, RemillArch arch, VmpParameterizedStateStructure stateStruct, VmCfg vCfg, HandlerLifter handlerCache, Dictionary<VmHandler, RemillRegister> handlerVips, Dictionary<ulong, HandlerData> handlerRipToRegisters)
         {
             this.dna = dna;
             this.module = module;
@@ -1022,7 +1019,6 @@ namespace Dna.BinaryTranslator.VMProtect.Rewrite
             this.stateStruct = stateStruct;
             this.vCfg = vCfg;
             this.handlerCache = handlerCache;
-            this.vmexitHandlerRips = vmexitHandlerRips;
             this.handlerRipToRegisters = handlerRipToRegisters;
             builder = LLVMBuilderRef.Create(module.Context);
         }
@@ -1110,7 +1106,7 @@ namespace Dna.BinaryTranslator.VMProtect.Rewrite
 
                     liftedCases.Add(target);
 
-  
+
                     var targetHandler = blockMapping.Single(x => x.Key.BytecodeRip == target.BytecodeRip).Key;
                     var targetBlock = CreateCaseBlock(translatedFunction, destIp, targetHandler, blockMapping);
 
@@ -1402,12 +1398,11 @@ namespace Dna.BinaryTranslator.VMProtect.Rewrite
         {
             var llvmBlock = blockMapping[handler];
 
-            bool isVmExit = vmexitHandlerRips.Contains(handler.NativeRip);
             var info = vCfg.Instructions[handler];
             bool isComplete = info.Metadata.IsComplete;
 
             // If this is an exit node, store all register values and exit.
-            if ((isComplete && info.Successors.Count == 0) || isVmExit)
+            if ((isComplete && info.Successors.Count == 0) || info.Metadata.IsVmExit)
             {
                 VmPartialBlockLifter.UpdateOutputRegisters(builder, function, registerAllocaMapping, stateStruct);
                 builder.BuildRetVoid();
@@ -1661,7 +1656,7 @@ namespace Dna.BinaryTranslator.VMProtect.Rewrite
 
             foreach (var inst in stripped.GetInstructions())
                 ConstantFoldingAPI.DropPoisonGeneratingFlags(inst);
-         
+
             // Eliminate any stack expansion in the IR
             EliminateStackExpansionLoop(stripped, handlerRip);
 
