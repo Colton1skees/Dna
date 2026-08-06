@@ -832,6 +832,12 @@ void OptimizeVmpModule(llvm::Module* module,
 	FPM.addPass(llvm::SimplifyCFGPass());
 	FPM.addPass(llvm::EarlyCSEPass(true));
 
+	if (llvm::any_of(*f, [](const llvm::BasicBlock& block)
+		{ return llvm::isa<llvm::SwitchInst>(block.getTerminator()); }))
+	{
+		FPM.addPass(llvm::LowerSwitchPass());
+	}
+
 	// Skip the remaining passes if we are
 	if (fastPipeline)
 		goto execute;
@@ -886,6 +892,8 @@ void OptimizeVmpModule(llvm::Module* module,
 	llvm::SimplifyCFGOptions lateSimplifyCfgOptions;
 	lateSimplifyCfgOptions.hoistCommonInsts(true).sinkCommonInsts(true);
 	FPM.addPass(llvm::SimplifyCFGPass(lateSimplifyCfgOptions));
+
+	FPM.addPass(llvm::LowerSwitchPass());
 
 
 execute:

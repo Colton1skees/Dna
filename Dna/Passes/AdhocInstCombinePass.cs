@@ -481,9 +481,6 @@ return peephole;
                     return null;
             }
 
-            if (inst.ToString().Contains("%109 = getelementptr i8, ptr %108, i64 %0"))
-                Debugger.Break();
-
             if (opcode == LLVMOpcode.LLVMGetElementPtr && inst.OperandCount != 2)
                 return null;
 

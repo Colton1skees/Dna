@@ -106,10 +106,7 @@ namespace Dna.Passes
         private unsafe bool StoreToLoadPropagation(LLVMOpaqueValue* function, nint loopInfo, nint domTree, nint mssa, nint simplifyQuery)
         {
             builder = LLVMBuilderRef.Create(LLVMContextRef.Global);
-            var r = Run(function, new LoopInfo(loopInfo), new DominatorTree(domTree), new MemorySSA(mssa), new SimplifyQuery(simplifyQuery));
-
-            new LLVMValueRef((nint)function).GlobalParent.PrintToFile("translatedFunction.ll");
-            return r;
+            return Run(function, new LoopInfo(loopInfo), new DominatorTree(domTree), new MemorySSA(mssa), new SimplifyQuery(simplifyQuery));
         }
 
         private BaseWithOffset GetCanonicalBasePlusOffsetOld(LLVMValueRef current)
@@ -360,6 +357,7 @@ namespace Dna.Passes
                         if (!nextInstr.Is(LLVMValueKind.LLVMInstructionValueKind))
                             continue;
 
+
                         // Delete trivially dead instructions
                         if (false && ConstantFoldingAPI.IsInstructionTriviallyDead(nextInstr))
                         {
@@ -372,7 +370,7 @@ namespace Dna.Passes
                         }
 
                         var opc = nextInstr.InstructionOpcode;
-
+               
                         bool TryReplaceAndRemove(LLVMValueRef replaceWith)
                         {
                             if (replaceWith.Handle == 0 || replaceWith.Handle == nextInstr.Handle)
@@ -455,6 +453,17 @@ namespace Dna.Passes
                                 continue;
                             }
                         }
+
+                        if (Hoist(nextInstr, opc, domTree))
+                        {
+                            var users = nextInstr.GetUsers().Where(sel => sel.Handle != nextInstr.Handle).ToList();
+                            worklist.AddRangeToFront(users);
+
+                            localChanged = true;
+                            continue;
+                        }
+
+
                     }
 
                     Changed |= localChanged;
@@ -464,6 +473,32 @@ namespace Dna.Passes
             mssa.Validate();
 
             Console.WriteLine($"Worklist converged in {numIterations} iterations!");
+            return true;
+        }
+
+
+        private bool Hoist(LLVMValueRef inst, LLVMOpcode opcode, DominatorTree domTree)
+        {
+            var matches = opcode == LLVMOpcode.LLVMAdd || opcode == LLVMOpcode.LLVMSub || opcode == LLVMOpcode.LLVMGetElementPtr;
+            if (!matches)
+                return false;
+            if (opcode == LLVMOpcode.LLVMGetElementPtr && inst.OperandCount != 2)
+                return false;
+
+            var operands = inst.GetOperands().Where(x => x.Is(LLVMValueKind.LLVMInstructionValueKind)).ToList();
+            bool AvailableIn(LLVMBasicBlockRef block) => operands.All(x =>
+                x.InstructionParent == block ? x != block.Terminator : domTree.Dominates(x, block));
+
+            var target = function.EntryBasicBlock;
+            if (!AvailableIn(target))
+                target = operands.Select(x => x.InstructionParent).FirstOrDefault(AvailableIn);
+
+            if (target.Handle == 0 || !domTree.ProperlyDominates(target, inst.InstructionParent))
+                return false;
+
+            LLVM.InstructionRemoveFromParent(inst);
+            builder.PositionBefore(target.Terminator);
+            builder.Insert(inst);
             return true;
         }
 

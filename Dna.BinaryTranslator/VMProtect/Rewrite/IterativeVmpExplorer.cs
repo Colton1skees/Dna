@@ -1708,8 +1708,8 @@ namespace Dna.BinaryTranslator.VMProtect.Rewrite
             var isExit = exitInsts.Count > 10;
             if (isExit)
             {
-                Console.WriteLine(GraphFormatter.FormatGraph(cfg));
-                Debugger.Break();
+                //Console.WriteLine(GraphFormatter.FormatGraph(cfg));
+                //Debugger.Break();
             }
             return isExit;
         }
@@ -2272,7 +2272,7 @@ namespace Dna.BinaryTranslator.VMProtect.Rewrite
         public void Simplify(LLVMValueRef func)
         {
             LLVMBuilderRef builder = func.GetFunctionCtx().CreateBuilder();
-            File.WriteAllText("llvmconstraints.py", new LLVMToBinjaGraph(func).Process());
+            //File.WriteAllText("llvmconstraints.py", new LLVMToBinjaGraph(func).Process());
             var li = new LoopInfo(func);
             var dt = new DominatorTree(func);
 
