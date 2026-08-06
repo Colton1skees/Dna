@@ -359,7 +359,7 @@ namespace Dna.Passes
 
         private static readonly string[] UnaryWhitelist = { "llvm.ctpop" };
 
-        private static readonly LLVMOpcode[] BinaryOpcodes = { LLVMOpcode.LLVMAdd, LLVMOpcode.LLVMSub, LLVMOpcode.LLVMMul, LLVMOpcode.LLVMAnd, LLVMOpcode.LLVMOr, LLVMOpcode.LLVMXor, LLVMOpcode.LLVMShl, LLVMOpcode.LLVMLShr, LLVMOpcode.LLVMAShr, LLVMOpcode.LLVMCall };
+        private static readonly LLVMOpcode[] BinaryOpcodes = { LLVMOpcode.LLVMAdd, LLVMOpcode.LLVMSub, LLVMOpcode.LLVMMul, LLVMOpcode.LLVMAnd, LLVMOpcode.LLVMOr, LLVMOpcode.LLVMXor, LLVMOpcode.LLVMShl, LLVMOpcode.LLVMLShr, LLVMOpcode.LLVMAShr, LLVMOpcode.LLVMCall, LLVMOpcode.LLVMGetElementPtr };
 
 
         private static readonly string[] BinaryWhitelist = { "llvm.bswap", "llvm.fshl" };
@@ -472,6 +472,8 @@ return peephole;
             if (Array.IndexOf(BinaryOpcodes, opcode) == -1)
                 return null;
 
+
+
             if (opcode == LLVMOpcode.LLVMCall)
             {
                 var name = inst.GetCallInstTarget().Name;
@@ -479,18 +481,25 @@ return peephole;
                     return null;
             }
 
+            if (inst.ToString().Contains("%109 = getelementptr i8, ptr %108, i64 %0"))
+                Debugger.Break();
+
+            if (opcode == LLVMOpcode.LLVMGetElementPtr && inst.OperandCount != 2)
+                return null;
+
 
             // Get the operands
             var op1 = inst.GetOperand(0);
             var op2 = inst.GetOperand(1);
 
             // At least one operand must be a select of two constants
-            if (!IsSelect(op1) && !IsSelect(op2))
+            var bothConstant = inst.InstructionOpcode != LLVMOpcode.LLVMGetElementPtr;
+            if (!IsSelect(op1, bothConstant) && !IsSelect(op2, bothConstant))
                 return null;
 
-            var selectIndex = IsSelect(op1) ? 0 : 1;
+            var selectIndex = IsSelect(op1, bothConstant) ? 0 : 1;
             var selectOperand = selectIndex == 0 ? op1 : op2;
-            var otherIndex = IsSelect(op1) ? 1 : 0;
+            var otherIndex = IsSelect(op1, bothConstant) ? 1 : 0;
             var otherOperand = otherIndex == 0 ? op1 : op2;
 
             builder.PositionBefore(inst);
@@ -509,6 +518,13 @@ return peephole;
 
             var peephole = new PeepholeResult();
             peephole.Add(clone0, clone1, res);
+
+            if (inst.InstructionOpcode == LLVMOpcode.LLVMGetElementPtr)
+            {
+                //inst.ReplaceAllUsesWith(res);
+                //inst.GetFunction().GlobalParent.PrintToFile("translatedFunction.ll");
+                //Debugger.Break();
+            }
             return peephole;
         }
         // Restrict this to expressions which are guaranteed to fold once their children are
@@ -1161,19 +1177,9 @@ return peephole;
             return true;
         }
 
-        private static bool IsSelect(LLVMValueRef inst)
+        private static bool IsSelect(LLVMValueRef inst, bool bothConstants = true)
         {
-            return IsSelectOfTwoConstants(inst);
-            //return IsRealSelect(inst);
-
-            if (inst.Kind != LLVMValueKind.LLVMInstructionValueKind)
-                return false;
-
-            // Return false if it's not a select inst.
-            if (inst.InstructionOpcode != LLVMOpcode.LLVMSelect)
-                return false;
-
-            return true;
+            return bothConstants ? IsSelectOfTwoConstants(inst) : inst.InstructionOpcode == LLVMOpcode.LLVMSelect;
         }
 
         // %188 = lshr i64 %load3552, 8

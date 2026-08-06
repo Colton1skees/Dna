@@ -106,7 +106,10 @@ namespace Dna.Passes
         private unsafe bool StoreToLoadPropagation(LLVMOpaqueValue* function, nint loopInfo, nint domTree, nint mssa, nint simplifyQuery)
         {
             builder = LLVMBuilderRef.Create(LLVMContextRef.Global);
-            return Run(function, new LoopInfo(loopInfo), new DominatorTree(domTree), new MemorySSA(mssa), new SimplifyQuery(simplifyQuery));
+            var r = Run(function, new LoopInfo(loopInfo), new DominatorTree(domTree), new MemorySSA(mssa), new SimplifyQuery(simplifyQuery));
+
+            new LLVMValueRef((nint)function).GlobalParent.PrintToFile("translatedFunction.ll");
+            return r;
         }
 
         private BaseWithOffset GetCanonicalBasePlusOffsetOld(LLVMValueRef current)
@@ -657,6 +660,9 @@ namespace Dna.Passes
             }
             */
 
+
+      
+
             // Exit early if we hit the max recursion depth
             if (depth >= config.MaxLoadElimDepth)
                 return null;
@@ -713,7 +719,7 @@ namespace Dna.Passes
             //List<ByteSource> values = new();
             StoreOffsetMapping values = new();
 
-            
+
             /*
             for (int i = 0; i < loadSize; i++)
             {
@@ -729,6 +735,7 @@ namespace Dna.Passes
                 return CreateFullReplacementOfLoad(loadInst, values);
             }
             */
+
 
 
             while (true)
@@ -909,32 +916,44 @@ namespace Dna.Passes
             
             else
             {
+                LLVMValueRef selectCond;
+                LLVMValueRef ptr1;
+                LLVMValueRef ptr2;
 
-                // Try to model this as an addition between a base pointer and a select between two constants.
-                // Return null if we can't.
+                var loadPtr = loadInst.GetOperand(0);
                 var baseWithConstantSelect = KnownIndexStoreToLoadPropagation.GetAsBaseWithConstantSelect(loadInst);
-                if (baseWithConstantSelect == null)
+                if (baseWithConstantSelect != null)
+                {
+                    builder.PositionBefore(loadInst);
+
+                    var index1 = builder.BuildAdd(baseWithConstantSelect.BasePtr, baseWithConstantSelect.SelectOfTwoConstantIndices.GetOperand(1));
+                    var index2 = builder.BuildAdd(baseWithConstantSelect.BasePtr, baseWithConstantSelect.SelectOfTwoConstantIndices.GetOperand(2));
+                    var ptrTy = function.GetFunctionCtx().GetPtrType();
+                    ptr1 = builder.BuildInBoundsGEP2(ptrTy, memPtr, new LLVMValueRef[] { index1 });
+                    ptr2 = builder.BuildInBoundsGEP2(ptrTy, memPtr, new LLVMValueRef[] { index2 });
+                    selectCond = baseWithConstantSelect.SelectOfTwoConstantIndices.GetOperand(0);
+                }
+                else if (loadPtr.Is(LLVMOpcode.LLVMSelect) &&
+                    loadPtr.GetOperand(1).TypeOf.Kind == LLVMTypeKind.LLVMPointerTypeKind &&
+                    loadPtr.GetOperand(2).TypeOf.Kind == LLVMTypeKind.LLVMPointerTypeKind)
+                {
+                    builder.PositionBefore(loadInst);
+                    selectCond = loadPtr.GetOperand(0);
+                    ptr1 = loadPtr.GetOperand(1);
+                    ptr2 = loadPtr.GetOperand(2);
+                }
+                else
+                {
                     return null;
-
-                // Position the builder before the original instruction.
-                builder.PositionBefore(loadInst);
-
-                // Calculate two separate memory pointer indices using the two constant indices and shared base pointer.
-                var index1 = builder.BuildAdd(baseWithConstantSelect.BasePtr, baseWithConstantSelect.SelectOfTwoConstantIndices.GetOperand(1));
-                var index2 = builder.BuildAdd(baseWithConstantSelect.BasePtr, baseWithConstantSelect.SelectOfTwoConstantIndices.GetOperand(2));
-
-                // Compute two gep instructions.
-                var ptrTy = function.GetFunctionCtx().GetPtrType();
-                var gep1 = builder.BuildInBoundsGEP2(ptrTy, memPtr, new LLVMValueRef[] { index1 });
-                var gep2 = builder.BuildInBoundsGEP2(ptrTy, memPtr, new LLVMValueRef[] { index2 });
+                }
 
                 // Create the loads
                 LLVMValueRef load1 = null;
                 LLVMValueRef load2 = null;
        
                 
-                load1 = builder.BuildLoad2(loadInst.TypeOf, gep1);
-                load2 = builder.BuildLoad2(loadInst.TypeOf, gep2);
+                load1 = builder.BuildLoad2(loadInst.TypeOf, ptr1);
+                load2 = builder.BuildLoad2(loadInst.TypeOf, ptr2);
 
                 // Update MSSA to be aware of the second load.
                 // Note that we set the insert point to be right before the original load.
@@ -966,7 +985,6 @@ namespace Dna.Passes
                 }
 
                 // Ok, we were able to propagate both load destinations to other loads.
-                var selectCond = baseWithConstantSelect.SelectOfTwoConstantIndices.GetOperand(0);
                 var combined = builder.BuildSelect(selectCond, solution1.GetResult(), solution2.GetResult());
 
 

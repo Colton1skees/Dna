@@ -48,6 +48,7 @@
 #include "llvm/Transforms/Scalar/Reassociate.h"
 #include "llvm/Transforms/Scalar/LoopSimplifyCFG.h"
 #include "llvm/Transforms/Scalar/SimplifyCFG.h"
+#include "llvm/Transforms/Utils/SimplifyCFGOptions.h"
 #include "llvm/Transforms/Scalar/LoopPassManager.h"
 #include "llvm/Transforms/Scalar/LoopUnrollPass.h"
 #include "llvm/Transforms/Scalar/SROA.h"
@@ -882,7 +883,9 @@ void OptimizeVmpModule(llvm::Module* module,
 
 	FPM.addPass(llvm::BDCEPass());
 	FPM.addPass(llvm::ADCEPass());
-	FPM.addPass(llvm::SimplifyCFGPass());
+	llvm::SimplifyCFGOptions lateSimplifyCfgOptions;
+	lateSimplifyCfgOptions.hoistCommonInsts(true).sinkCommonInsts(true);
+	FPM.addPass(llvm::SimplifyCFGPass(lateSimplifyCfgOptions));
 
 
 execute:

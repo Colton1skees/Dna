@@ -37,6 +37,7 @@ using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.Linq;
+using System.Numerics;
 using System.Reflection.Metadata;
 using System.Runtime.InteropServices;
 using System.Text;
@@ -313,6 +314,7 @@ namespace Dna.BinaryTranslator.VMProtect.Rewrite
                     optHeavy = false;
                 }
 
+       
                 var solution = OptimizeAndSolve(stateStruct, stateStruct2, liftedFunction, handlerLifter, handlerRipToRegisters);
                 if (solution is Err<InvalidOperationException> err)
                 {
@@ -644,6 +646,10 @@ namespace Dna.BinaryTranslator.VMProtect.Rewrite
             if (ripResult is not Ok<Dictionary<ulong, HashSet<ulong>>> dests)
                 return new Err<InvalidOperationException>(ripResult.Err());
 
+
+            var idxOf = stateStruct.GetRegisterArgumentIndex(arch.GetRegisterByName("RBP"));
+            Console.WriteLine($"RBP IDX: {idxOf}");
+
             // Compute the VIP/vkey reg for each handler
             foreach (var (bytecodePtr, outgoingHandlers) in dests.Value)
             {
@@ -697,7 +703,7 @@ namespace Dna.BinaryTranslator.VMProtect.Rewrite
                 {
                     // TODO: Solve for concrete vkey and store it
                     vkey = GetVkeyByUsage(rip, t, stateStruct, vip);
-                    Debug.Assert(vkey != null);
+                    //Debug.Assert(vkey != null);
                 }
 
 
@@ -852,6 +858,9 @@ namespace Dna.BinaryTranslator.VMProtect.Rewrite
                 Debug.Assert(isVkey);
                 cands.Add(reg);
             }
+
+            if (cands.Count > 1)
+                return null;
 
             return cands.SingleOrDefault();
         }
@@ -1108,6 +1117,8 @@ namespace Dna.BinaryTranslator.VMProtect.Rewrite
         private readonly Dictionary<ulong, HandlerData> handlerRipToRegisters;
         private LLVMBuilderRef builder;
 
+        private const bool concretize = true;
+
         public IterativeCfgBuilder(IDna dna, LLVMModuleRef module, RemillArch arch, VmpParameterizedStateStructure stateStruct, VmCfg vCfg, HandlerLifter handlerCache, Dictionary<VmHandler, RemillRegister> handlerVips, Dictionary<ulong, HandlerData> handlerRipToRegisters)
         {
             this.dna = dna;
@@ -1236,7 +1247,7 @@ namespace Dna.BinaryTranslator.VMProtect.Rewrite
                 builder.PositionAtEnd(block);
 
                 // Concretize the VIP register!
-                if (handler != entryHandler)
+                if (handler != entryHandler && concretize)
                 {
                     var regInfo = handlerRipToRegisters[handler.NativeRip];
                     var incomingVipRegister = regInfo.Vip;
@@ -1299,7 +1310,7 @@ namespace Dna.BinaryTranslator.VMProtect.Rewrite
                 {
                     liftedHandler = HandlerLifter.CloneFunction(name, srcHandler);
 
-                    if (handler != entryHandler)
+                    if (concretize && handler != entryHandler)
                     {
                         var regInfo = handlerRipToRegisters[handler.NativeRip];
 
@@ -1355,6 +1366,7 @@ namespace Dna.BinaryTranslator.VMProtect.Rewrite
 
                     foreach (var (reg, inputIndex) in stateStruct.RegisterArgumentIndices)
                     {
+                        break;
                         var input = liftedHandler.GetParam((uint)inputIndex);
                         var output = liftedHandler.GetParam((uint)stateStruct.RegisterOutputArgumentIndices[reg]);
                         foreach (var store in liftedHandler.GetInstructions().Where(x => x.Is(LLVMOpcode.LLVMStore) && x.GetOperand(0) == input && x.GetOperand(1) == output).ToList())
@@ -1437,7 +1449,7 @@ namespace Dna.BinaryTranslator.VMProtect.Rewrite
 
 
                 builder.PositionAtEnd(call.InstructionParent);
-                if (true && handler != entryHandler && handlerRipToRegisters.TryGetValue(handler.NativeRip, out var slotInfo) && slotInfo.hasVkeyStackSlot)
+                if (false && handler != entryHandler && handlerRipToRegisters.TryGetValue(handler.NativeRip, out var slotInfo) && slotInfo.hasVkeyStackSlot)
                 {
                     var func = module.GetNamedFunction("SaveVkey");
                     if (func.Handle == 0)
@@ -1677,12 +1689,29 @@ namespace Dna.BinaryTranslator.VMProtect.Rewrite
 
         public static ControlFlowGraph<Instruction> DisHandler(IDna dna, ulong ip)
         {
-            return dna.RecursiveDescent.ReconstructCfg(ip, IterativeVmpExplorer.DescentCallback(dna), null, IterativeVmpExplorer.ShouldContinueCallback(dna));
+            var cfg = dna.RecursiveDescent.ReconstructCfg(ip, IterativeVmpExplorer.DescentCallback(dna), null, IterativeVmpExplorer.ShouldContinueCallback(dna));
+            return cfg;
+            var isVmEnter = cfg.GetInstructions().Count(x => x.Mnemonic == Mnemonic.Push) > 10;
+
+            var extractor = new VmpHandlerExtractor(dna);
+            var insts = extractor.Process(ip, isVmEnter);
+
+            var newCfg = new ControlFlowGraph<Instruction>(insts[0].IP);
+            var eb = newCfg.CreateBlock(insts[0].IP);
+            eb.Instructions.AddRange(insts);
+            return newCfg;
         }
 
         public static bool IsVmexit(ControlFlowGraph<Instruction> cfg)
         {
-            return cfg.GetInstructions().Count(x => x.Mnemonic == Iced.Intel.Mnemonic.Pop) > 10;
+            var exitInsts = cfg.GetInstructions().Where(x => x.Mnemonic == Iced.Intel.Mnemonic.Pop).ToList();
+            var isExit = exitInsts.Count > 10;
+            if (isExit)
+            {
+                Console.WriteLine(GraphFormatter.FormatGraph(cfg));
+                Debugger.Break();
+            }
+            return isExit;
         }
 
         public bool ContainsHandler(ulong rip)
@@ -1745,6 +1774,8 @@ namespace Dna.BinaryTranslator.VMProtect.Rewrite
 
         public LLVMValueRef LiftHandler(ulong handlerRip, bool isVmEnter)
         {
+            //if (handlerRip == 0x180003092)
+            //    Debugger.Break();
             if (handlerRipToLlvmFunction.TryGetValue(handlerRip, out var existing))
                 return existing;
 
@@ -1838,6 +1869,11 @@ namespace Dna.BinaryTranslator.VMProtect.Rewrite
 
             var constStores = lifted.GetInstructions().Where(x => x.InstructionOpcode == LLVMOpcode.LLVMStore && x.GetOperand(0).Kind == LLVMValueKind.LLVMConstantIntValueKind && dna.Binary.IsConstantData(x.GetOperand(0).ConstIntZExt)).ToList();
 
+            var expected = "6442472884"; // battleye
+            expected = "5368736796"; // vmptest.vmp.bin
+            if (constStores.Count == 2)
+                constStores.RemoveAll(x => !x.ToString().Contains(expected));
+
             // %24 = getelementptr inbounds i8, ptr %mem, i64 5368736796
             // store i64 5368736796, ptr %out_RSI, align 8
             LLVMValueRef targetStore = constStores
@@ -1873,6 +1909,10 @@ namespace Dna.BinaryTranslator.VMProtect.Rewrite
             var matches = Matches(inReg, add);
             if (!matches && !isVmEnter && !isVmExit)
             {
+                // For vmp3.5+ you need to use the heuristic below
+                return existingRegister;
+                return null;
+                stripped.GlobalParent.PrintToFile("translatedFunction.ll");
                 var instructions = stripped.EntryBasicBlock.GetInstructions();
                 var firstLoad = instructions.First(x => x.InstructionOpcode == LLVMOpcode.LLVMLoad && x.GetOperand(0).Kind == LLVMValueKind.LLVMInstructionValueKind && x.GetOperand(0).InstructionOpcode == LLVMOpcode.LLVMGetElementPtr);
                 var firstAdd = instructions.First(x => x.InstructionOpcode == LLVMOpcode.LLVMAdd && x.GetOperand(0) == firstLoad && x.GetOperand(1).Kind == LLVMValueKind.LLVMConstantIntValueKind);
@@ -1986,6 +2026,9 @@ namespace Dna.BinaryTranslator.VMProtect.Rewrite
         // To make optimization a bit easier we modify the VMEnter to allocate a huge amount of stack space and delete all of the stack expansion loops.
         private void EliminateStackExpansionLoop(LLVMValueRef function, ulong handlerRip)
         {
+           // if (function.GetInstructions().Any(x => x.InstructionOpcode == LLVMOpcode.LLVMAnd && x.ToString().Contains("-65536")))
+            //    Debugger.Break();
+       
             var hasCycles = () =>
             {
                 var entryBlock = function.EntryBasicBlock;
@@ -2012,15 +2055,66 @@ namespace Dna.BinaryTranslator.VMProtect.Rewrite
                 return r;
             };
 
+            if (handlerRip == 0x18000151A && false)
+            {
+                
+                var t = function.EntryBasicBlock.LastInstruction;
+                var op0 = t.GetOperand(1).AsBasicBlock();
+                var op1 = t.GetOperand(2).AsBasicBlock();
+                var b0Cy = ReachesCycle(op0, new(), new());
+                var b11Cy = ReachesCycle(op1, new(), new());
+                File.WriteAllText("maybeCycle.py", new LLVMToBinjaGraph(function).Process());
+                Debugger.Break();
+            }
+
+            // TODO: Add "&& IsStackExpansionPredicate(x)" back for newer vmp versions. For vmp 3.5 the stack expansion predicate pattern changed
             var exitInsts = function.GetBlocks()
                 .Select(x => x.Terminator)
-                .Where(x => x.InstructionOpcode == LLVMOpcode.LLVMBr && x.OperandCount == 3 && IsStackExpansionPredicate(x) && getCycles(x.GetOperand(1).AsBasicBlock(), x.GetOperand(2).AsBasicBlock()) == 1)
+                .Where(x => x.InstructionOpcode == LLVMOpcode.LLVMBr && x.OperandCount == 3 && IsStackExpansionPredicate(x) && BitOperations.PopCount(getCycles(x.GetOperand(1).AsBasicBlock(), x.GetOperand(2).AsBasicBlock())) == 1)
                 .ToList();
 
             if (exitInsts.Count == 0)
+            {
+                // Eliminate any opaque branches
+                //if (function.EntryBasicBlock.LastInstruction.OperandCount == 3)
+                //    function.EntryBasicBlock.LastInstruction.SetOperand(0, LLVMValueRef.CreateConstInt(LLVMTypeRef.Int1, 1));
+                
                 return;
+            }
+
+            var exit = exitInsts.Single();
+            var cycles = getCycles(exit.GetOperand(1).AsBasicBlock(), exit.GetOperand(2).AsBasicBlock());
+            var opIdx = cycles == 1 ? 1 : 0;
+            if (opIdx != 1)
+                Debugger.Break();
+
+            if (!IsStackExpansionPredicate(exitInsts.Single()))
+                Debugger.Break();
+
+            var cond = exitInsts.Single().GetOperand(0).GetOperand(0);
+            if (cond.Is(LLVMOpcode.LLVMOr) && cond.GetOperand(1).Is(LLVMOpcode.LLVMAnd))
+            {
+                var tgt = cond.GetOperand(1).GetOperand(0);
+                var toReplace = cond;
+                Debug.Assert(tgt.Is(LLVMValueKind.LLVMArgumentValueKind));
+                toReplace.ReplaceAllUsesWith(tgt);
+
+                //Debugger.Break();
+
+            }
+
 
             exitInsts.Single().SetOperand(0, LLVMValueRef.CreateConstInt(LLVMTypeRef.Int1, 1));
+
+            /*
+              %local_state_struct.sroa.725.2328.insert.ext = zext i16 %1 to i64
+              %local_state_struct.sroa.725.2328.insert.mask916 = and i64 %RBP, -65536
+              %local_state_struct.sroa.725.2328.insert.insert917 = or disjoint i64 %local_state_struct.sroa.725.2328.insert.ext, %local_state_struct.sroa.725.2328.insert.mask916
+              %2 = add i64 %RDI, 224
+              %.not = icmp ugt i64 %local_state_struct.sroa.725.2328.insert.insert917, %2
+              br i1 %.not, label %bb_1800029FB.i, label %bb_18000114B.i
+            */
+            // Now eliminate the alignment
 
         }
 
@@ -2207,6 +2301,7 @@ namespace Dna.BinaryTranslator.VMProtect.Rewrite
             int rejected = 0;
             while (true)
             {
+
                 foreach (var value in LLVMUtil.GetRpoInstructions(func))
                 {
                     if (!MbaDeobfuscationPass.IsValidIntegerInst(value))
