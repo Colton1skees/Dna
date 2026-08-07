@@ -99,7 +99,7 @@ namespace Dna.BinaryTranslator.Unsafe
         {
             // Use GEP to create an i8* pointer to memory[address].
             var storeAddr = function.GetParams()[1];
-            var storePointer = builder.BuildInBoundsGEP2(module.Context.GetInt8Ty(), memPtr, new LLVMValueRef[] { storeAddr });
+            var storePointer = builder.BuildGEP2(module.Context.GetInt8Ty(), memPtr, new LLVMValueRef[] { storeAddr });
 
             // Bitcast the i8* pointer to the type of the value being stored.
             var storeValue = function.GetParams()[2];
@@ -114,7 +114,7 @@ namespace Dna.BinaryTranslator.Unsafe
         private void ImplementMemRead(LLVMValueRef function, LLVMValueRef memPtr)
         {
             // Use GEP to create an i8* pointer to memory[address].
-            var loadPointer = builder.BuildInBoundsGEP2(module.Context.GetInt8Ty(), memPtr, new LLVMValueRef[] { function.GetParam(1) });
+            var loadPointer = builder.BuildGEP2(module.Context.GetInt8Ty(), memPtr, new LLVMValueRef[] { function.GetParam(1) });
 
             // Note: This is a hack required to get the return type using the APIs we have access to.
             LLVMTypeRef valueType = function.Name.Replace("__remill_read_memory_", "") switch

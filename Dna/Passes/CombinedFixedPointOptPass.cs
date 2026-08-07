@@ -789,11 +789,6 @@ namespace Dna.Passes
                 // Alternatively this may return a MemoryPhi or a "LiveOnEntry" object.
                 var newAccess = current.DefiningAccess;
 
-                if (newAccess is MemoryPhi memoryPhi)
-                {
-                    Debugger.Break();
-                }
-
                 // Break out of the loop if we hit a memory clobber we can't handle.
                 if (!IsValidMemoryAccess(newAccess))
                     break;
@@ -979,8 +974,8 @@ namespace Dna.Passes
                     var index1 = builder.BuildAdd(baseWithConstantSelect.BasePtr, baseWithConstantSelect.SelectOfTwoConstantIndices.GetOperand(1));
                     var index2 = builder.BuildAdd(baseWithConstantSelect.BasePtr, baseWithConstantSelect.SelectOfTwoConstantIndices.GetOperand(2));
                     var ptrTy = function.GetFunctionCtx().GetPtrType();
-                    ptr1 = builder.BuildInBoundsGEP2(ptrTy, memPtr, new LLVMValueRef[] { index1 });
-                    ptr2 = builder.BuildInBoundsGEP2(ptrTy, memPtr, new LLVMValueRef[] { index2 });
+                    ptr1 = builder.BuildGEP2(ptrTy, memPtr, new LLVMValueRef[] { index1 });
+                    ptr2 = builder.BuildGEP2(ptrTy, memPtr, new LLVMValueRef[] { index2 });
                     selectCond = baseWithConstantSelect.SelectOfTwoConstantIndices.GetOperand(0);
                 }
                 else if (loadPtr.Is(LLVMOpcode.LLVMSelect) &&
@@ -1111,6 +1106,21 @@ namespace Dna.Passes
             return peephole;
         }
 
+        private static bool IsMemory(LLVMValueRef gep)
+        {
+            if (!gep.Is(LLVMOpcode.LLVMGetElementPtr))
+                return false;
+            if (gep.OperandCount != 2)
+                return false;
+
+            var load = gep.GetOperand(0);
+            if (gep.OperandCount != 2)
+                return false;
+
+            var isMemGep = load.Is(LLVMOpcode.LLVMLoad) && load.GetOperand(0).Kind == LLVMValueKind.LLVMGlobalVariableValueKind;
+            return isMemGep;
+        }
+
         private PeepholeResult ProcessBinaryLoad(LLVMValueRef loadInst, MemorySSAUpdater updater)
         {
             // Type check
@@ -1122,10 +1132,22 @@ namespace Dna.Passes
             if (gep.InstructionOpcode != LLVMOpcode.LLVMGetElementPtr)
                 return null;
 
+            var gep0 = gep.GetOperand(0);
+            if (gep.OperandCount != 2)
+                return null;
+
             // If this is not a binary section access, do a last-ditch attempt with a load-of-select.
             if (!BinaryAccessMatcher.IsConstantWithinBinarySection(bin, gep.GetOperand(1)))
                 return TryProcessAsLoadOfTwoPossibleAddresses(gep, loadInst, updater);
 
+
+            //if (!gep0.Is(LLVMOpcode.LLVMLoad) || gep0.GetOperand(0).Kind != LLVMValueKind.LLVMGlobalVariableValueKind)
+            if (!IsMemory(gep))
+            {
+                //loadInst.GetFunction().GlobalParent.PrintToFile("translatedFunction.ll");
+                return null;
+
+            }
             //Console.WriteLine(gep);
 
             var bitWidth = loadInst.TypeOf.IntWidth;

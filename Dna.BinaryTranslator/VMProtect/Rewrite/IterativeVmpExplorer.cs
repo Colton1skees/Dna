@@ -297,6 +297,9 @@ namespace Dna.BinaryTranslator.VMProtect.Rewrite
 
                 serialize();
 
+                if (liftedFunction.Handle != 0)
+                    liftedFunction.GlobalParent.PrintToFile("translatedFunction.ll");
+
 
                 AdhocInstCombinePass.Validate(liftedFunction);
                 liftedFunction = new IterativeCfgBuilder(dna, outModule, arch, stateStruct, vCfg, handlerLifter, handlerVips, handlerRipToRegisters).Run(liftedFunction, handlers.First());
@@ -513,6 +516,8 @@ namespace Dna.BinaryTranslator.VMProtect.Rewrite
                 };
 
 
+                if (ii >= 378)
+                    isRebuildRequired = true;
 
                 //isRebuildRequired = true;
                 if (isRebuildRequired)
@@ -1254,7 +1259,7 @@ namespace Dna.BinaryTranslator.VMProtect.Rewrite
                     builder.BuildStore(LLVMValueRef.CreateConstInt(LLVMTypeRef.Int64, handler.BytecodeRip), registerAllocaMapping[incomingVipRegister]);
 
                     // Concretize vkey if its known
-                    if (vCfg.Instructions[handler].Metadata.Vkey is ulong existing)
+                    if (false && vCfg.Instructions[handler].Metadata.Vkey is ulong existing)
                     {
                         // TODO: If this is a vmexit, do not concretize bytecode rip and stuff
                         var incomingVkeyRegister = regInfo.Vkey;
@@ -1278,7 +1283,7 @@ namespace Dna.BinaryTranslator.VMProtect.Rewrite
                     }
 
                     // Concretize vkey if its known
-                    if (vCfg.Instructions[handler].Metadata.Vbase is ulong existingBase)
+                    if (false && vCfg.Instructions[handler].Metadata.Vbase is ulong existingBase)
                     {
                         // TODO: If this is a vmexit, do not concretize bytecode rip and stuff
                         var incomingImgbaseReg = regInfo.ImgBaseReg;
@@ -1318,7 +1323,7 @@ namespace Dna.BinaryTranslator.VMProtect.Rewrite
                         var vipIndex = stateStruct.RegisterArgumentIndices[regInfo.Vip];
                         liftedHandler.GetParam((uint)vipIndex).ReplaceAllUsesWith(vipConst);
 
-                        if (vCfg.Instructions[handler].Metadata.Vkey is ulong existing2)
+                        if (false && vCfg.Instructions[handler].Metadata.Vkey is ulong existing2)
                         {
                             var incomingVkeyRegister = regInfo.Vkey;
 
@@ -1335,7 +1340,7 @@ namespace Dna.BinaryTranslator.VMProtect.Rewrite
 
                         }
 
-                        if (vCfg.Instructions[handler].Metadata.Vbase is ulong existing3)
+                        if (false && vCfg.Instructions[handler].Metadata.Vbase is ulong existing3)
                         {
                             var incomingBaseReg = regInfo.ImgBaseReg;
 
@@ -1437,7 +1442,7 @@ namespace Dna.BinaryTranslator.VMProtect.Rewrite
 
                 var call = VmPartialBlockLifter.CallVmHandler(builder, function, liftedHandler, registerAllocaMapping, stateStruct);
 
-                bool dbgIntrins = false;
+                bool dbgIntrins = true;
 
 
                 builder.PositionBefore(call);
@@ -1793,6 +1798,8 @@ namespace Dna.BinaryTranslator.VMProtect.Rewrite
 
             // Lift the function using remill.
             var encodedCfg = X86CfgEncoder.EncodeCfg(dna.Binary, cfg);
+
+
             var (liftedFunction, blockMapping, filterFunctions) = CfgTranslator.Translate(dna.Binary.BaseAddress, arch, new BinaryFunction(encodedCfg, scopeTableTree, new List<JmpTable>()), fallthroughFromIps, CallHandlingKind.VMProtect);
             liftedFunction = FunctionIsolator.IsolateFunctionIntoNewModule(arch, liftedFunction);
 
@@ -1871,7 +1878,8 @@ namespace Dna.BinaryTranslator.VMProtect.Rewrite
 
             var expected = "6442472884"; // battleye
             expected = "5368736796"; // vmptest.vmp.bin
-            if (constStores.Count == 2)
+            //if (constStores.Count == 2)
+            if (true)
                 constStores.RemoveAll(x => !x.ToString().Contains(expected));
 
             // %24 = getelementptr inbounds i8, ptr %mem, i64 5368736796

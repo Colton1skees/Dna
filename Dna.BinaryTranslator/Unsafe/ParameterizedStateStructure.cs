@@ -73,6 +73,9 @@ namespace Dna.BinaryTranslator.Unsafe
             this.justRAX = justRAX;
             builder = LLVMBuilderRef.Create(ctx);
             rootRegisters = ArchRegisters.GetRootGprs(arch);
+
+            var flagRegs = arch.Registers.Where(x => x.Size == 1).ToList();
+
             RegisterArgumentIndices = ApplyParameterOrderingToRegisters(rootRegisters);
 
             var outputRegs = new Dictionary<RemillRegister, int>();

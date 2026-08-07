@@ -209,6 +209,8 @@ namespace Dna.Passes
             if (changed != null)
                 return changed;
 
+            return changed;
+
             /*
             changed = TryCollapseRedundantSelectRound(inst);
             if (changed != null)
@@ -339,7 +341,10 @@ namespace Dna.Passes
 
             var outerElementType = new LLVMTypeRef((IntPtr)LLVM.GetGEPSourceElementType(inst));
             var innerElementType = new LLVMTypeRef((IntPtr)LLVM.GetGEPSourceElementType(innerGep));
-  
+
+            if (innerIndex.TypeOf.IntWidth != 64 || outerIndex.TypeOf.IntWidth != 64)
+                Debugger.Break();
+
             var combinedIndex = LLVMValueRef.CreateConstInt(
                 outerIndex.TypeOf,
                 unchecked(innerIndex.ConstIntZExt + outerIndex.ConstIntZExt));
