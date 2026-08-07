@@ -14,6 +14,7 @@ using System.Drawing;
 using System.Linq;
 using System.Net;
 using System.Reflection.Metadata;
+using System.Reflection.Metadata.Ecma335;
 using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
 using System.Text;
@@ -106,7 +107,9 @@ namespace Dna.Passes
         private unsafe bool StoreToLoadPropagation(LLVMOpaqueValue* function, nint loopInfo, nint domTree, nint mssa, nint simplifyQuery)
         {
             builder = LLVMBuilderRef.Create(LLVMContextRef.Global);
-            return Run(function, new LoopInfo(loopInfo), new DominatorTree(domTree), new MemorySSA(mssa), new SimplifyQuery(simplifyQuery));
+            var r = Run(function, new LoopInfo(loopInfo), new DominatorTree(domTree), new MemorySSA(mssa), new SimplifyQuery(simplifyQuery));
+            new LLVMValueRef((nint)function).GlobalParent.Verify(LLVMVerifierFailureAction.LLVMAbortProcessAction);
+            return r;
         }
 
         private BaseWithOffset GetCanonicalBasePlusOffsetOld(LLVMValueRef current)
@@ -354,9 +357,13 @@ namespace Dna.Passes
                     {
                         var nextInstr = worklist.PopFront();
 
+
                         if (!nextInstr.Is(LLVMValueKind.LLVMInstructionValueKind))
                             continue;
 
+                        //var isTgt = nextInstr.Is(LLVMOpcode.LLVMLoad) && nextInstr.GetOperand(0).Is(LLVMOpcode.LLVMGetElementPtr) && nextInstr.GetOperand(0).GetOperand(0).ToString().Contains("i64 96");
+                        //if (!isTgt)
+                        //    continue;
 
                         // Delete trivially dead instructions
                         if (false && ConstantFoldingAPI.IsInstructionTriviallyDead(nextInstr))
@@ -479,6 +486,7 @@ namespace Dna.Passes
 
         private bool Hoist(LLVMValueRef inst, LLVMOpcode opcode, DominatorTree domTree)
         {
+            return false;
             var matches = opcode == LLVMOpcode.LLVMAdd || opcode == LLVMOpcode.LLVMSub || opcode == LLVMOpcode.LLVMGetElementPtr;
             if (!matches)
                 return false;
@@ -499,6 +507,7 @@ namespace Dna.Passes
             LLVM.InstructionRemoveFromParent(inst);
             builder.PositionBefore(target.Terminator);
             builder.Insert(inst);
+            inst.GetFunction().GlobalParent.PrintToFile("translatedFunction.ll");
             return true;
         }
 
@@ -679,6 +688,7 @@ namespace Dna.Passes
 
         private PeepholeResult ProcessLoad(LLVMValueRef loadInst, MemorySSAUpdater updater, int depth)
         {
+           
             /*
             if (loadInst.ToString().Contains("%292 = load i64, ptr %71"))
             {
@@ -778,6 +788,11 @@ namespace Dna.Passes
                 // Locate the first memory write *before* our current definition that may clobber the current definition.
                 // Alternatively this may return a MemoryPhi or a "LiveOnEntry" object.
                 var newAccess = current.DefiningAccess;
+
+                if (newAccess is MemoryPhi memoryPhi)
+                {
+                    Debugger.Break();
+                }
 
                 // Break out of the loop if we hit a memory clobber we can't handle.
                 if (!IsValidMemoryAccess(newAccess))

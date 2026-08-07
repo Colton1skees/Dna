@@ -75,10 +75,10 @@ if (genDsl)
 //LazyLLVMFixes.InstallValueToStringBugFix(RemillUtils.LLVMValueToString);
 
 
-bool dbgCode = false;
+bool dbgCode = true;
 if (dbgCode)
 {
-    var irPath = "C:\\Users\\user\\Downloads\\bar.ll";
+    var irPath = "C:\\Users\\user\\Downloads\\extracted.ll";
     var t = File.ReadAllText(irPath);
     Console.WriteLine(irPath);
 
@@ -127,8 +127,8 @@ if (dbgCode)
 
 
         //new VmpSolver2(vmpDna, existingFunc).SolveVip(existingFunc, existingFunc.GetInstructions().Single(x => x.ToString().Contains("%add.i.i125.i.i.i = a")));
-        if (opt)
-            new VmpSolver2(vmpDna, existingFunc).Simplify(existingFunc);
+        //if (opt)
+         //   new VmpSolver2(vmpDna, existingFunc).Simplify(existingFunc);
 
         //MbaDeobfuscationPass.Run(existingFunc);
 
@@ -142,7 +142,7 @@ if (dbgCode)
             {
                 PassPipeline.Run(vmpBin, existingFunc, false, true, true);
                 PassPipeline.Run(vmpBin, existingFunc, false, false, false);
-                new VmpSolver2(vmpDna, existingFunc).Simplify(existingFunc);
+                //new VmpSolver2(vmpDna, existingFunc).Simplify(existingFunc);
             }
             sw2.Stop();
             tempNewMod.PrintToFile(("translatedFunction.ll"));

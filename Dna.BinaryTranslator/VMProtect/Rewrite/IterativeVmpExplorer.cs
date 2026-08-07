@@ -2094,11 +2094,12 @@ namespace Dna.BinaryTranslator.VMProtect.Rewrite
             var cond = exitInsts.Single().GetOperand(0).GetOperand(0);
             if (cond.Is(LLVMOpcode.LLVMOr) && cond.GetOperand(1).Is(LLVMOpcode.LLVMAnd))
             {
+                /*
                 var tgt = cond.GetOperand(1).GetOperand(0);
                 var toReplace = cond;
                 Debug.Assert(tgt.Is(LLVMValueKind.LLVMArgumentValueKind));
                 toReplace.ReplaceAllUsesWith(tgt);
-
+                */
                 //Debugger.Break();
 
             }
@@ -2295,7 +2296,7 @@ namespace Dna.BinaryTranslator.VMProtect.Rewrite
 
             var sw = Stopwatch.StartNew();
             //foreach(var (value, idx) in converter.defMap)
-            var solver = MkSolver(200);
+            var solver = MkSolver(1000);
             solver.Push();
             LLVMBasicBlockRef currBlock = null;
             int rejected = 0;
@@ -2392,7 +2393,7 @@ namespace Dna.BinaryTranslator.VMProtect.Rewrite
                         }
                     }
 
-                    if (solutions.Count() == 2 && !isSelect(value))
+                    if (solutions.Count() == 2 && !isSelect(value) && value.TypeOf.IntWidth != 1)
                     {
                         var cmps = currBlock.GetInstructions().TakeWhile(x => x != value).Where(x => x.TypeOf.Kind == LLVMTypeKind.LLVMIntegerTypeKind && x.TypeOf.IntWidth == 1 && converter.defMap.ContainsKey(x)).ToList();
                         var translatedCmps = cmps.Select(x => translator.Translate(converter.defMap[x])).ToList();
@@ -2433,6 +2434,13 @@ namespace Dna.BinaryTranslator.VMProtect.Rewrite
                             func.GlobalParent.Verify(LLVMVerifierFailureAction.LLVMAbortProcessAction);
                             goto done;
                         }
+
+                        func.GlobalParent.PrintToFile("translatedFunction.ll");
+
+                       // if (value.InstructionParent.ToString().Contains("vmp_branch"))
+                        //    Debugger.Break();
+                        Console.WriteLine("FAIL");
+                        //Debugger.Break();
                     }
 
                     if (solutions.Count() != 1)
