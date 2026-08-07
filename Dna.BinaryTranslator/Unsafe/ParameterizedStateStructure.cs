@@ -264,6 +264,8 @@ namespace Dna.BinaryTranslator.Unsafe
             }
         }
 
+        public LLVMValueRef GetRegParam(RemillRegister reg, LLVMValueRef func) => func.GetParam((uint)RegisterArgumentIndices[reg]);
+
         public uint GetRegisterArgumentIndex(RemillRegister reg) => (uint)RegisterArgumentIndices[reg];
 
         public LLVMValueRef GetRegInputParam(RemillRegister reg, LLVMValueRef func) => func.GetParam((uint)RegisterArgumentIndices[reg]);

@@ -1,5 +1,6 @@
 ﻿using Dna.BinaryTranslator.JmpTables;
 using Dna.BinaryTranslator.Runtime;
+using Dna.BinaryTranslator.Unsafe;
 using Dna.ControlFlow;
 using Dna.Extensions;
 using Dna.LLVMInterop.API.LLVMBindings.Transforms.Utils;
@@ -23,7 +24,7 @@ namespace Dna.BinaryTranslator.VMProtect
 
         private readonly RemillArch arch;
 
-        private readonly VmpParameterizedStateStructure StateStruct;
+        private readonly ParameterizedStateStructure StateStruct;
 
         private readonly ControlFlowGraph<VmHandler> vmCfg;
 
@@ -42,7 +43,7 @@ namespace Dna.BinaryTranslator.VMProtect
 
         private LLVMValueRef translatedFunction;
 
-        public VmCfgLifter(LLVMModuleRef module, RemillArch arch, VmpParameterizedStateStructure stateStruct, ControlFlowGraph<VmHandler> vmCfg, IReadOnlyDictionary<VmHandler, (LLVMValueRef func, BasicBlock<VmHandler> block)> blockToFunctionMapping, IReadOnlyDictionary<ulong, VmpJmpTable> jmpTables, IReadOnlySet<ulong> vmexitHandlerRips)
+        public VmCfgLifter(LLVMModuleRef module, RemillArch arch, ParameterizedStateStructure stateStruct, ControlFlowGraph<VmHandler> vmCfg, IReadOnlyDictionary<VmHandler, (LLVMValueRef func, BasicBlock<VmHandler> block)> blockToFunctionMapping, IReadOnlyDictionary<ulong, VmpJmpTable> jmpTables, IReadOnlySet<ulong> vmexitHandlerRips)
         {
             this.module = module;
             this.arch = arch;
