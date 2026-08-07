@@ -21,9 +21,9 @@ namespace Dna.BinaryTranslator.Unsafe
     /// </summary>
     public class ParameterizedStateStructure
     {
-        private readonly RemillArch arch;
+        public readonly RemillArch arch;
 
-        public readonly bool addMemoryPtr;
+        public readonly bool addStateStruct;
 
         public bool hasOutputRegisters;
 
@@ -68,16 +68,20 @@ namespace Dna.BinaryTranslator.Unsafe
         public ParameterizedStateStructure(RemillArch arch, LLVMContextRef ctx, bool addMemoryPtr, bool hasOutputRegisters, bool justRAX)
         {
             this.arch = arch;
-            this.addMemoryPtr = addMemoryPtr;
+            addMemoryPtr = true;
+            this.addStateStruct = addMemoryPtr;
             this.hasOutputRegisters = hasOutputRegisters;
             this.justRAX = justRAX;
             builder = LLVMBuilderRef.Create(ctx);
             rootRegisters = ArchRegisters.GetRootGprs(arch);
+
+            var allRegs = arch.Registers;
+
             RegisterArgumentIndices = ApplyParameterOrderingToRegisters(rootRegisters);
 
             var outputRegs = new Dictionary<RemillRegister, int>();
             RegisterOutputArgumentIndices = outputRegs;
-            uint baseOffset = (uint)(OrderedRegisterArguments.Count + (addMemoryPtr ? 1 : 0));
+            uint baseOffset = (uint)OrderedRegisterArguments.Count;
             for (int i = 0; i < OrderedRegisterArguments.Count; i++)
             {
                 var reg = OrderedRegisterArguments[i];
@@ -87,7 +91,7 @@ namespace Dna.BinaryTranslator.Unsafe
             // Create a prototype for the new function we are creating.
             // This takes all registers as integers, aswell as an optional
             // single ptr(last argument) for the remill memory pointer.
-            ParameterizedFunctionPrototype = CreateParameterizedPrototype(ctx, RegisterArgumentIndices, addMemoryPtr, hasOutputRegisters);
+            ParameterizedFunctionPrototype = CreateParameterizedPrototype(ctx, arch, RegisterArgumentIndices, addMemoryPtr, hasOutputRegisters);
         }
 
         private static IReadOnlyDictionary<RemillRegister, int> ApplyParameterOrderingToRegisters(IReadOnlySet<RemillRegister> unorderedRegisters)
@@ -101,7 +105,7 @@ namespace Dna.BinaryTranslator.Unsafe
             // Ensure that RSP is always the first argument.
             var rsp = orderedRegisters.Single(x => x.Name == "RSP");
             var rspIndex = orderedRegisters.IndexOf(rsp);
-            if(rspIndex != 0)
+            if (rspIndex != 0)
             {
                 // Move the register at index zero into RSP's old position.
                 orderedRegisters[rspIndex] = orderedRegisters[0];
@@ -140,6 +144,10 @@ namespace Dna.BinaryTranslator.Unsafe
             if (hasOutputRegisters)
                 UpdateOutputRegisters(newFunc, builder, localStateStruct);
 
+            // Store the local state structure into the output state structure
+            var existing = builder.BuildLoad2(arch.StateStructType, localStateStruct);
+            builder.BuildStore(existing, GetStateStructOutputParam(newFunc));
+
             builder.BuildRetVoid();
 
             // Inline the call to the original function.
@@ -154,7 +162,7 @@ namespace Dna.BinaryTranslator.Unsafe
             OutputFunction = newFunc;
         }
 
-        public static LLVMTypeRef CreateParameterizedPrototype(LLVMContextRef ctx, IReadOnlyDictionary<RemillRegister, int> registerArgumentIndices, bool addMemoryPtr, bool hasOutputRegisters)
+        public static LLVMTypeRef CreateParameterizedPrototype(LLVMContextRef ctx, RemillArch arch, IReadOnlyDictionary<RemillRegister, int> registerArgumentIndices, bool addMemoryPtr, bool hasOutputRegisters)
         {
             // Create a list of function argument types.
             // The last index is the remill memory ptr.
@@ -171,11 +179,7 @@ namespace Dna.BinaryTranslator.Unsafe
                 paramTypes.Add(ctx.GetIntTy((uint)(reg.Size * 8)));
             }
 
-            // Add the last argument: the remill memory ptr.
-            if(addMemoryPtr)
-                paramTypes.Add(ptrTy);
-
-            if(hasOutputRegisters)
+            if (hasOutputRegisters)
             {
                 // For each register, add an additional i64* argument.
                 for (int i = 0; i < orderedRegisters.Count; i++)
@@ -183,6 +187,15 @@ namespace Dna.BinaryTranslator.Unsafe
                     var reg = orderedRegisters[i];
                     paramTypes.Add(ctx.GetPtrType((uint)(reg.Size * 8)));
                 }
+            }
+
+
+            // If the memory ptr is enabled
+            if (addMemoryPtr)
+            {
+                paramTypes.Add(arch.StateStructType);
+                paramTypes.Add(ptrTy);
+
             }
 
             // Create the LLVM prototype for our new function.
@@ -197,11 +210,13 @@ namespace Dna.BinaryTranslator.Unsafe
 
             // Assign readable names to each parameter.
             // TODO: Make things `noalias`.
-            if (addMemoryPtr)
+            if (addStateStruct)
             {
-                var memParam = newFunction.GetParams().Last();
-                memParam.Name = "memory";
-                LLVMCloning.AddParamAttr(newFunction, newFunction.ParamsCount - 1, AttrKind.NoAlias);
+                var memIn = newFunction.GetParam(newFunction.ParamsCount - 2);
+                memIn.Name = "stateIn";
+                var memOut = newFunction.GetParam(newFunction.ParamsCount - 1);
+                memOut.Name = "stateOut";
+                //LLVMCloning.AddParamAttr(newFunction, newFunction.ParamsCount - 1, AttrKind.NoAlias);
             }
 
             foreach (var indexMapping in RegisterArgumentIndices)
@@ -212,7 +227,7 @@ namespace Dna.BinaryTranslator.Unsafe
 
             if (hasOutputRegisters)
             {
-                var baseOffset = RegisterArgumentIndices.Count + (addMemoryPtr ? 1 : 0);
+                var baseOffset = RegisterArgumentIndices.Count;
                 foreach (var indexMapping in RegisterArgumentIndices)
                 {
                     var regParam = newFunction.GetParams()[indexMapping.Value + baseOffset];
@@ -233,7 +248,7 @@ namespace Dna.BinaryTranslator.Unsafe
             var stateStructType = arch.StateStructType;
             var localStateStruct = builder.BuildAlloca(stateStructType, "local_state_struct");
 
-            foreach(var register in arch.Registers)
+            foreach (var register in arch.Registers)
             {
                 var type = register.LLVMType;
                 if (type.Kind != LLVMTypeKind.LLVMIntegerTypeKind)
@@ -241,9 +256,6 @@ namespace Dna.BinaryTranslator.Unsafe
 
                 var zero = LLVMValueRef.CreateConstInt(type, 0);
                 builder.BuildStore(zero, register.GetAddressOf(localStateStruct, builder));
-
-                
-
             }
 
             return localStateStruct;
@@ -251,10 +263,13 @@ namespace Dna.BinaryTranslator.Unsafe
 
         private void CopyParameterizedStateIntoStructure(LLVMValueRef function, LLVMValueRef statePtr)
         {
+            // Store the input state structure to the local state struct.
+            builder.BuildStore(GetStateStructInputParam(function), statePtr);
+
             // For each register ptr argument, copy it's value into the local state structure.
             // Note: The builder should be correctly positioned before this method is called.
             var registerValueMap = new Dictionary<RemillRegister, LLVMValueRef>();
-            foreach(var (reg, argIndex) in RegisterArgumentIndices.OrderBy(x => x.Value))
+            foreach (var (reg, argIndex) in RegisterArgumentIndices.OrderBy(x => x.Value))
             {
                 // Get the register value.
                 var regValue = GetRegInputParam(reg, function);
@@ -264,17 +279,21 @@ namespace Dna.BinaryTranslator.Unsafe
             }
         }
 
+
+        public LLVMValueRef GetRegParam(RemillRegister reg, LLVMValueRef func) => func.GetParam((uint)RegisterArgumentIndices[reg]);
+
+
         public uint GetRegisterArgumentIndex(RemillRegister reg) => (uint)RegisterArgumentIndices[reg];
+
 
         public LLVMValueRef GetRegInputParam(RemillRegister reg, LLVMValueRef func) => func.GetParam((uint)RegisterArgumentIndices[reg]);
         public LLVMValueRef GetRegOutputParam(RemillRegister reg, LLVMValueRef func) => func.GetParam((uint)RegisterOutputArgumentIndices[reg]);
 
-        private LLVMValueRef GetMemoryParamPtr(LLVMValueRef function)
-        {
-            if (addMemoryPtr == false)
-                throw new InvalidOperationException($"Memory pointer was not requested.");
-            return function.GetParams().Last();
-        }
+        public uint GetStateStructInputParamIdx() => ParameterizedFunctionPrototype.ParamTypesCount - 2;
+        public uint GetStateStructOutputParamIdx() => ParameterizedFunctionPrototype.ParamTypesCount - 1;
+
+        public LLVMValueRef GetStateStructInputParam(LLVMValueRef func) => func.GetParam(func.ParamsCount - 2);
+        public LLVMValueRef GetStateStructOutputParam(LLVMValueRef func) => func.GetParam(func.ParamsCount - 1);
 
         private LLVMValueRef CreateCallToOriginalFunction(LLVMValueRef originalFunc, LLVMValueRef newFunc, LLVMValueRef localStateStruct)
         {
@@ -284,7 +303,7 @@ namespace Dna.BinaryTranslator.Unsafe
             // Create the list of arguments: %local_state_struct, %program_counter, and %memory.
             callArgs.Add(localStateStruct);
             callArgs.Add(GetRegInputParam(rootRegisters.Single(x => x.Name == "RIP"), newFunc));
-            callArgs.Add(addMemoryPtr ? GetMemoryParamPtr(newFunc) : LLVMValueRef.CreateConstPointerNull(newFunc.GetPtrType()));
+            callArgs.Add(LLVMValueRef.CreateConstPointerNull(newFunc.GetPtrType()));
 
             // Call the original function.
             return builder.BuildCall2(arch.LiftedFunctionType, originalFunc, callArgs.ToArray(), "call_original");
@@ -292,7 +311,7 @@ namespace Dna.BinaryTranslator.Unsafe
 
         private void UpdateOutputRegisters(LLVMValueRef function, LLVMBuilderRef builder, LLVMValueRef localStateStruct)
         {
-            foreach(var reg in OrderedRegisterArguments)
+            foreach (var reg in OrderedRegisterArguments)
             {
                 if (justRAX && reg.Name.ToLower() != "rax")
                     continue;

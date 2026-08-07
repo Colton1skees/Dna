@@ -791,7 +791,7 @@ namespace Dna.Passes
 
                 if (newAccess is MemoryPhi memoryPhi)
                 {
-                    Debugger.Break();
+                    //Debugger.Break();
                 }
 
                 // Break out of the loop if we hit a memory clobber we can't handle.

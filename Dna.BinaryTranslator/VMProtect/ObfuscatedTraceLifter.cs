@@ -54,7 +54,7 @@ namespace Dna.BinaryTranslator.VMProtect
             return traceInsts;
         }
 
-        public (RemillArch arch, VmpParameterizedStateStructure function) Lift(RemillArch arch)
+        public (RemillArch arch, ParameterizedStateStructure function) Lift(RemillArch arch)
         {
             if (arch == null)
                 arch = new RemillArch(ctx, RemillOsId.kOSWindows, RemillArchId.kArchAMD64_AVX512);
@@ -73,7 +73,7 @@ namespace Dna.BinaryTranslator.VMProtect
 
             // Create a new function which doesn't take a state structure pointer.
             // Instead it takes all registers as `noalias ptr` arguments.
-            var parameterizedStateStruct = VmpParameterizedStateStructure.CreateFromFunction(arch, function);
+            var parameterizedStateStruct = ParameterizedStateStructure.CreateFromFunction(arch, function);
             function = parameterizedStateStruct.OutputFunction;
 
             //function.GlobalParent.PrintToFile(ArtifactPaths.Resolve("translatedFunction.ll"));

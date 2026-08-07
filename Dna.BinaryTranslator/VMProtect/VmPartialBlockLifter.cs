@@ -1,5 +1,6 @@
 ﻿using Dna.BinaryTranslator.JmpTables;
 using Dna.BinaryTranslator.Runtime;
+using Dna.BinaryTranslator.Unsafe;
 using Dna.ControlFlow;
 using Dna.Extensions;
 using Dna.LLVMInterop.API.LLVMBindings.Transforms.Utils;
@@ -34,7 +35,7 @@ namespace Dna.BinaryTranslator.VMProtect
         public LLVMModuleRef module;
 
         // Wrapper class for reading and writing to registers based off the prototype of function that we specified.
-        private readonly VmpParameterizedStateStructure StateStruct;
+        private readonly ParameterizedStateStructure StateStruct;
 
         public VmPartialBlockLifter(LLVMContextRef ctx, RemillArch arch, ControlFlowGraph<VmHandler> vmCfg, VmHandlerCache handlerCache, VmBlockCache partialBlockCache, IReadOnlyDictionary<ulong, VmpJmpTable> jmpTables)
         {
@@ -92,7 +93,7 @@ namespace Dna.BinaryTranslator.VMProtect
             var entryBb = outFunction.AppendBasicBlock("entry");
             builder.PositionAtEnd(entryBb);
 
-            var registerAllocaMapping = CreateLocalStateStruct(builder, StateStruct, outFunction);
+            var (sstruct, registerAllocaMapping) = CreateLocalStateStruct(arch, builder, StateStruct, outFunction);
 
             // Try to model the block as a cached partial block + a sequence of new instructions that need to be appended to the end.
             var maybeAsPartialBlock = TryModelAsPartialBlock(block);
@@ -106,7 +107,7 @@ namespace Dna.BinaryTranslator.VMProtect
                 clonedPartialBlock = partialBlockCache.ClonePartialBlockIntoModule(blockHandler, module);
 
                 // Call the partial vm block.
-                CallVmHandler(builder, outFunction, clonedPartialBlock.Function, registerAllocaMapping, StateStruct);
+                CallVmHandler(builder, outFunction, clonedPartialBlock.Function, sstruct, registerAllocaMapping, StateStruct);
             }
 
             // Fetch the set of instructions to be lifted.
@@ -119,7 +120,7 @@ namespace Dna.BinaryTranslator.VMProtect
 
                 // Invoke the native VM handler.
                 var handlerFunction = handlerToLlvmFunc[inst];
-                var call = CallVmHandler(builder, outFunction, handlerFunction, registerAllocaMapping, StateStruct);
+                var call = CallVmHandler(builder, outFunction, handlerFunction, sstruct, registerAllocaMapping, StateStruct);
             }
 
             var ret = builder.BuildRetVoid();
@@ -128,6 +129,7 @@ namespace Dna.BinaryTranslator.VMProtect
             ret.InstructionEraseFromParent();
 
             // Write the local state struct contents back into the output argument pointers.
+            // The GPRs are handled explicitly here.. the non GPRs should be handled by passing the local struct ptr?
             UpdateOutputRegisters(builder, outFunction, registerAllocaMapping, StateStruct);
             // Return nothing.
             builder.BuildRetVoid();
@@ -161,7 +163,30 @@ namespace Dna.BinaryTranslator.VMProtect
             return outFunction;
         }
 
-        public static IReadOnlyDictionary<RemillRegister, LLVMValueRef> CreateLocalStateStruct(LLVMBuilderRef builder, VmpParameterizedStateStructure stateStruct, LLVMValueRef function)
+        public static (LLVMValueRef stateStruct, IReadOnlyDictionary<RemillRegister, LLVMValueRef> allocaMapping) CreateLocalStateStruct(RemillArch arch, LLVMBuilderRef builder, ParameterizedStateStructure stateStruct, LLVMValueRef function)
+        {
+            var registerAllocaMapping = new Dictionary<RemillRegister, LLVMValueRef>();
+            var sstruct = builder.BuildAlloca(arch.StateStructType);
+            builder.BuildStore(stateStruct.GetStateStructInputParam(function), sstruct);
+
+            foreach (var reg in stateStruct.OrderedRegisterArguments)
+            {
+                // Allocate a local variable for the register.
+                var regType = LLVMTypeRef.CreateInt((uint)reg.Size * 8);
+                //var alloca = builder.BuildAlloca(regType);
+                var alloca = reg.GetAddressOf(sstruct, builder);
+
+                // Store the input register value to our local register variable.
+                var regValue = stateStruct.GetRegParam(reg, function);
+                builder.BuildStore(regValue, alloca);
+
+                registerAllocaMapping.Add(reg, alloca);
+            }
+
+            return (sstruct, registerAllocaMapping);
+        }
+
+        public static IReadOnlyDictionary<RemillRegister, LLVMValueRef> CreateLocalStateStruct(LLVMBuilderRef builder, ParameterizedStateStructure stateStruct, LLVMValueRef function)
         {
             // For each register, create a local alloca.
             var registerAllocaMapping = new Dictionary<RemillRegister, LLVMValueRef>();
@@ -214,7 +239,7 @@ namespace Dna.BinaryTranslator.VMProtect
             return (new PartialLiftedBlock(partialBlock, partialFunction), outsideOfPartialBlock);
         }
 
-        public static LLVMValueRef CallVmHandler(LLVMBuilderRef builder, LLVMValueRef parentFunction, LLVMValueRef handlerFunction, IReadOnlyDictionary<RemillRegister, LLVMValueRef> registerAllocaMapping, VmpParameterizedStateStructure StateStruct)
+        public static LLVMValueRef CallVmHandler(LLVMBuilderRef builder, LLVMValueRef parentFunction, LLVMValueRef handlerFunction, LLVMValueRef sstruct,  IReadOnlyDictionary<RemillRegister, LLVMValueRef> registerAllocaMapping, ParameterizedStateStructure StateStruct)
         {
             // For each input register, pass the local register value as a by-register argument.
             var args = new List<LLVMValueRef>();
@@ -225,10 +250,6 @@ namespace Dna.BinaryTranslator.VMProtect
                 args.Add(regValue);
             }
 
-            // Gotcha: If an optional memory pointer is used, it is always placed between the input and output register arguments.
-            if (StateStruct.addMemoryPtr)
-                args.Add(parentFunction.GetParam((uint)StateStruct.RegisterArgumentIndices.Count + 1));
-
             // For each output register argument, pass in our local state structure argument pointer.
             foreach (var (reg, index) in StateStruct.RegisterOutputArgumentIndices.OrderBy(x => x.Value))
             {
@@ -236,11 +257,16 @@ namespace Dna.BinaryTranslator.VMProtect
                 args.Add(regPtr);
             }
 
+            // Add the input and output state structs
+            var load = builder.BuildLoad2(StateStruct.arch.StateStructType, sstruct);
+            args.Add(load);
+            args.Add(sstruct);
+
             var call = builder.BuildCall2(StateStruct.ParameterizedFunctionPrototype, handlerFunction, args.ToArray());
             return call;
         }
 
-        public static void UpdateOutputRegisters(LLVMBuilderRef builder, LLVMValueRef function, IReadOnlyDictionary<RemillRegister, LLVMValueRef> registerAllocaMapping, VmpParameterizedStateStructure StateStruct)
+        public static void UpdateOutputRegisters(LLVMBuilderRef builder, LLVMValueRef function, IReadOnlyDictionary<RemillRegister, LLVMValueRef> registerAllocaMapping, ParameterizedStateStructure StateStruct)
         {
             // For each input register, fetch the register value from the local state structure.
             var args = new List<LLVMValueRef>();
@@ -263,7 +289,7 @@ namespace Dna.BinaryTranslator.VMProtect
             }
         }
 
-        public static void LoadOutputRegisters(LLVMBuilderRef builder, LLVMValueRef function, IReadOnlyDictionary<RemillRegister, LLVMValueRef> registerAllocaMapping, VmpParameterizedStateStructure StateStruct)
+        public static void LoadOutputRegisters(LLVMBuilderRef builder, LLVMValueRef function, IReadOnlyDictionary<RemillRegister, LLVMValueRef> registerAllocaMapping, ParameterizedStateStructure StateStruct)
         {
             // For each output register argument, store the register value to the local state structure
             foreach (var (reg, index) in StateStruct.RegisterOutputArgumentIndices.OrderBy(x => x.Value))

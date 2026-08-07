@@ -1,5 +1,6 @@
 ﻿using Dna.BinaryTranslator.JmpTables;
 using Dna.BinaryTranslator.Runtime;
+using Dna.BinaryTranslator.Unsafe;
 using Dna.ControlFlow;
 using Dna.Extensions;
 using Dna.LLVMInterop.API.LLVMBindings.Transforms.Utils;
@@ -23,7 +24,7 @@ namespace Dna.BinaryTranslator.VMProtect
 
         private readonly RemillArch arch;
 
-        private readonly VmpParameterizedStateStructure StateStruct;
+        private readonly ParameterizedStateStructure StateStruct;
 
         private readonly ControlFlowGraph<VmHandler> vmCfg;
 
@@ -42,7 +43,7 @@ namespace Dna.BinaryTranslator.VMProtect
 
         private LLVMValueRef translatedFunction;
 
-        public VmCfgLifter(LLVMModuleRef module, RemillArch arch, VmpParameterizedStateStructure stateStruct, ControlFlowGraph<VmHandler> vmCfg, IReadOnlyDictionary<VmHandler, (LLVMValueRef func, BasicBlock<VmHandler> block)> blockToFunctionMapping, IReadOnlyDictionary<ulong, VmpJmpTable> jmpTables, IReadOnlySet<ulong> vmexitHandlerRips)
+        public VmCfgLifter(LLVMModuleRef module, RemillArch arch, ParameterizedStateStructure stateStruct, ControlFlowGraph<VmHandler> vmCfg, IReadOnlyDictionary<VmHandler, (LLVMValueRef func, BasicBlock<VmHandler> block)> blockToFunctionMapping, IReadOnlyDictionary<ulong, VmpJmpTable> jmpTables, IReadOnlySet<ulong> vmexitHandlerRips)
         {
             this.module = module;
             this.arch = arch;
@@ -68,7 +69,7 @@ namespace Dna.BinaryTranslator.VMProtect
             // Allocate a local state structure as a mutable alloca for each general purpose register.
             // TODO: Refactor method out to a common helper class
             builder.PositionAtEnd(entryBlock);
-            registerAllocaMapping = VmPartialBlockLifter.CreateLocalStateStruct(builder, StateStruct, translatedFunction);
+            var (sstruct, registerAllocaMapping) = VmPartialBlockLifter.CreateLocalStateStruct(arch, builder, StateStruct, translatedFunction);
 
             // Create an exit block.
             exitBlock = translatedFunction.AppendBasicBlock("exit");
@@ -84,7 +85,7 @@ namespace Dna.BinaryTranslator.VMProtect
             builder.BuildBr(blockMapping[vmCfg.GetBlocks().First()]);
 
             // Lift each basic block.
-            LiftBlocks(blockMapping, registerAllocaMapping);
+            LiftBlocks(blockMapping, sstruct, registerAllocaMapping);
 
 
             //module.PrintToFile(ArtifactPaths.Resolve("translatedFunction.ll"));
@@ -114,16 +115,16 @@ namespace Dna.BinaryTranslator.VMProtect
             return blockMapping.AsReadOnly();
         }
 
-        private void LiftBlocks(BlockMapping blockMapping, IReadOnlyDictionary<RemillRegister, LLVMValueRef> registerAllocaMapping)
+        private void LiftBlocks(BlockMapping blockMapping, LLVMValueRef sstruct, IReadOnlyDictionary<RemillRegister, LLVMValueRef> registerAllocaMapping)
         {
             foreach (var block in blockMapping)
             {
                 // Lift the basic block into the LLVM IR function.
-                LiftBlock(block.Key, blockMapping, registerAllocaMapping);
+                LiftBlock(block.Key, blockMapping, sstruct, registerAllocaMapping);
             }
         }
 
-        private void LiftBlock(BasicBlock<VmHandler> block, BlockMapping blockMapping, IReadOnlyDictionary<RemillRegister, LLVMValueRef> registerAllocaMapping)
+        private void LiftBlock(BasicBlock<VmHandler> block, BlockMapping blockMapping, LLVMValueRef sstruct, IReadOnlyDictionary<RemillRegister, LLVMValueRef> registerAllocaMapping)
         {
             // Fetch the corresponding LLVM block within our cfg.
             var handler = block.Instructions.First();
@@ -134,7 +135,7 @@ namespace Dna.BinaryTranslator.VMProtect
             var blockFunction = blockToFunctionMapping[handler];
 
             // Call the block function.
-            VmPartialBlockLifter.CallVmHandler(builder, translatedFunction, blockFunction.func, registerAllocaMapping, StateStruct);
+            VmPartialBlockLifter.CallVmHandler(builder, translatedFunction, blockFunction.func, sstruct, registerAllocaMapping, StateStruct);
 
             LiftBlockEdges(blockMapping, block);
         }

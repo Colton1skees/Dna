@@ -75,7 +75,7 @@ if (genDsl)
 //LazyLLVMFixes.InstallValueToStringBugFix(RemillUtils.LLVMValueToString);
 
 
-bool dbgCode = true;
+bool dbgCode = false;
 if (dbgCode)
 {
     var irPath = "C:\\Users\\user\\Downloads\\extracted.ll";

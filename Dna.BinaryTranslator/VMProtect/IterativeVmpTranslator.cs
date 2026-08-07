@@ -1,6 +1,7 @@
 ﻿using Dna.BinaryTranslator;
 using Dna.BinaryTranslator.JmpTables;
 using Dna.BinaryTranslator.Runtime;
+using Dna.BinaryTranslator.Unsafe;
 using Dna.ControlFlow;
 using Dna.ControlFlow.Extensions;
 using Dna.DataStructures;
@@ -20,7 +21,7 @@ using System.Threading.Tasks;
 
 namespace Dna.BinaryTranslator.VMProtect
 {
-    public record FunctionWithStateStructure(LLVMValueRef Function, VmpParameterizedStateStructure ParameterizedStateStructure);
+    public record FunctionWithStateStructure(LLVMValueRef Function, ParameterizedStateStructure ParameterizedStateStructure);
 
     public class IterativeVmpTranslator
     {
