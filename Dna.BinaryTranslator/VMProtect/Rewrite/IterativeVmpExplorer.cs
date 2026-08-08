@@ -538,11 +538,7 @@ namespace Dna.BinaryTranslator.VMProtect.Rewrite
                     return $"0x{x.BytecodeRip.ToString("X")} {vCfg.Instructions[x].Metadata.IsComplete}";
                 };
 
-                var cand0 = vCfg.Instructions.Where(x => x.Key.BytecodeRip == 5369053455);
-                if (cand0.Count() == 1)
-                    Debugger.Break();
-                if (cand0.Count() > 1)
-                    throw new InvalidOperationException();
+ 
                     //var cand0 = new VmHandler(0x14005410, 0);
 
 
@@ -729,8 +725,8 @@ namespace Dna.BinaryTranslator.VMProtect.Rewrite
                 var vip = GetVipByUsage(rip, t, stateStruct);
 
 
-                if (vip == null)
-                    vip = existingRegister;
+                //if (vip == null)
+               //     vip = existingRegister;
 
                 var otherVip = handlerLifter.GetBytecodeRegister(HandlerLifter.DisHandler(dna, prevRip), stateStruct2, jmpFrom, prevRip == entryHandler.BytecodeRip, existingRegister);
 
@@ -1999,8 +1995,8 @@ namespace Dna.BinaryTranslator.VMProtect.Rewrite
             if (!matches && !isVmEnter && !isVmExit)
             {
                 // For vmp3.5+ you need to use the heuristic below
-                return existingRegister;
-                return null;
+                //return existingRegister;
+                //return null;
                 stripped.GlobalParent.PrintToFile("translatedFunction.ll");
                 var instructions = stripped.EntryBasicBlock.GetInstructions();
                 var firstLoad = instructions.First(x => x.InstructionOpcode == LLVMOpcode.LLVMLoad && x.GetOperand(0).Kind == LLVMValueKind.LLVMInstructionValueKind && x.GetOperand(0).InstructionOpcode == LLVMOpcode.LLVMGetElementPtr);
