@@ -1,5 +1,6 @@
 ﻿using Bitwuzla;
 using Dna.Binary;
+using Dna.Binary.Windows;
 using Dna.BinaryTranslator.JmpTables;
 using Dna.BinaryTranslator.Lifting;
 using Dna.BinaryTranslator.Unsafe;
@@ -142,7 +143,7 @@ namespace Dna.BinaryTranslator.VMProtect.Rewrite
             }
 
             sw.Stop();
-            Console.WriteLine($"Finished devirtualization. Took {sw.ElapsedMilliseconds}ms");
+            Console.WriteLine($"Finished devirtualization.  Took {sw.ElapsedMilliseconds}ms");
             Debugger.Break();
             Console.ReadLine();
 
@@ -516,9 +517,6 @@ namespace Dna.BinaryTranslator.VMProtect.Rewrite
                 };
 
 
-                if (ii >= 378)
-                    isRebuildRequired = true;
-
                 //isRebuildRequired = true;
                 if (isRebuildRequired)
                 {
@@ -672,10 +670,10 @@ namespace Dna.BinaryTranslator.VMProtect.Rewrite
 
         private HandlerData GetHandlerRegisters(ParameterizedStateStructure stateStruct, ParameterizedStateStructure stateStruct2, VmHandler entryHandler, HandlerLifter handlerLifter, ulong bytecodeAddr, HashSet<ulong> outgoingHandlers, Dictionary<ulong, HandlerData> handlerRipToRegister)
         {
-            var debugModule = ctx.CreateModuleWithName("debugHandlers");
+            //var debugModule = ctx.CreateModuleWithName("debugHandlers");
             var prevRip = bytecodeAddrToRip[bytecodeAddr];
-            var jmpFrom = handlerLifter.Lift(debugModule, prevRip, entryHandler.BytecodeRip == bytecodeAddr);
-            var targets = outgoingHandlers.Select(x => (x, handlerLifter.Lift(debugModule, x, x == entryHandler.BytecodeRip))).ToList();
+            var jmpFrom = handlerLifter.LiftHandler(prevRip, entryHandler.BytecodeRip == bytecodeAddr);
+            var targets = outgoingHandlers.Select(x => (x, handlerLifter.LiftHandler(x, x == entryHandler.BytecodeRip))).ToList();
 
             HashSet<(RemillRegister, RemillRegister, RemillRegister)> registers = new();
             bool hasStackKey = false;
@@ -838,6 +836,7 @@ namespace Dna.BinaryTranslator.VMProtect.Rewrite
             var loadUsers = loads.SelectMany(x => CollectUsers(x, 50, shouldContinue)).ToHashSet();
 
             List<RemillRegister> cands = new();
+            List<(RemillRegister, int)> probabilities = new();
             foreach (var (reg, idx) in stateStructure.RegisterArgumentIndices)
             {
                 if (reg == vipReg)
@@ -861,10 +860,13 @@ namespace Dna.BinaryTranslator.VMProtect.Rewrite
 
                 Debug.Assert(isVkey);
                 cands.Add(reg);
+                probabilities.Add((reg, count));
             }
 
+            // TODO: This isn't a great heuristic. There should only be one candidate
+            // If there's more than one, it's just from junk related to opaque branching
             if (cands.Count > 1)
-                return null;
+                return probabilities.MaxBy(x => x.Item2).Item1;
 
             return cands.SingleOrDefault();
         }
@@ -1443,7 +1445,7 @@ namespace Dna.BinaryTranslator.VMProtect.Rewrite
 
                 var call = VmPartialBlockLifter.CallVmHandler(builder, function, liftedHandler, registerAllocaMapping, stateStruct);
 
-                bool dbgIntrins = true;
+                bool dbgIntrins = false;
 
 
                 builder.PositionBefore(call);
@@ -1875,18 +1877,51 @@ namespace Dna.BinaryTranslator.VMProtect.Rewrite
                 .Where(x => x.InstructionOpcode == LLVMOpcode.LLVMGetElementPtr && x.OperandCount == 2 && x.GetOperand(1).Kind == LLVMValueKind.LLVMConstantIntValueKind && dna.Binary.IsConstantData(x.GetOperand(1).ConstIntZExt))
                 .Select(x => x.GetOperand(1));
 
-            var constStores = lifted.GetInstructions().Where(x => x.InstructionOpcode == LLVMOpcode.LLVMStore && x.GetOperand(0).Kind == LLVMValueKind.LLVMConstantIntValueKind && dna.Binary.IsConstantData(x.GetOperand(0).ConstIntZExt)).ToList();
+            var windowsBinary = (dna.Binary as WindowsBinary);
 
-            var expected = "6442472884"; // battleye
-            expected = "5368736796"; // vmptest.vmp.bin
-            //if (constStores.Count == 2)
-            if (true)
-                constStores.RemoveAll(x => !x.ToString().Contains(expected));
+            List<LLVMValueRef> constStores = new();
+            foreach(var store in lifted.GetInstructions().Where(x => x.InstructionOpcode == LLVMOpcode.LLVMStore))
+            {
+                var constValue = store.GetOperand(0);
+                if (!store.GetOperand(0).IsConstant())
+                    continue;
+                if (store.GetOperand(1).Kind != LLVMValueKind.LLVMArgumentValueKind)
+                    continue;
+
+                var imm = constValue.ConstIntZExt;
+                if (imm == 5369130309)
+                    Debugger.Break();
+                if (!dna.Binary.IsConstantData(imm))
+                    continue;
+
+                var rva = imm - dna.Binary.BaseAddress;
+                var section = windowsBinary.PEFile.GetSectionContainingRva((uint)rva);
+                if (section == null)
+                    continue;
+                if (section.Name == ".text" || section.Name == ".rdata" || section.Name == ".data" || section.Name == ".idata")
+                    continue;
+
+                constStores.Add(store);
+            }
+
+            //var constStores = lifted.GetInstructions()
+            //    .Where(x => x.InstructionOpcode == LLVMOpcode.LLVMStore && x.GetOperand(0).Kind == LLVMValueKind.LLVMConstantIntValueKind && dna.Binary.IsConstantData(x.GetOperand(0).ConstIntZExt) && x.GetOperand(1).Kind == LLVMValueKind.LLVMArgumentValueKind).ToList();
+
+
+
+
+            //var expected = "6442472884"; // battleye
+            //expected = "5368736796"; // vmptest.vmp.bin
+            ////if (constStores.Count == 2)
+            //if (true)
+            //    constStores.RemoveAll(x => !x.ToString().Contains(expected));
 
             // %24 = getelementptr inbounds i8, ptr %mem, i64 5368736796
             // store i64 5368736796, ptr %out_RSI, align 8
-            LLVMValueRef targetStore = constStores
-                .SingleOrDefault(x => x.GetOperand(1).Kind == LLVMValueKind.LLVMArgumentValueKind && gepConstants.Contains(x.GetOperand(0)));
+            //LLVMValueRef targetStore = constStores
+            //    .SingleOrDefault(x => x.GetOperand(1).Kind == LLVMValueKind.LLVMArgumentValueKind && gepConstants.Contains(x.GetOperand(0)));
+
+            var targetStore = constStores.Single();
 
             lifted.GlobalParent.PrintToFile("translatedFunction.ll");
 

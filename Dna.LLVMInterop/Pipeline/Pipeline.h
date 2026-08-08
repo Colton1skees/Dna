@@ -828,9 +828,9 @@ void OptimizeVmpModule(llvm::Module* module,
 	}
 
 	FPM.addPass(llvm::SimplifyCFGPass());
-	FPM.addPass(llvm::ADCEPass());
-	FPM.addPass(llvm::SimplifyCFGPass());
-	FPM.addPass(llvm::EarlyCSEPass(true));
+	//FPM.addPass(llvm::ADCEPass());
+	//FPM.addPass(llvm::SimplifyCFGPass());
+	//FPM.addPass(llvm::EarlyCSEPass(true));
 
 	if (llvm::any_of(*f, [](const llvm::BasicBlock& block)
 		{ return llvm::isa<llvm::SwitchInst>(block.getTerminator()); }))

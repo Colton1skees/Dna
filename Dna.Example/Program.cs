@@ -208,8 +208,16 @@ if (dbgCode)
 }
 
 
+bool testPipeline = true;
+if (testPipeline)
+{
+    VmpTests.Run();
+    Console.WriteLine("Done");
+    Debugger.Break();
+    Console.ReadLine();
+}
 
-bool useVmp = true;
+bool useVmp = false;
 if (useVmp)
 {
     var (vmpPath, vmpAddr) = ("", 0ul);
