@@ -104,6 +104,7 @@ namespace Dna.BinaryTranslator.VMProtect.Rewrite
             var worklist = new WorkList<ulong>();
             worklist.AddToFront(run);
             Dictionary<ulong, LLVMValueRef> stubs = new();
+            var sw = Stopwatch.StartNew();
             while(worklist.Count != 0)
             {
                 var popped = worklist.PopBack();
@@ -140,7 +141,8 @@ namespace Dna.BinaryTranslator.VMProtect.Rewrite
 
             }
 
-            Console.WriteLine($"Done");
+            sw.Stop();
+            Console.WriteLine($"Finished devirtualization. Took {sw.ElapsedMilliseconds}ms");
             Debugger.Break();
             Console.ReadLine();
 
@@ -1370,7 +1372,7 @@ namespace Dna.BinaryTranslator.VMProtect.Rewrite
 
                     foreach (var (reg, inputIndex) in stateStruct.RegisterArgumentIndices)
                     {
-                        break;
+                        //break;
                         var input = liftedHandler.GetParam((uint)inputIndex);
                         var output = liftedHandler.GetParam((uint)stateStruct.RegisterOutputArgumentIndices[reg]);
                         foreach (var store in liftedHandler.GetInstructions().Where(x => x.Is(LLVMOpcode.LLVMStore) && x.GetOperand(0) == input && x.GetOperand(1) == output).ToList())
@@ -2022,10 +2024,6 @@ namespace Dna.BinaryTranslator.VMProtect.Rewrite
                 if (!matches)
                     continue;
                 inst.ReplaceAllUsesWith(lhs);
-
-                //function.GlobalParent.PrintToFile("translatedFunction.ll");
-
-                //Debugger.Break();
             }
         }
 
@@ -2101,6 +2099,7 @@ namespace Dna.BinaryTranslator.VMProtect.Rewrite
             var cond = exitInsts.Single().GetOperand(0).GetOperand(0);
             if (cond.Is(LLVMOpcode.LLVMOr) && cond.GetOperand(1).Is(LLVMOpcode.LLVMAnd))
             {
+                // This was not the issue
                 /*
                 var tgt = cond.GetOperand(1).GetOperand(0);
                 var toReplace = cond;
@@ -2400,7 +2399,7 @@ namespace Dna.BinaryTranslator.VMProtect.Rewrite
                         }
                     }
 
-                    if (solutions.Count() == 2 && !isSelect(value) && value.TypeOf.IntWidth != 1)
+                    if (solutions.Count() == 2 && !isSelect(value) && value.TypeOf.IntWidth != 1 && targets.Contains(value))
                     {
                         var cmps = currBlock.GetInstructions().TakeWhile(x => x != value).Where(x => x.TypeOf.Kind == LLVMTypeKind.LLVMIntegerTypeKind && x.TypeOf.IntWidth == 1 && converter.defMap.ContainsKey(x)).ToList();
                         var translatedCmps = cmps.Select(x => translator.Translate(converter.defMap[x])).ToList();
@@ -2412,13 +2411,29 @@ namespace Dna.BinaryTranslator.VMProtect.Rewrite
                             goto done;
                         var modelCmps = translatedCmps.Select(solver.GetValue).ToList();
 
+                        solver.Push();
+                        solver.Assert(translated != modelValue);
+                        if (solver.CheckSat() != Result.Sat)
+                        {
+                            solver.Pop();
+                            goto done;
+                        }
+
+                        var alternateModelCmps = translatedCmps.Select(solver.GetValue).ToList();
+                        solver.Pop();
+
                         for (var cmpIdx = 0; cmpIdx < cmps.Count; cmpIdx++)
                         {
                             var modelCmp = modelCmps[cmpIdx];
-                            if (modelCmp.Kind != BitwuzlaKind.BITWUZLA_KIND_VALUE)
+                            var alternateModelCmp = alternateModelCmps[cmpIdx];
+                            if (modelCmp.Kind != BitwuzlaKind.BITWUZLA_KIND_VALUE || alternateModelCmp.Kind != BitwuzlaKind.BITWUZLA_KIND_VALUE)
                                 continue;
 
                             var conditionIsTrue = Tm.GetIntegerValue(modelCmp) != 0;
+                            var alternateConditionIsTrue = Tm.GetIntegerValue(alternateModelCmp) != 0;
+                            if (conditionIsTrue == alternateConditionIsTrue)
+                                continue;
+
                             var otherValue = solutions.Single(x => x != modelValue);
                             var trueValue = conditionIsTrue ? modelValue : otherValue;
                             var falseValue = conditionIsTrue ? otherValue : modelValue;
@@ -2438,7 +2453,6 @@ namespace Dna.BinaryTranslator.VMProtect.Rewrite
                             value.ReplaceAllUsesWith(select);
                             simplCount++;
                             simplifications.Add((idx, select));
-                            func.GlobalParent.Verify(LLVMVerifierFailureAction.LLVMAbortProcessAction);
                             goto done;
                         }
 
@@ -2463,7 +2477,6 @@ namespace Dna.BinaryTranslator.VMProtect.Rewrite
                     //Debugger.Break();
                     simplCount++;
                     simplifications.Add((idx, constInt));
-                    func.GlobalParent.Verify(LLVMVerifierFailureAction.LLVMAbortProcessAction);
 
                 done:
                     continue;
