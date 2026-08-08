@@ -78,7 +78,7 @@ if (genDsl)
 bool dbgCode = false;
 if (dbgCode)
 {
-    var irPath = "C:\\Users\\user\\Downloads\\extracted.ll";
+    var irPath = "C:\\Users\\user\\Downloads\\loopfail_intrin.ll";
     var t = File.ReadAllText(irPath);
     Console.WriteLine(irPath);
 
@@ -142,7 +142,7 @@ if (dbgCode)
             {
                 PassPipeline.Run(vmpBin, existingFunc, false, true, true);
                 PassPipeline.Run(vmpBin, existingFunc, false, false, false);
-                //new VmpSolver2(vmpDna, existingFunc).Simplify(existingFunc);
+                new VmpSolver2(vmpDna, existingFunc).Simplify(existingFunc);
             }
             sw2.Stop();
             tempNewMod.PrintToFile(("translatedFunction.ll"));
@@ -217,7 +217,7 @@ if (testPipeline)
     Console.ReadLine();
 }
 
-bool useVmp = false;
+bool useVmp = true;
 if (useVmp)
 {
     var (vmpPath, vmpAddr) = ("", 0ul);

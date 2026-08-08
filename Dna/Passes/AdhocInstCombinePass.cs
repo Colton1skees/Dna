@@ -171,6 +171,7 @@ namespace Dna.Passes
             if (changed != null)
                 return changed;
 
+            return changed;
 
             //return null;
 
@@ -217,6 +218,7 @@ namespace Dna.Passes
                 return changed;
             */
 
+
             changed = TryDistributeTernarySelect(inst);
             if (changed != null)
                 return changed;
@@ -246,6 +248,8 @@ namespace Dna.Passes
                 return changed;
             */
 
+            // WORKS HERE
+
             changed = TryRewriteCmpAnd(inst);
             if (changed != null)
                 return changed;
@@ -254,18 +258,24 @@ namespace Dna.Passes
             if (changed != null)
                 return changed;
 
+ 
             changed = TrySinkLoadOfSelect(inst);
             if (changed != null)
                 return changed;
 
-
+      
             changed = TryRewriteSignExtI1(inst);
             if (changed != null)
                 return changed;
 
+            return changed;
+
             changed = TrySimplifySelectIdentity(inst);
             if (changed != null)
                 return changed;
+
+
+            // STOPS WORKING HERE
 
             /*
          changed = TryRewriteTruncAnd(inst);
@@ -1269,10 +1279,10 @@ return peephole;
                 return null;
 
             builder.PositionBefore(inst);
-            var select = builder.BuildSelect(inst.GetOperand(0), LLVMValueRef.CreateConstInt(type, ulong.MaxValue), LLVMValueRef.CreateConstInt(type, 0));
-            ValidateSelect(select);
+            var extended = builder.BuildZExt(inst.GetOperand(0), type);
+            var negated = builder.BuildSub(LLVMValueRef.CreateConstInt(type, 0), extended);
             var peephole = new PeepholeResult();
-            peephole.Add(select);
+            peephole.Add(extended, negated);
             return peephole;
         }
 

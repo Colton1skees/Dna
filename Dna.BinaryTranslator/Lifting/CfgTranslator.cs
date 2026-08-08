@@ -22,6 +22,7 @@ using System.Runtime.Intrinsics.X86;
 using System.Text;
 using System.Threading.Tasks;
 using Unicorn.X86;
+using WebAssembly.Instructions;
 using BlockMapping = System.Collections.Generic.IReadOnlyDictionary<Dna.ControlFlow.BasicBlock<Iced.Intel.Instruction>, LLVMSharp.Interop.LLVMBasicBlockRef>;
 
 namespace Dna.BinaryTranslator.Lifting
@@ -209,7 +210,7 @@ namespace Dna.BinaryTranslator.Lifting
                 // TODO: We might not be updating RIP correctly?
                 else if (flow.IsRet())
                 {
-                    LiftRet(llvmBlock);
+                    LiftRet(blockMapping, llvmBlock, block, inst);
                 }
 
                 else if (flow.IsBranch())
@@ -318,25 +319,17 @@ namespace Dna.BinaryTranslator.Lifting
             builder.BuildBr(immDestBlock);
         }
 
-        private void LiftRet(LLVMBasicBlockRef llvmBlock)
+        private void LiftRet(BlockMapping blockMapping, LLVMBasicBlockRef llvmBlock, BasicBlock<Instruction> block, Instruction branchInst)
         {
-            // this breaks everything, do not uncomment
-            /*
-            var returnPc = builder.BuildLoad2(ctx.GetInt64Ty(), RemillUtils.LoadReturnProgramCounterRef(llvmBlock));
-            // Then we store the return address to NEXT_PC. This allows the lifted code to have correct behavior.
-            builder.BuildStore(returnPc, RemillUtils.LoadNextProgramCounterRef(llvmBlock));
-            */
+            RemillUtils.AddTerminatingTailCall(llvmBlock, arch.IntrinsicTable.FunctionReturn, arch.IntrinsicTable);
+            return;
 
-            /*
-            // For vmprotect do nothing at RETs, the RIP should be updated
-            if (callHandlingKind != CallHandlingKind.VMProtect)
+            if (callHandlingKind == CallHandlingKind.VMProtect)
             {
-                RemillUtils.AddTerminatingTailCall(llvmBlock, arch.IntrinsicTable.FunctionReturn, arch.IntrinsicTable);
+                AddCallToIndirectBranchIntrinsic(blockMapping[block], branchInst.IP);
                 return;
             }
 
-            builder.BuildRetVoid();
-            */
             RemillUtils.AddTerminatingTailCall(llvmBlock, arch.IntrinsicTable.FunctionReturn, arch.IntrinsicTable);
         }
 

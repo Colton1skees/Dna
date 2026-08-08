@@ -24,7 +24,7 @@ namespace Dna.Example
 
 
             string name = "";
-            name = "add_two_vars32";
+            name = "des_encrypt_main";
             var vmpAddr = test.Funcs.Single(x => x.Name == name).Addr;
 
             var vmpCtx = LLVMContextRef.Global;
@@ -84,7 +84,7 @@ namespace Dna.Example
                     new("complex_loop_64", 0x140003F20),
                     new("cond_add_two_vars32", 0x1400039F0),
                     new("cond_add_two_vars64", 0x140003A50),
-                    new("des_encrypt_main", 0x140002660),
+                    new("des_encrypt_main", 0x14000268C),
                     new("des_encrypt_target_function", 0x140001D30),
                     new("des_key_schedule_main", 0x140002B80),
                     new("des_key_schedule_target_function", 0x1400027A0),
