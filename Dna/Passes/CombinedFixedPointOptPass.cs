@@ -108,7 +108,6 @@ namespace Dna.Passes
         {
             builder = LLVMBuilderRef.Create(LLVMContextRef.Global);
             var r = Run(function, new LoopInfo(loopInfo), new DominatorTree(domTree), new MemorySSA(mssa), new SimplifyQuery(simplifyQuery));
-            new LLVMValueRef((nint)function).GlobalParent.Verify(LLVMVerifierFailureAction.LLVMAbortProcessAction);
             return r;
         }
 

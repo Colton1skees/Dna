@@ -140,7 +140,9 @@ namespace Dna.BinaryTranslator.VMProtect.Rewrite
 
             }
 
+            Console.WriteLine($"Done");
             Debugger.Break();
+            Console.ReadLine();
 
             return default;
         }
@@ -296,10 +298,6 @@ namespace Dna.BinaryTranslator.VMProtect.Rewrite
                 Console.WriteLine($"{numFast} / {numFast + numHeavy} solvers finished. Rebuilt {numRebuilds} times");
 
                 serialize();
-
-                if (liftedFunction.Handle != 0)
-                    liftedFunction.GlobalParent.PrintToFile("translatedFunction.ll");
-
 
                 AdhocInstCombinePass.Validate(liftedFunction);
                 liftedFunction = new IterativeCfgBuilder(dna, outModule, arch, stateStruct, vCfg, handlerLifter, handlerVips, handlerRipToRegisters).Run(liftedFunction, handlers.First());
@@ -644,7 +642,6 @@ namespace Dna.BinaryTranslator.VMProtect.Rewrite
 
         private Result<JmpTablesWithHandlerRips2, InvalidOperationException> TrySolve(ParameterizedStateStructure stateStruct, ParameterizedStateStructure stateStruct2, LLVMValueRef liftedFunction, HandlerLifter handlerLifter, Dictionary<ulong, HandlerData> handlerRipToRegisters)
         {
-            liftedFunction.GlobalParent.PrintToFile("translatedFunction.ll");
             // Attempt to solve the handler RIPs    
             var solver = new VmpSolver(arch, liftedFunction);
             var ripResult = solver.SolveRIPs(stateStruct);
@@ -1124,6 +1121,8 @@ namespace Dna.BinaryTranslator.VMProtect.Rewrite
 
         private const bool concretize = true;
 
+        private const bool concretizeVkey = true;
+
         public IterativeCfgBuilder(IDna dna, LLVMModuleRef module, RemillArch arch, ParameterizedStateStructure stateStruct, VmCfg vCfg, HandlerLifter handlerCache, Dictionary<VmHandler, RemillRegister> handlerVips, Dictionary<ulong, HandlerData> handlerRipToRegisters)
         {
             this.dna = dna;
@@ -1259,7 +1258,7 @@ namespace Dna.BinaryTranslator.VMProtect.Rewrite
                     builder.BuildStore(LLVMValueRef.CreateConstInt(LLVMTypeRef.Int64, handler.BytecodeRip), registerAllocaMapping[incomingVipRegister]);
 
                     // Concretize vkey if its known
-                    if (false && vCfg.Instructions[handler].Metadata.Vkey is ulong existing)
+                    if (concretizeVkey && vCfg.Instructions[handler].Metadata.Vkey is ulong existing)
                     {
                         // TODO: If this is a vmexit, do not concretize bytecode rip and stuff
                         var incomingVkeyRegister = regInfo.Vkey;
@@ -1283,7 +1282,7 @@ namespace Dna.BinaryTranslator.VMProtect.Rewrite
                     }
 
                     // Concretize vkey if its known
-                    if (false && vCfg.Instructions[handler].Metadata.Vbase is ulong existingBase)
+                    if (concretizeVkey && vCfg.Instructions[handler].Metadata.Vbase is ulong existingBase)
                     {
                         // TODO: If this is a vmexit, do not concretize bytecode rip and stuff
                         var incomingImgbaseReg = regInfo.ImgBaseReg;
@@ -1323,7 +1322,7 @@ namespace Dna.BinaryTranslator.VMProtect.Rewrite
                         var vipIndex = stateStruct.RegisterArgumentIndices[regInfo.Vip];
                         liftedHandler.GetParam((uint)vipIndex).ReplaceAllUsesWith(vipConst);
 
-                        if (false && vCfg.Instructions[handler].Metadata.Vkey is ulong existing2)
+                        if (concretizeVkey && vCfg.Instructions[handler].Metadata.Vkey is ulong existing2)
                         {
                             var incomingVkeyRegister = regInfo.Vkey;
 
@@ -1340,7 +1339,7 @@ namespace Dna.BinaryTranslator.VMProtect.Rewrite
 
                         }
 
-                        if (false && vCfg.Instructions[handler].Metadata.Vbase is ulong existing3)
+                        if (concretizeVkey && vCfg.Instructions[handler].Metadata.Vbase is ulong existing3)
                         {
                             var incomingBaseReg = regInfo.ImgBaseReg;
 
@@ -2304,7 +2303,7 @@ namespace Dna.BinaryTranslator.VMProtect.Rewrite
 
             var sw = Stopwatch.StartNew();
             //foreach(var (value, idx) in converter.defMap)
-            var solver = MkSolver(1000);
+            var solver = MkSolver(200);
             solver.Push();
             LLVMBasicBlockRef currBlock = null;
             int rejected = 0;
@@ -2443,7 +2442,7 @@ namespace Dna.BinaryTranslator.VMProtect.Rewrite
                             goto done;
                         }
 
-                        func.GlobalParent.PrintToFile("translatedFunction.ll");
+                        //func.GlobalParent.PrintToFile("translatedFunction.ll");
 
                        // if (value.InstructionParent.ToString().Contains("vmp_branch"))
                         //    Debugger.Break();

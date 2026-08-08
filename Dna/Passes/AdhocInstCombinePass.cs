@@ -209,7 +209,7 @@ namespace Dna.Passes
             if (changed != null)
                 return changed;
 
-            return changed;
+            //return changed;
 
             /*
             changed = TryCollapseRedundantSelectRound(inst);
