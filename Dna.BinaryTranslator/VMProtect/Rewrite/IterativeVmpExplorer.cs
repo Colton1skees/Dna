@@ -302,7 +302,13 @@ namespace Dna.BinaryTranslator.VMProtect.Rewrite
                 Console.WriteLine($"Lifting iteration {ii++} at {sw.ElapsedMilliseconds}ms. ");
                 Console.WriteLine($"{numFast} / {numFast + numHeavy} solvers finished. Rebuilt {numRebuilds} times");
 
-                serialize();
+                bool dbgSerialize = false;
+                if (dbgSerialize)
+                    serialize();
+
+                if ((ii % 300) == 0 && liftedFunction.Handle != 0)
+                    liftedFunction.GlobalParent.PrintToFile("snapshot.ll");
+
 
                 AdhocInstCombinePass.Validate(liftedFunction);
                 liftedFunction = new IterativeCfgBuilder(dna, outModule, arch, stateStruct, vCfg, handlerLifter, handlerVips, handlerRipToRegisters).Run(liftedFunction, handlers.First());
@@ -314,7 +320,7 @@ namespace Dna.BinaryTranslator.VMProtect.Rewrite
                 IterativeVmpTranslator.CanonicalizeMemoryPtr(liftedFunction);
 
 
-                liftedFunction.GlobalParent.PrintToFile("presolve.ll");
+                //liftedFunction.GlobalParent.PrintToFile("presolve.ll");
 
 
                 if (optHeavy)
@@ -637,7 +643,7 @@ namespace Dna.BinaryTranslator.VMProtect.Rewrite
                 }
 
 
-                function.GlobalParent.PrintToFile("translatedFunction.ll");
+                //unction.GlobalParent.PrintToFile("translatedFunction.ll");
                 var solution = solve();
                 if (solution is Ok<JmpTablesWithHandlerRips2> ok0)
                 {
@@ -1163,7 +1169,7 @@ namespace Dna.BinaryTranslator.VMProtect.Rewrite
 
         private const bool concretizeVkey = true;
 
-        private const bool concretizeVbase = false;
+        private const bool concretizeVbase = true;
 
         public IterativeCfgBuilder(IDna dna, LLVMModuleRef module, RemillArch arch, ParameterizedStateStructure stateStruct, VmCfg vCfg, HandlerLifter handlerCache, Dictionary<VmHandler, RemillRegister> handlerVips, Dictionary<ulong, HandlerData> handlerRipToRegisters)
         {
@@ -1483,7 +1489,7 @@ namespace Dna.BinaryTranslator.VMProtect.Rewrite
 
                 var call = VmPartialBlockLifter.CallVmHandler(builder, function, liftedHandler, registerAllocaMapping, stateStruct);
 
-                bool dbgIntrins = true;
+                bool dbgIntrins = false;
 
 
                 builder.PositionBefore(call);
@@ -2354,7 +2360,7 @@ namespace Dna.BinaryTranslator.VMProtect.Rewrite
         }
         public void Simplify(LLVMValueRef func)
         {
-            func.GlobalParent.PrintToFile("translatedFunction.ll");
+            //func.GlobalParent.PrintToFile("translatedFunction.ll");
             LLVMBuilderRef builder = func.GetFunctionCtx().CreateBuilder();
             //File.WriteAllText("llvmconstraints.py", new LLVMToBinjaGraph(func).Process());
             var li = new LoopInfo(func);
