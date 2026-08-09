@@ -139,10 +139,7 @@ namespace Dna.Passes
 
         public PeepholeResult PeepholeInst(LLVMValueRef inst, DominatorTree domTree, SimplifyQuery query)
         {
-
-            Validate(inst.InstructionParent.Parent);
             var r = PeepholeInstInternal(inst, domTree, query);
-            Validate(inst.InstructionParent.Parent);
             return r;
         }
 
@@ -155,7 +152,7 @@ namespace Dna.Passes
                 return null;
 
             var opc = inst.InstructionOpcode;
-            if (inst.InstructionOpcode == LLVMOpcode.LLVMStore || inst.InstructionOpcode == LLVMOpcode.LLVMLoad || inst.InstructionOpcode == LLVMOpcode.LLVMPHI)
+            if (opc == LLVMOpcode.LLVMStore || opc == LLVMOpcode.LLVMLoad || opc == LLVMOpcode.LLVMPHI)
                 return null;
 
 

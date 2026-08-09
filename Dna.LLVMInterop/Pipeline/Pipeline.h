@@ -848,8 +848,13 @@ void OptimizeVmpModule(llvm::Module* module,
 	MPM.addPass(llvm::createModuleToPostOrderCGSCCPassAdaptor(std::move(CGPM)));
 	
 	FPM.addPass(llvm::DSEPass());
-	FPM.addPass(llvm::InstCombinePass());
-	FPM.addPass(llvm::EarlyCSEPass(true));
+
+
+	llvm::InstCombineOptions ioptions = {};
+	ioptions.MaxIterations = 1;
+	ioptions.VerifyFixpoint = false;
+	//FPM.addPass(llvm::InstCombinePass(ioptions));
+	//FPM.addPass(llvm::EarlyCSEPass(true));
 
 	FPM.addPass(llvm::TailCallElimPass());
 	FPM.addPass(llvm::SimplifyCFGPass());
@@ -872,7 +877,7 @@ void OptimizeVmpModule(llvm::Module* module,
 		FPM.addPass(Dna::Passes::MultiUseCloningPass(multiUseCloning));
 	}
 
-	FPM.addPass(llvm::InstCombinePass());
+	FPM.addPass(llvm::InstCombinePass(ioptions));
 	FPM.addPass(llvm::GVNPass());
 	FPM.addPass(llvm::SCCPPass());
 	FPM.addPass(llvm::BDCEPass());

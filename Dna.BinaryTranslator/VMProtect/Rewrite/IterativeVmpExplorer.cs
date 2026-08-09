@@ -39,6 +39,7 @@ using System.Collections.Generic;
 using System.Diagnostics;
 using System.Linq;
 using System.Numerics;
+using System.Reflection;
 using System.Reflection.Metadata;
 using System.Runtime.InteropServices;
 using System.Text;
@@ -521,6 +522,8 @@ namespace Dna.BinaryTranslator.VMProtect.Rewrite
                 }
 
 
+
+                /*
                 var (oldCfg, oldLabels) = GetCfg(vCfg, handlers.First());
 
                 var (tCfg, tLabels) = GetCfg(newCfg, handlers.First());
@@ -533,7 +536,18 @@ namespace Dna.BinaryTranslator.VMProtect.Rewrite
 
                     optHeavy = true;
                 }
+                */
 
+                var oldLabels = GetLabels(vCfg, handlers.First());
+                var tLabels = GetLabels(newCfg, handlers.First());
+                if (!oldLabels.SetEquals(tLabels))
+                {
+                    Console.WriteLine($"Iteration {ii} requires full opt");
+                    //OptimizeHeavy(liftedFunction);
+                    //Debugger.Break();
+
+                    optHeavy = true;
+                }
 
                 // Replace the CFG
                 vCfg = newCfg;
@@ -1097,6 +1111,26 @@ namespace Dna.BinaryTranslator.VMProtect.Rewrite
                 var memoryPtrNull = LLVMValueRef.CreateConstPointerNull(module.GetPtrType());
                 memPtr.Initializer = memoryPtrNull;
             }
+        }
+
+        public static HashSet<VmHandler> GetLabels(VmCfg vCfg, VmHandler entry)
+        {
+            var labels = new HashSet<VmHandler>();
+            foreach (var (handler, info) in vCfg.Instructions)
+            {
+                var isEntrypoint = handler == entry;
+                var hasMultiplePredecessors = info.Predecessors.Count > 1;
+                var isCyclic = info.Predecessors.Contains(handler);
+                var isCondTarget = info.Predecessors.Any(x => vCfg.Instructions[x].Successors.Count > 1);
+
+                var isLabel = isEntrypoint || hasMultiplePredecessors || isCyclic || isCondTarget;
+                if (!isLabel)
+                    continue;
+
+                labels.Add(handler);
+            }
+
+            return labels;
         }
 
         public static (ControlFlowGraph<VmHandler>, Dictionary<VmHandler, BasicBlock<VmHandler>>) GetCfg(VmCfg vCfg, VmHandler entry)
