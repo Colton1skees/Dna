@@ -78,7 +78,7 @@ if (genDsl)
 bool dbgCode = false;
 if (dbgCode)
 {
-    var irPath = "C:\\Users\\user\\Downloads\\loopfail_intrin.ll";
+    var irPath = "C:\\Users\\user\\Downloads\\tryagain.ll";
     var t = File.ReadAllText(irPath);
     Console.WriteLine(irPath);
 
@@ -122,6 +122,7 @@ if (dbgCode)
 
         // Note: Need to update this path on different samples
         var vmpPath = @"C:\Users\user\Downloads\PRIV_BINARIES\vmp3_private_tlb.vmp.exe";
+        vmpPath = @"C:\Users\user\Downloads\PRIV_BINARIES\vmp35_private_tlb\virt.exe";
         var vmpBin = WindowsBinary.From(vmpPath);
         var vmpDna = new Dna.Dna(vmpBin);
 
@@ -289,7 +290,7 @@ if (useVmp)
     //Console.WriteLine($"Successfully lifted VM. Found exit targets: {String.Join(" ", exitTargets.Select(x => x.ToString("X")))}");
 
     Debugger.Break();
-    //VmpContextRemovalPass.Run(devirtedFunc);
+    VmpContextRemovalPass.Run(devirtedFunc);
 
     
 

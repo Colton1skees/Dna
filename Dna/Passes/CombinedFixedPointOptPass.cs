@@ -781,7 +781,7 @@ namespace Dna.Passes
             */
 
 
-
+            var kind = Classify(loadBaseAndOffset);
             while (true)
             {
                 // Locate the first memory write *before* our current definition that may clobber the current definition.
@@ -825,6 +825,9 @@ namespace Dna.Passes
                     if (ignore)
                         continue;
 
+                    // If we are trying to resolve the vctx, just ignore base mismatches. The vctx shoudl never be used indirectly
+                    if (kind == PtrKind.Vctx)
+                        continue;
 
                     break;
                 }
@@ -1039,10 +1042,51 @@ namespace Dna.Passes
                 return peephole;
             }
 
-    
-
             return null;
         }
+
+        public enum PtrKind
+        {
+            Unk,
+            // Virtual context
+            Vctx,
+        }
+
+        public enum AliasKind
+        {
+            Unk,
+            Must,
+            NoAlias,
+        }
+
+        public PtrKind Classify(BaseWithOffset baseWithOffset)
+        {
+            return PtrKind.Unk;
+            if (baseWithOffset.Base.Kind == LLVMValueKind.LLVMArgumentValueKind && baseWithOffset.Base == function.GetParam(0))
+            {
+                //if ((long)baseWithOffset.Offset == -12582920)
+                //    Debugger.Break();
+
+
+                //var inbounds = (long)baseWithOffset.Offset >= 0 && baseWithOffset
+
+                var offset = (long)baseWithOffset.Offset;
+
+
+                var inbounds = offset >= -12583064 && offset <= -12582864;
+                if (inbounds)
+                    return PtrKind.Vctx;
+
+                //var inbounds = (long)baseWithOffset.Offset >= -12583064 && (long)baseWithOffset.Offset <= -12582912;
+                //if (inbounds)
+                //   return PtrKind.Vctx;
+
+                return PtrKind.Unk;
+            }
+
+            return PtrKind.Unk;
+        }
+       
 
         // Get a list of indices for each load byte that has not yet been accounted for.
         private IReadOnlyList<long> GetUnhandledLoadIndices(long storeStart, long storeEnd, StoreOffsetMapping handledBytesToValue)

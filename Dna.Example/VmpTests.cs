@@ -25,7 +25,8 @@ namespace Dna.Example
 
             string name = "";
             name = "des_encrypt_main"; // works
-            name = "aes_target_function";
+            name = "aes_target_function"; // works at least for the first massive stub..
+            name = "rc4_target_function"; // breaking somewhere
             var vmpAddr = test.Funcs.Single(x => x.Name == name).Addr;
 
             var vmpCtx = LLVMContextRef.Global;
@@ -94,7 +95,7 @@ namespace Dna.Example
                     new("nested_simple_loop_32", 0x140003FE0),
                     new("nested_simple_loop_64", 0x140004350),
                     new("rc4_main", 0x1400034E0),
-                    new("rc4_target_function", 0x1400031F0),
+                    new("rc4_target_function", 0x140003226),
                     new("sha1_main", 0x140003850),
                     new("sha1_target_function", 0x140003620),
                     new("simple_loop_32", 0x140003B20),
