@@ -38,6 +38,7 @@ using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.Linq;
+using System.Net.NetworkInformation;
 using System.Numerics;
 using System.Reflection;
 using System.Reflection.Metadata;
@@ -84,7 +85,7 @@ namespace Dna.BinaryTranslator.VMProtect.Rewrite
     }
 
 
-    public record HandlerData(RemillRegister Vip, RemillRegister Vkey, RemillRegister ImgBaseReg, bool hasVkeyStackSlot = false);
+    public record HandlerData(RemillRegister Vip, RemillRegister Vkey, RemillRegister ImgBaseReg, bool hasVkeyStackSlot = false, RemillRegister VspRegister = null);
 
     public class VmpFunctionExplorer
     {
@@ -258,12 +259,13 @@ namespace Dna.BinaryTranslator.VMProtect.Rewrite
             var stateStruct2 = new ParameterizedStateStructure(arch, ctx, false, true, false);
             var stateStruct = stateStruct2;
             RemillRegister bytecodeRegister = handlerLifter.GetVmenterBytecodeRegister(stateStruct2, handlerLifter.LiftHandler(funcRip, true));
+            RemillRegister vspReg = handlerLifter.GetVmenterVspRegister(stateStruct2, handlerLifter.LiftHandler(funcRip, true));
             Dictionary<VmHandler, RemillRegister> handlerVips = new();
             Dictionary<ulong, HandlerData> handlerRipToRegisters = new();
 
 
             Console.WriteLine($"TODO: Stop passing bytecoderegister as vkey for first handler");
-            handlerRipToRegisters[handlers.First().NativeRip] = new HandlerData(bytecodeRegister, bytecodeRegister, bytecodeRegister);
+            handlerRipToRegisters[handlers.First().NativeRip] = new HandlerData(bytecodeRegister, bytecodeRegister, bytecodeRegister, false, vspReg);
             handlerVips[handlers.First()] = bytecodeRegister;
 
             bool optHeavy = false;
@@ -730,14 +732,15 @@ namespace Dna.BinaryTranslator.VMProtect.Rewrite
             var jmpFrom = handlerLifter.LiftHandler(prevRip, entryHandler.BytecodeRip == bytecodeAddr);
             var targets = outgoingHandlers.Select(x => (x, handlerLifter.LiftHandler(x, x == entryHandler.BytecodeRip))).ToList();
 
-            HashSet<(RemillRegister, RemillRegister, RemillRegister)> registers = new();
+            HashSet<(RemillRegister, RemillRegister, RemillRegister, RemillRegister)> registers = new();
             bool hasStackKey = false;
             foreach (var (rip, t) in targets)
             {
                 var existingRegister = handlerRipToRegister[prevRip].Vip;
+                var existingVsp = handlerRipToRegister[prevRip].VspRegister;
                 if (HandlerLifter.IsVmexit(HandlerLifter.DisHandler(dna, rip)))
                 {
-                    registers.Add(new(existingRegister, existingRegister, existingRegister));
+                    registers.Add(new(existingRegister, existingRegister, existingRegister, existingVsp));
                     continue;
                 }
 
@@ -745,10 +748,13 @@ namespace Dna.BinaryTranslator.VMProtect.Rewrite
                 var vip = GetVipByUsage(rip, t, stateStruct);
 
 
+                var cfg = HandlerLifter.DisHandler(dna, prevRip);
+                var vsp = handlerLifter.GetVspRegister(cfg, stateStruct2, jmpFrom, prevRip == entryHandler.BytecodeRip, existingVsp);
+
                 //if (vip == null)
                //     vip = existingRegister;
 
-                var otherVip = handlerLifter.GetBytecodeRegister(HandlerLifter.DisHandler(dna, prevRip), stateStruct2, jmpFrom, prevRip == entryHandler.BytecodeRip, existingRegister);
+                var otherVip = handlerLifter.GetBytecodeRegister(cfg, stateStruct2, jmpFrom, prevRip == entryHandler.BytecodeRip, existingRegister);
 
                 RemillRegister vkey = null;
                 if (existingRegister.Name != vip.Name)
@@ -766,7 +772,7 @@ namespace Dna.BinaryTranslator.VMProtect.Rewrite
 
 
                 var imagebaseReg = GetImagebaseRegister(rip, t, stateStruct);
-                registers.Add((vip, vkey, imagebaseReg));
+                registers.Add((vip, vkey, imagebaseReg, vsp));
             }
 
             Debug.Assert(registers.Count == 1);
@@ -2050,6 +2056,56 @@ namespace Dna.BinaryTranslator.VMProtect.Rewrite
 
         }
 
+        public RemillRegister GetVspRegister(ControlFlowGraph<Instruction> cfg, ParameterizedStateStructure stateStruct, LLVMValueRef stripped, bool isVmEnter, RemillRegister existingRegister)
+        {
+            return existingRegister;
+
+            var inReg = stateStruct.GetRegParam(existingRegister, stripped);
+            var users = inReg.GetUsers().Where(x => !x.Is(LLVMOpcode.LLVMGetElementPtr)).ToList();
+            
+
+            var stores = users.Where(x => x.Is(LLVMOpcode.LLVMStore)).ToList();
+
+            return null;
+        }
+
+        public RemillRegister GetVmenterVspRegister(ParameterizedStateStructure stateStruct, LLVMValueRef stripped)
+        {
+            List<RemillRegister> cands = new();
+            var rsp = stateStruct.GetRegParam(arch.GetRegisterByName("RSP"), stripped);
+            foreach(var store in stripped.GetInstructions().Where(x => x.InstructionOpcode == LLVMOpcode.LLVMStore))
+            {
+                var tgtReg = store.GetOperand(1);
+                if (!tgtReg.Is(LLVMValueKind.LLVMArgumentValueKind))
+                    continue;
+
+                var add = store.GetOperand(0);
+                if (!add.Is(LLVMOpcode.LLVMAdd, LLVMOpcode.LLVMSub))
+                    continue;
+                var imm = add.GetOperand(1);
+                if (!imm.IsConstant() || imm.ConstIntZExt < 0x1000)
+                    continue;
+                if (add.GetOperand(0) != rsp)
+                    continue;
+
+                var idx = stripped.GetParams().IndexOf(tgtReg);
+                cands.Add(stateStruct.RegisterOutputArgumentIndices.Single(x => x.Value == idx).Key);
+            }
+
+            cands.RemoveAll(x => x.Name == "RSP");
+            return cands.Single();
+        }
+
+        private RemillRegister ParamToReg(ParameterizedStateStructure stateStruct, LLVMValueRef stripped, LLVMValueRef param)
+        {
+            var idx = stripped.GetParams().IndexOf(param);
+            var reg = stateStruct.RegisterArgumentIndices.SingleOrDefault(x => x.Value == idx);
+            if (reg.Key != null)
+                return reg.Key;
+
+            reg = stateStruct.RegisterOutputArgumentIndices.Single(x => x.Value == idx);
+            return reg.Key;
+        }
 
         private bool Matches(LLVMValueRef inReg, LLVMValueRef add)
         {
